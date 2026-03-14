@@ -1,0 +1,159 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // ===============================================================
+    // Assumed Data Model
+    // ===============================================================
+    //
+    // Collection: users
+    // Fields: uid, name, email, role, shopName, createdAt
+    //
+    // Collection: clients
+    // Fields: id, name, phone, email, notes, ownerUid, createdAt
+    //
+    // Collection: services
+    // Fields: id, name, price, duration, ownerUid
+    //
+    // Collection: appointments
+    // Fields: id, clientId, clientName, serviceId, serviceName, barberId, barberName, date, status, price, ownerUid
+    //
+    // Collection: transactions
+    // Fields: id, type, amount, description, date, category, ownerUid
+    //
+    // ===============================================================
+
+    // Helper Functions
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+
+    function isOwner(ownerUid) {
+      return isAuthenticated() && request.auth.uid == ownerUid;
+    }
+
+    function isDocOwner() {
+      return isAuthenticated() && request.auth.uid == resource.data.ownerUid;
+    }
+
+    function isAdmin() {
+      return isAuthenticated() && 
+        (request.auth.token.email == "renatadouglas739@gmail.com" && request.auth.token.email_verified == true);
+    }
+
+    function isSuperAdmin() {
+      return isAdmin();
+    }
+
+    function isValidUser(data) {
+      return data.keys().hasAll(['uid', 'name', 'email', 'role']) &&
+             data.uid is string && data.name is string && data.email is string &&
+             data.role in ['admin', 'barber'];
+    }
+
+    function isValidClient(data) {
+      return data.keys().hasAll(['name', 'ownerUid']) &&
+             data.name is string && data.name.size() > 0 && data.name.size() < 100 &&
+             data.ownerUid == request.auth.uid;
+    }
+
+    function isValidService(data) {
+      return data.keys().hasAll(['name', 'price', 'duration', 'ownerUid']) &&
+             data.name is string && data.price is number && data.duration is int &&
+             data.ownerUid == request.auth.uid;
+    }
+
+    function isValidAppointment(data) {
+      return data.keys().hasAll(['clientId', 'serviceId', 'date', 'status', 'ownerUid']) &&
+             data.status in ['scheduled', 'completed', 'cancelled'] &&
+             data.ownerUid == request.auth.uid;
+    }
+
+    function isValidTransaction(data) {
+      return data.keys().hasAll(['type', 'amount', 'date', 'ownerUid']) &&
+             data.type in ['income', 'expense'] && data.amount is number &&
+             data.ownerUid == request.auth.uid;
+    }
+
+    // Rules
+    match /users/{uid} {
+      allow read: if isAuthenticated() && (request.auth.uid == uid || isSuperAdmin());
+      allow create: if isAuthenticated() && request.auth.uid == uid && isValidUser(request.resource.data);
+      allow update: if isAuthenticated() && (request.auth.uid == uid || isSuperAdmin()) && isValidUser(request.resource.data);
+    }
+
+    match /clients/{clientId} {
+      allow read: if isOwner(resource.data.ownerUid);
+      allow create: if isAuthenticated() && isValidClient(request.resource.data);
+      allow update: if isOwner(resource.data.ownerUid) && isValidClient(request.resource.data);
+      allow delete: if isOwner(resource.data.ownerUid);
+    }
+
+    match /services/{serviceId} {
+      allow read: if isOwner(resource.data.ownerUid);
+      allow create: if isAuthenticated() && isValidService(request.resource.data);
+      allow update: if isOwner(resource.data.ownerUid) && isValidService(request.resource.data);
+      allow delete: if isOwner(resource.data.ownerUid);
+    }
+
+    match /appointments/{appointmentId} {
+      allow read: if isOwner(resource.data.ownerUid);
+      allow create: if isAuthenticated() && isValidAppointment(request.resource.data);
+      allow update: if isOwner(resource.data.ownerUid) && isValidAppointment(request.resource.data);
+      allow delete: if isOwner(resource.data.ownerUid);
+    }
+
+    match /transactions/{transactionId} {
+      allow read: if isOwner(resource.data.ownerUid);
+      allow create: if isAuthenticated() && isValidTransaction(request.resource.data);
+      allow update: if isOwner(resource.data.ownerUid) && isValidTransaction(request.resource.data);
+      allow delete: if isOwner(resource.data.ownerUid);
+    }
+
+    match /staff/{staffId} {
+      allow read: if isOwner(resource.data.ownerUid);
+      allow create: if isAuthenticated() && request.resource.data.ownerUid == request.auth.uid;
+      allow update: if isOwner(resource.data.ownerUid);
+      allow delete: if isOwner(resource.data.ownerUid);
+    }
+
+    match /settings/{uid} {
+      allow read: if isAuthenticated() && request.auth.uid == uid;
+      allow write: if isAuthenticated() && request.auth.uid == uid;
+    }
+
+    match /holidays/{holidayId} {
+      allow read: if isOwner(resource.data.ownerUid);
+      allow create: if isAuthenticated() && request.resource.data.ownerUid == request.auth.uid;
+      allow update: if isOwner(resource.data.ownerUid);
+      allow delete: if isOwner(resource.data.ownerUid);
+    }
+
+    match /products/{productId} {
+      allow read: if isOwner(resource.data.ownerUid);
+      allow create: if isAuthenticated() && request.resource.data.ownerUid == request.auth.uid;
+      allow update: if isOwner(resource.data.ownerUid);
+      allow delete: if isOwner(resource.data.ownerUid);
+    }
+
+    match /plans/{planId} {
+      allow read: if true; // Publicly readable
+      allow write: if isAdmin();
+    }
+
+    match /subscriptions/{uid} {
+      allow read: if isAuthenticated() && (request.auth.uid == uid || isSuperAdmin());
+      allow write: if isSuperAdmin(); // Only system/admin can update sub status
+    }
+
+    match /whatsapp_messages/{messageId} {
+      allow read: if isOwner(resource.data.ownerUid);
+      allow create: if isAuthenticated() && request.resource.data.ownerUid == request.auth.uid;
+      allow delete: if isOwner(resource.data.ownerUid);
+    }
+
+    match /whatsapp_settings/{uid} {
+      allow read: if isAuthenticated() && request.auth.uid == uid;
+      allow write: if isAuthenticated() && request.auth.uid == uid;
+    }
+  }
+}

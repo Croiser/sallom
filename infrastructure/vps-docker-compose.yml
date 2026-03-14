@@ -1,0 +1,70 @@
+version: '3.8'
+
+services:
+  # Main Application (Node + Vite)
+  app:
+    build: .
+    container_name: barbeiro_app
+    restart: always
+    environment:
+      - DATABASE_URL=postgresql://barbeiro:barbeiro_pass@barbeiro_db:5432/barbeiro_db?sslmode=disable
+      - NODE_ENV=production
+    ports:
+      - "3000:3000"
+    depends_on:
+      - barbeiro_db
+      - evolution_api
+    networks:
+      - barbeiro_network
+
+  # Isolated Database for this project
+  barbeiro_db:
+    image: postgres:15-alpine
+    container_name: barbeiro_db
+    restart: always
+    environment:
+      - POSTGRES_USER=barbeiro
+      - POSTGRES_PASSWORD=barbeiro_pass
+      - POSTGRES_DB=barbeiro_db
+    volumes:
+      - barbeiro_db_data:/var/lib/postgresql/data
+    networks:
+      - barbeiro_network
+
+  # Evolution API (Isolated for this project)
+  evolution_api:
+    image: atendare/evolution-api:latest
+    container_name: barbeiro_evolution
+    restart: always
+    environment:
+      - SERVER_URL=http://barbeiro_evolution:8080 # Internal URL for other containers
+      - DOCKER_ENV=true
+      - AUTHENTICATION_TYPE=apikey
+      - AUTHENTICATION_API_KEY=barbeiro_key_123
+      - DATABASE_ENABLED=true
+      - DATABASE_CONNECTION_URI=postgresql://barbeiro:barbeiro_pass@barbeiro_db:5432/barbeiro_evolution_db?sslmode=disable
+      - DATABASE_CONNECTION_CLIENT_NAME=barbeiro_evolution
+      - CACHE_REDIS_ENABLED=true
+      - CACHE_REDIS_URI=redis://barbeiro_redis:6379
+      - CACHE_REDIS_PREFIX_KEY=barbeiro_evolution
+    ports:
+      - "8081:8080" # Exposed on 8081 to avoid conflict with existing services
+    depends_on:
+      - barbeiro_db
+      - barbeiro_redis
+    networks:
+      - barbeiro_network
+
+  barbeiro_redis:
+    image: redis:7-alpine
+    container_name: barbeiro_redis
+    restart: always
+    networks:
+      - barbeiro_network
+
+networks:
+  barbeiro_network:
+    driver: bridge
+
+volumes:
+  barbeiro_db_data:
