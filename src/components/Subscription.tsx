@@ -7,28 +7,17 @@ import {
   ShieldCheck,
   ArrowRight
 } from 'lucide-react';
+import { useSubscription } from '../hooks/useSubscription';
 
 export default function Subscription() {
-  const plans = [
-    {
-      name: 'Básico',
-      price: '49,90',
-      features: ['Até 2 profissionais', 'Agendamento online', 'Gestão de clientes', 'Financeiro básico'],
-      recommended: false
-    },
-    {
-      name: 'Pro',
-      price: '89,90',
-      features: ['Profissionais ilimitados', 'WhatsApp Automático', 'Relatórios avançados', 'Suporte prioritário'],
-      recommended: true
-    },
-    {
-      name: 'Premium',
-      price: '149,90',
-      features: ['Tudo do Pro', 'App personalizado (PWA)', 'Marketing automatizado', 'Consultoria de gestão'],
-      recommended: false
-    }
-  ];
+  const { plans, subscription, loading } = useSubscription();
+
+  if (loading) return <div className="flex items-center justify-center h-64">Carregando planos...</div>;
+
+  const currentPlan = plans.find(p => p.id === subscription?.planId);
+  const daysRemaining = subscription?.currentPeriodEnd 
+    ? Math.ceil((new Date(subscription.currentPeriodEnd).getTime() - new Date().getTime()) / (1000 * 60 * 60 * 24))
+    : 0;
 
   return (
     <div className="space-y-10 pb-20">
@@ -38,16 +27,21 @@ export default function Subscription() {
           <div className="space-y-4">
             <div className="inline-flex items-center gap-2 px-3 py-1 bg-rose-500/20 text-rose-500 rounded-full text-xs font-bold uppercase tracking-wider">
               <Zap size={14} />
-              Período de Teste
+              {subscription?.status === 'active' ? 'Assinatura Ativa' : 'Atenção'}
             </div>
-            <h2 className="text-3xl font-bold">Você tem 7 dias restantes</h2>
+            <h2 className="text-3xl font-bold">
+              {daysRemaining > 0 
+                ? `Você tem ${daysRemaining} dias restantes` 
+                : 'Sua assinatura expirou'}
+            </h2>
             <p className="text-zinc-400 max-w-md">
-              Aproveite todos os recursos do plano Pro durante seu período de teste. 
-              Ative sua assinatura agora para não perder o acesso.
+              {subscription?.status === 'active' 
+                ? `Você está no plano ${currentPlan?.name || 'Básico'}. Mantenha sua assinatura em dia para continuar usando todos os recursos.`
+                : 'Sua assinatura precisa de atenção. Ative um plano para continuar usando todos os recursos.'}
             </p>
           </div>
           <button className="bg-rose-500 text-zinc-900 px-8 py-4 rounded-2xl font-bold hover:bg-rose-600 transition-all flex items-center gap-2 group shadow-lg shadow-rose-500/20">
-            Ativar Assinatura
+            {subscription?.status === 'active' ? 'Mudar de Plano' : 'Ativar Assinatura'}
             <ArrowRight size={20} className="group-hover:translate-x-1 transition-transform" />
           </button>
         </div>
@@ -59,52 +53,86 @@ export default function Subscription() {
 
       {/* Plans Grid */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-        {plans.map((plan) => (
-          <div 
-            key={plan.name}
-            className={`
-              relative bg-white rounded-3xl p-8 border transition-all duration-300
-              ${plan.recommended 
-                ? 'border-rose-500 shadow-xl shadow-rose-500/5 scale-105 z-10' 
-                : 'border-zinc-200 hover:border-zinc-300'}
-            `}
-          >
-            {plan.recommended && (
-              <div className="absolute -top-4 left-1/2 -translate-x-1/2 bg-rose-500 text-zinc-900 px-4 py-1 rounded-full text-xs font-bold uppercase tracking-wider">
-                Recomendado
-              </div>
-            )}
-            
-            <div className="space-y-6">
-              <div>
-                <h3 className="text-xl font-bold text-zinc-900">{plan.name}</h3>
-                <div className="mt-4 flex items-baseline gap-1">
-                  <span className="text-sm font-medium text-zinc-500">R$</span>
-                  <span className="text-4xl font-bold text-zinc-900">{plan.price}</span>
-                  <span className="text-sm font-medium text-zinc-500">/mês</span>
+        {plans.map((plan) => {
+          const isCurrent = subscription?.planId === plan.id;
+          return (
+            <div 
+              key={plan.id}
+              className={`
+                relative bg-white rounded-3xl p-8 border transition-all duration-300
+                ${plan.slug === 'silver' 
+                  ? 'border-rose-500 shadow-xl shadow-rose-500/5 scale-105 z-10' 
+                  : 'border-zinc-200 hover:border-zinc-300'}
+              `}
+            >
+              {plan.slug === 'silver' && (
+                <div className="absolute -top-4 left-1/2 -translate-x-1/2 bg-rose-500 text-zinc-900 px-4 py-1 rounded-full text-xs font-bold uppercase tracking-wider">
+                  Recomendado
                 </div>
-              </div>
-
-              <div className="space-y-4">
-                {plan.features.map((feature) => (
-                  <div key={feature} className="flex items-center gap-3 text-zinc-600">
-                    <CheckCircle2 size={18} className="text-emerald-500 flex-shrink-0" />
-                    <span className="text-sm">{feature}</span>
+              )}
+              
+              <div className="space-y-6">
+                <div>
+                  <h3 className="text-xl font-bold text-zinc-900">{plan.name}</h3>
+                  <div className="mt-4 flex items-baseline gap-1">
+                    <span className="text-sm font-medium text-zinc-500">R$</span>
+                    <span className="text-4xl font-bold text-zinc-900">{plan.priceMonthly.toFixed(2)}</span>
+                    <span className="text-sm font-medium text-zinc-500">/mês</span>
                   </div>
-                ))}
-              </div>
+                </div>
 
-              <button className={`
-                w-full py-4 rounded-2xl font-bold transition-all
-                ${plan.recommended 
-                  ? 'bg-rose-500 text-zinc-900 hover:bg-rose-600' 
-                  : 'bg-zinc-100 text-zinc-900 hover:bg-zinc-200'}
-              `}>
-                Escolher Plano
-              </button>
+                <div className="space-y-4">
+                  <div className="flex items-center gap-3 text-zinc-600">
+                    <CheckCircle2 size={18} className="text-emerald-500 flex-shrink-0" />
+                    <span className="text-sm">
+                      {plan.features.staffLimit === null ? 'Profissionais Ilimitados' : `Até ${plan.features.staffLimit} Profissional${plan.features.staffLimit > 1 ? 'ais' : ''}`}
+                    </span>
+                  </div>
+                  <div className="flex items-center gap-3 text-zinc-600">
+                    <CheckCircle2 size={18} className="text-emerald-500 flex-shrink-0" />
+                    <span className="text-sm">Agendamento online</span>
+                  </div>
+                  <div className="flex items-center gap-3 text-zinc-600">
+                    <CheckCircle2 size={18} className="text-emerald-500 flex-shrink-0" />
+                    <span className="text-sm">Gestão de clientes</span>
+                  </div>
+                  {plan.features.inventory && (
+                    <div className="flex items-center gap-3 text-zinc-600">
+                      <CheckCircle2 size={18} className="text-emerald-500 flex-shrink-0" />
+                      <span className="text-sm">Gestão de Estoque</span>
+                    </div>
+                  )}
+                  {plan.features.reports && (
+                    <div className="flex items-center gap-3 text-zinc-600">
+                      <CheckCircle2 size={18} className="text-emerald-500 flex-shrink-0" />
+                      <span className="text-sm">Relatórios Avançados</span>
+                    </div>
+                  )}
+                  {plan.features.whatsapp && (
+                    <div className="flex items-center gap-3 text-zinc-600">
+                      <CheckCircle2 size={18} className="text-emerald-500 flex-shrink-0" />
+                      <span className="text-sm">WhatsApp Automático</span>
+                    </div>
+                  )}
+                </div>
+
+                <button 
+                  disabled={isCurrent}
+                  className={`
+                    w-full py-4 rounded-2xl font-bold transition-all
+                    ${isCurrent
+                      ? 'bg-zinc-100 text-zinc-400 cursor-default'
+                      : plan.slug === 'silver' 
+                        ? 'bg-rose-500 text-zinc-900 hover:bg-rose-600' 
+                        : 'bg-zinc-100 text-zinc-900 hover:bg-zinc-200'}
+                  `}
+                >
+                  {isCurrent ? 'Plano Atual' : 'Escolher Plano'}
+                </button>
+              </div>
             </div>
-          </div>
-        ))}
+          );
+        })}
       </div>
 
       {/* Security Info */}

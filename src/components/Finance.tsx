@@ -12,9 +12,11 @@ import {
   CheckCircle2
 } from 'lucide-react';
 import { Transaction, Appointment, Product } from '../types';
-import { apiFetch } from '../lib/api';
+import { useAuth } from '../contexts/AuthContext';
+import { api } from '../services/api';
 
 export default function Finance() {
+  const { user } = useAuth();
   const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [todayAppointments, setTodayAppointments] = useState<Appointment[]>([]);
   const [products, setProducts] = useState<Product[]>([]);
@@ -32,21 +34,20 @@ export default function Finance() {
 
   const fetchData = async () => {
     try {
-      const [transactionsData, appointmentsData, productsData] = await Promise.all([
-        apiFetch('/transactions'),
-        apiFetch('/appointments'),
-        apiFetch('/products')
+      const [transData, appsData, productsData] = await Promise.all([
+        api.get('/transactions'),
+        api.get('/appointments'),
+        api.get('/products')
       ]);
-
-      setTransactions(transactionsData);
-      setProducts(productsData || []);
+      setTransactions(transData);
+      setProducts(productsData);
 
       const today = new Date();
       today.setHours(0, 0, 0, 0);
       const tomorrow = new Date(today);
       tomorrow.setDate(tomorrow.getDate() + 1);
 
-      const todayApps = appointmentsData.filter((app: Appointment) => {
+      const todayApps = appsData.filter((app: any) => {
         const appDate = new Date(app.date);
         return appDate >= today && appDate < tomorrow && app.status === 'scheduled';
       });
@@ -57,22 +58,21 @@ export default function Finance() {
   };
 
   useEffect(() => {
-    fetchData();
-  }, []);
+    if (user) {
+      fetchData();
+    }
+  }, [user]);
 
   const handleCreate = async (e: React.FormEvent) => {
     e.preventDefault();
 
     try {
-      await apiFetch('/transactions', {
-        method: 'POST',
-        body: JSON.stringify({
-          type,
-          amount: parseFloat(amount),
-          description,
-          category,
-          date: new Date(date).toISOString()
-        })
+      await api.post('/transactions', {
+        type,
+        amount: parseFloat(amount),
+        description,
+        category,
+        date: new Date(date).toISOString()
       });
 
       setIsModalOpen(false);
@@ -89,15 +89,12 @@ export default function Finance() {
     e.preventDefault();
 
     try {
-      await apiFetch('/transactions', {
-        method: 'POST',
-        body: JSON.stringify({
-          type: 'income',
-          amount: parseFloat(amount),
-          description: `Venda Avulsa: ${description}`,
-          category: 'Vendas',
-          date: new Date().toISOString()
-        })
+      await api.post('/transactions', {
+        type: 'income',
+        amount: parseFloat(amount),
+        description: `Venda Avulsa: ${description}`,
+        category: 'Vendas',
+        date: new Date().toISOString()
       });
 
       setIsSaleModalOpen(false);
@@ -111,22 +108,7 @@ export default function Finance() {
 
   const completeAppointment = async (app: Appointment) => {
     try {
-      await apiFetch(`/appointments/${app.id}/status`, {
-        method: 'PUT',
-        body: JSON.stringify({ status: 'completed' })
-      });
-
-      await apiFetch('/transactions', {
-        method: 'POST',
-        body: JSON.stringify({
-          type: 'income',
-          amount: app.price,
-          description: `Serviço: ${app.serviceName} - ${app.clientName}`,
-          date: new Date().toISOString(),
-          category: 'Serviços'
-        })
-      });
-
+      await api.put(`/appointments/${app.id}/status`, { status: 'completed' });
       fetchData();
     } catch (err) {
       console.error('Failed to complete appointment:', err);
@@ -136,7 +118,7 @@ export default function Finance() {
   const handleDelete = async (id: string) => {
     if (confirm('Deseja realmente excluir este registro?')) {
       try {
-        await apiFetch(`/transactions/${id}`, { method: 'DELETE' });
+        await api.delete(`/transactions/${id}`);
         fetchData();
       } catch (err) {
         console.error('Failed to delete transaction:', err);

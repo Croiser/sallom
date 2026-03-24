@@ -19,10 +19,20 @@ import {
   Database,
   Zap,
   Save,
-  Trash2
+  Trash2,
+  LifeBuoy,
+  Phone,
+  Mail,
+  Calendar as CalendarIcon,
+  Scissors,
+  ExternalLink,
+  ChevronRight,
+  X
 } from 'lucide-react';
-import { motion, AnimatePresence } from 'framer-motion';
+import { motion, AnimatePresence } from 'motion/react';
 import { Plan, Subscription, UserProfile } from '../types';
+import { api } from '../services/api';
+import { useAuth } from '../contexts/AuthContext';
 import { 
   BarChart, 
   Bar, 
@@ -37,9 +47,9 @@ import {
   Pie,
   Cell
 } from 'recharts';
-import { apiFetch } from '../lib/api';
 
 export default function SuperAdmin() {
+  const { user } = useAuth();
   const [stats, setStats] = useState({
     totalUsers: 0,
     activeSubscriptions: 0,
@@ -51,8 +61,11 @@ export default function SuperAdmin() {
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
   const [editingPlan, setEditingPlan] = useState<Plan | null>(null);
+  const [selectedTenant, setSelectedTenant] = useState<UserProfile | null>(null);
+  const [tenantUsage, setTenantUsage] = useState<{ appointments: number, staff: number } | null>(null);
+  const [isEditingTenant, setIsEditingTenant] = useState(false);
   const [apiStatus, setApiStatus] = useState({
-    firebase: 'online',
+    database: 'online',
     asaas: 'online',
     evolution: 'online',
     webhooks: 'online'
@@ -60,41 +73,74 @@ export default function SuperAdmin() {
   const [isSuperAdmin, setIsSuperAdmin] = useState(false);
 
   useEffect(() => {
-    const fetchAdminData = async () => {
+    if (!user) return;
+    setIsSuperAdmin(user.role === 'admin');
+    setLoading(false);
+  }, [user]);
+
+  useEffect(() => {
+    if (!isSuperAdmin) return;
+
+    const fetchData = async () => {
       try {
-        // First check if user is super admin by trying to fetch stats
-        const statsData = await apiFetch('/admin/stats');
-        setIsSuperAdmin(true);
-        setStats(statsData);
-
-        const [plansData, usersData] = await Promise.all([
-          apiFetch('/admin/plans'),
-          apiFetch('/admin/users')
+        const [statsData, tenantsData, plansData] = await Promise.all([
+          api.get('/superadmin/stats'),
+          api.get('/superadmin/tenants'),
+          api.get('/superadmin/plans')
         ]);
-
+        setStats(statsData);
+        setTenants(tenantsData);
         setPlans(plansData);
-        setTenants(usersData);
-      } catch (error: any) {
-        if (error.message === 'Forbidden') {
-          setIsSuperAdmin(false);
-        }
-        console.error("Error fetching superadmin data:", error);
-      } finally {
-        setLoading(false);
+      } catch (error) {
+        console.error('Error fetching superadmin data:', error);
       }
     };
 
-    fetchAdminData();
-  }, []);
+    fetchData();
+  }, [isSuperAdmin]);
+
+  const fetchTenantUsage = async (userId: string) => {
+    try {
+      const usage = await api.get(`/superadmin/tenant-usage/${userId}`);
+      setTenantUsage(usage);
+    } catch (error) {
+      console.error("Error fetching tenant usage:", error);
+      setTenantUsage({ appointments: 0, staff: 0 });
+    }
+  };
+
+  const handleOpenSupport = (tenant: UserProfile) => {
+    setSelectedTenant(tenant);
+    setIsEditingTenant(false);
+    fetchTenantUsage(tenant.id!);
+  };
+
+  const handleUpdateTenant = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!selectedTenant || !selectedTenant.id) return;
+    try {
+      const { id, ...data } = selectedTenant;
+      await api.put(`/superadmin/tenants/${id}`, data);
+      
+      // Update local state
+      setTenants(prev => prev.map(t => t.id === id ? { ...t, ...data } : t));
+      
+      setIsEditingTenant(false);
+      alert('Dados do salão atualizados com sucesso!');
+    } catch (error: any) {
+      console.error("Error updating tenant:", error);
+      alert(`Erro ao atualizar: ${error.message}`);
+    }
+  };
 
   const handleSuspendAccount = async (userId: string, currentStatus: string) => {
     const newStatus = currentStatus === 'suspended' ? 'active' : 'suspended';
     try {
-      await apiFetch(`/admin/users/${userId}/status`, {
-        method: 'PUT',
-        body: JSON.stringify({ status: newStatus })
-      });
-      setTenants(tenants.map(t => t.id === userId ? { ...t, status: newStatus } : t));
+      await api.put(`/superadmin/tenants/${userId}`, { status: newStatus });
+      setTenants(prev => prev.map(t => t.id === userId ? { ...t, status: newStatus } : t));
+      if (selectedTenant?.id === userId) {
+        setSelectedTenant(prev => prev ? ({ ...prev, status: newStatus }) : null);
+      }
     } catch (error) {
       console.error("Error updating user status:", error);
     }
@@ -102,11 +148,11 @@ export default function SuperAdmin() {
 
   const handleUpdateUserPlan = async (userId: string, planId: string) => {
     try {
-      await apiFetch(`/admin/users/${userId}/plan`, {
-        method: 'PUT',
-        body: JSON.stringify({ planId })
-      });
-      setTenants(tenants.map(t => t.id === userId ? { ...t, planId } : t));
+      await api.put(`/superadmin/tenants/${userId}`, { planId });
+      setTenants(prev => prev.map(t => t.id === userId ? { ...t, planId } : t));
+      if (selectedTenant?.id === userId) {
+        setSelectedTenant(prev => prev ? ({ ...prev, planId }) : null);
+      }
       alert('Plano atualizado com sucesso!');
     } catch (error: any) {
       console.error("Error updating user plan:", error);
@@ -114,31 +160,13 @@ export default function SuperAdmin() {
     }
   };
 
-  const handleUpdatePlanPrice = async (planId: string, type: 'monthly' | 'yearly', value: number) => {
-    try {
-      const plan = plans.find(p => p.id === planId);
-      if (!plan) return;
-      const updatedPlan = { ...plan, [type === 'monthly' ? 'priceMonthly' : 'priceYearly']: value };
-      
-      await apiFetch(`/admin/plans/${planId}`, {
-        method: 'PUT',
-        body: JSON.stringify(updatedPlan)
-      });
-      setPlans(plans.map(p => p.id === planId ? updatedPlan : p));
-    } catch (error) {
-      console.error("Error updating plan price:", error);
-    }
-  };
-
   const handleSavePlan = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!editingPlan) return;
     try {
-      await apiFetch(`/admin/plans/${editingPlan.id}`, {
-        method: 'PUT',
-        body: JSON.stringify(editingPlan)
-      });
-      setPlans(plans.map(p => p.id === editingPlan.id ? editingPlan : p));
+      const { id, ...data } = editingPlan;
+      await api.put(`/superadmin/plans/${id}`, data);
+      setPlans(prev => prev.map(p => p.id === id ? { ...p, ...data } : p));
       setEditingPlan(null);
     } catch (error) {
       console.error("Error saving plan:", error);
@@ -178,7 +206,7 @@ export default function SuperAdmin() {
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
           <h1 className="text-3xl font-bold tracking-tight">Super Admin Dashboard</h1>
-          <p className="text-zinc-400">Gestão centralizada do SaaS <span className="text-rose-500 font-bold italic tracking-tight">Salão Pro Manager</span></p>
+          <p className="text-zinc-400">Gestão centralizada do SaaS <span className="text-rose-500 font-bold italic tracking-tight uppercase">Dodile</span></p>
         </div>
         <div className="flex items-center gap-3">
           <div className="px-4 py-2 bg-zinc-900 border border-zinc-800 rounded-xl flex items-center gap-2">
@@ -303,7 +331,7 @@ export default function SuperAdmin() {
             Monitoramento de API
           </h3>
           <div className="space-y-6">
-            <StatusItem label="Firebase Firestore" status={apiStatus.firebase} icon={<Database size={18} />} />
+            <StatusItem label="Database PostgreSQL" status={apiStatus.database} icon={<Database size={18} />} />
             <StatusItem label="Asaas Payment API" status={apiStatus.asaas} icon={<CreditCard size={18} />} />
             <StatusItem label="Evolution WhatsApp API" status={apiStatus.evolution} icon={<Globe size={18} />} />
             <StatusItem label="Webhooks System" status={apiStatus.webhooks} icon={<Zap size={18} />} />
@@ -470,6 +498,204 @@ export default function SuperAdmin() {
         )}
       </AnimatePresence>
 
+      {/* Support & Details Modal */}
+      <AnimatePresence>
+        {selectedTenant && (
+          <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              onClick={() => setSelectedTenant(null)}
+              className="absolute inset-0 bg-black/80 backdrop-blur-sm"
+            />
+            <motion.div
+              initial={{ opacity: 0, scale: 0.95, y: 20 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.95, y: 20 }}
+              className="relative w-full max-w-3xl bg-zinc-900 border border-zinc-800 rounded-3xl shadow-2xl overflow-hidden"
+            >
+              <div className="p-8 border-b border-zinc-800 flex items-center justify-between bg-zinc-900/50">
+                <div>
+                  <h3 className="text-xl font-bold flex items-center gap-2">
+                    <LifeBuoy size={24} className="text-rose-500" />
+                    Central de Suporte: {selectedTenant.shopName}
+                  </h3>
+                  <p className="text-sm text-zinc-500">ID: {selectedTenant.id}</p>
+                </div>
+                <button 
+                  onClick={() => setSelectedTenant(null)}
+                  className="p-2 text-zinc-500 hover:text-white hover:bg-zinc-800 rounded-xl transition-all"
+                >
+                  <X size={24} />
+                </button>
+              </div>
+
+              <div className="p-8 grid grid-cols-1 md:grid-cols-3 gap-8">
+                {/* Left Column: Info & Actions */}
+                <div className="md:col-span-2 space-y-8">
+                  {isEditingTenant ? (
+                    <form onSubmit={handleUpdateTenant} className="space-y-4">
+                      <div className="grid grid-cols-2 gap-4">
+                        <div className="space-y-1">
+                          <label className="text-xs font-bold text-zinc-500 uppercase">Nome do Salão</label>
+                          <input 
+                            type="text"
+                            value={selectedTenant.shopName}
+                            onChange={e => setSelectedTenant(prev => prev ? ({...prev, shopName: e.target.value}) : null)}
+                            className="w-full bg-zinc-950 border border-zinc-800 rounded-xl px-4 py-2 text-sm focus:border-rose-500 outline-none"
+                          />
+                        </div>
+                        <div className="space-y-1">
+                          <label className="text-xs font-bold text-zinc-500 uppercase">Subdomínio (Slug)</label>
+                          <div className="flex items-center gap-2">
+                            <input 
+                              type="text"
+                              value={selectedTenant.slug || ''}
+                              onChange={e => setSelectedTenant(prev => prev ? ({...prev, slug: e.target.value}) : null)}
+                              className="w-full bg-zinc-950 border border-zinc-800 rounded-xl px-4 py-2 text-sm focus:border-rose-500 outline-none"
+                              placeholder="ex: studio-glow"
+                            />
+                            <span className="text-xs text-zinc-500">.dodile.com.br</span>
+                          </div>
+                        </div>
+                        <div className="space-y-1">
+                          <label className="text-xs font-bold text-zinc-500 uppercase">E-mail</label>
+                          <input 
+                            type="email"
+                            value={selectedTenant.email}
+                            onChange={e => setSelectedTenant(prev => prev ? ({...prev, email: e.target.value}) : null)}
+                            className="w-full bg-zinc-950 border border-zinc-800 rounded-xl px-4 py-2 text-sm focus:border-rose-500 outline-none"
+                          />
+                        </div>
+                        <div className="space-y-1">
+                          <label className="text-xs font-bold text-zinc-500 uppercase">Telefone</label>
+                          <input 
+                            type="text"
+                            value={selectedTenant.phone || ''}
+                            onChange={e => setSelectedTenant(prev => prev ? ({...prev, phone: e.target.value}) : null)}
+                            className="w-full bg-zinc-950 border border-zinc-800 rounded-xl px-4 py-2 text-sm focus:border-rose-500 outline-none"
+                          />
+                        </div>
+                        <div className="space-y-1">
+                          <label className="text-xs font-bold text-zinc-500 uppercase">Proprietário</label>
+                          <input 
+                            type="text"
+                            value={selectedTenant.name || ''}
+                            onChange={e => setSelectedTenant(prev => prev ? ({...prev, name: e.target.value}) : null)}
+                            className="w-full bg-zinc-950 border border-zinc-800 rounded-xl px-4 py-2 text-sm focus:border-rose-500 outline-none"
+                          />
+                        </div>
+                      </div>
+                      <div className="flex gap-2">
+                        <button 
+                          type="submit"
+                          className="bg-rose-500 text-zinc-900 px-6 py-2 rounded-xl font-bold text-sm hover:bg-rose-400 transition-all"
+                        >
+                          Salvar Alterações
+                        </button>
+                        <button 
+                          type="button"
+                          onClick={() => setIsEditingTenant(false)}
+                          className="px-6 py-2 rounded-xl text-zinc-400 hover:text-white hover:bg-zinc-800 font-bold text-sm transition-all"
+                        >
+                          Cancelar
+                        </button>
+                      </div>
+                    </form>
+                  ) : (
+                    <div className="space-y-6">
+                      <div className="grid grid-cols-2 gap-6">
+                        <div className="p-4 bg-zinc-950 rounded-2xl border border-zinc-800">
+                          <p className="text-xs font-bold text-zinc-500 uppercase mb-2">Contato Direto</p>
+                          <div className="space-y-2">
+                            <a href={`mailto:${selectedTenant.email}`} className="flex items-center gap-2 text-sm text-zinc-300 hover:text-rose-500 transition-colors">
+                              <Mail size={16} /> {selectedTenant.email}
+                            </a>
+                            {selectedTenant.phone && (
+                              <a href={`https://wa.me/${selectedTenant.phone.replace(/\D/g, '')}`} target="_blank" rel="noreferrer" className="flex items-center gap-2 text-sm text-zinc-300 hover:text-emerald-500 transition-colors">
+                                <Phone size={16} /> {selectedTenant.phone}
+                              </a>
+                            )}
+                            {selectedTenant.slug && (
+                              <a href={`https://${selectedTenant.slug}.dodile.com.br`} target="_blank" rel="noreferrer" className="flex items-center gap-2 text-sm text-zinc-300 hover:text-rose-500 transition-colors">
+                                <Globe size={16} /> {selectedTenant.slug}.dodile.com.br
+                              </a>
+                            )}
+                          </div>
+                        </div>
+                        <div className="p-4 bg-zinc-950 rounded-2xl border border-zinc-800">
+                          <p className="text-xs font-bold text-zinc-500 uppercase mb-2">Métricas de Uso</p>
+                          <div className="space-y-2">
+                            <div className="flex items-center justify-between text-sm">
+                              <span className="text-zinc-500 flex items-center gap-1"><CalendarIcon size={14} /> Agendamentos:</span>
+                              <span className="font-bold text-white">{tenantUsage?.appointments || 0}</span>
+                            </div>
+                            <div className="flex items-center justify-between text-sm">
+                              <span className="text-zinc-500 flex items-center gap-1"><Scissors size={14} /> Profissionais:</span>
+                              <span className="font-bold text-white">{tenantUsage?.staff || 0}</span>
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+
+                      <div className="flex flex-wrap gap-3">
+                        <button 
+                          onClick={() => setIsEditingTenant(true)}
+                          className="flex items-center gap-2 px-4 py-2 bg-zinc-800 hover:bg-zinc-700 text-white rounded-xl text-sm font-bold transition-all"
+                        >
+                          <Settings size={16} /> Editar Perfil
+                        </button>
+                        <button 
+                          onClick={() => handleSuspendAccount(selectedTenant.id!, selectedTenant.status || 'active')}
+                          className={`flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-bold transition-all ${selectedTenant.status === 'suspended' ? 'bg-emerald-500/10 text-emerald-500 hover:bg-emerald-500/20' : 'bg-rose-500/10 text-rose-500 hover:bg-rose-500/20'}`}
+                        >
+                          {selectedTenant.status === 'suspended' ? <CheckCircle2 size={16} /> : <Ban size={16} />}
+                          {selectedTenant.status === 'suspended' ? 'Ativar Conta' : 'Suspender Conta'}
+                        </button>
+                      </div>
+                    </div>
+                  )}
+                </div>
+
+                {/* Right Column: Plan & Subscription */}
+                <div className="space-y-6">
+                  <div className="p-6 bg-zinc-950 rounded-2xl border border-zinc-800">
+                    <p className="text-xs font-bold text-zinc-500 uppercase mb-4">Plano Atual</p>
+                    <div className="flex items-center justify-between mb-4">
+                      <span className="text-xl font-bold text-rose-500">
+                        {plans.find(p => p.id === selectedTenant.planId)?.name || 'Bronze'}
+                      </span>
+                      <div className="px-2 py-1 bg-rose-500/10 text-rose-500 text-[10px] font-bold rounded uppercase">
+                        {selectedTenant.billingCycle === 'yearly' ? 'Anual' : 'Mensal'}
+                      </div>
+                    </div>
+                    <select
+                      value={selectedTenant.planId || 'plan_bronze'}
+                      onChange={(e) => handleUpdateUserPlan(selectedTenant.id!, e.target.value)}
+                      className="w-full bg-zinc-900 border border-zinc-800 rounded-xl px-4 py-2 text-sm text-white outline-none focus:border-rose-500"
+                    >
+                      {plans.map(p => (
+                        <option key={p.id} value={p.id}>{p.name}</option>
+                      ))}
+                    </select>
+                  </div>
+
+                  <div className="p-6 bg-zinc-950 rounded-2xl border border-zinc-800">
+                    <p className="text-xs font-bold text-zinc-500 uppercase mb-4">Status Financeiro</p>
+                    <div className="flex items-center gap-2 text-emerald-500 font-bold">
+                      <CheckCircle2 size={18} />
+                      <span>Assinatura Ativa</span>
+                    </div>
+                    <p className="text-[10px] text-zinc-500 mt-2 italic">Próximo vencimento: 20/04/2026</p>
+                  </div>
+                </div>
+              </div>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
+
       {/* Tenants Table */}
       <div className="bg-zinc-900/50 backdrop-blur-xl rounded-3xl border border-zinc-800 shadow-2xl overflow-hidden">
         <div className="p-8 border-b border-zinc-800 flex flex-col md:flex-row md:items-center justify-between gap-4">
@@ -507,7 +733,7 @@ export default function SuperAdmin() {
                   <td className="px-8 py-6">
                     <div>
                       <p className="font-bold text-white">{tenant.shopName}</p>
-                      <p className="text-sm text-zinc-500">{tenant.email}</p>
+                      <p className="text-xs text-zinc-500">{tenant.slug ? `${tenant.slug}.dodile.com.br` : tenant.email}</p>
                     </div>
                   </td>
                   <td className="px-8 py-6">
@@ -533,13 +759,22 @@ export default function SuperAdmin() {
                     {new Date(tenant.createdAt).toLocaleDateString('pt-BR')}
                   </td>
                   <td className="px-8 py-6 text-right">
-                    <button 
-                      onClick={() => handleSuspendAccount(tenant.id!, tenant.status || 'active')}
-                      className={`p-2 rounded-lg transition-colors ${tenant.status === 'suspended' ? 'text-emerald-400 hover:bg-emerald-400/10' : 'text-rose-400 hover:bg-rose-400/10'}`}
-                      title={tenant.status === 'suspended' ? 'Ativar Conta' : 'Suspender Conta'}
-                    >
-                      {tenant.status === 'suspended' ? <CheckCircle2 size={20} /> : <Ban size={20} />}
-                    </button>
+                    <div className="flex items-center justify-end gap-2">
+                      <button 
+                        onClick={() => handleOpenSupport(tenant)}
+                        className="p-2 text-blue-400 hover:bg-blue-400/10 rounded-lg transition-colors"
+                        title="Suporte e Detalhes"
+                      >
+                        <LifeBuoy size={20} />
+                      </button>
+                      <button 
+                        onClick={() => handleSuspendAccount(tenant.id!, tenant.status || 'active')}
+                        className={`p-2 rounded-lg transition-colors ${tenant.status === 'suspended' ? 'text-emerald-400 hover:bg-emerald-400/10' : 'text-rose-400 hover:bg-rose-400/10'}`}
+                        title={tenant.status === 'suspended' ? 'Ativar Conta' : 'Suspender Conta'}
+                      >
+                        {tenant.status === 'suspended' ? <CheckCircle2 size={20} /> : <Ban size={20} />}
+                      </button>
+                    </div>
                   </td>
                 </tr>
               ))}

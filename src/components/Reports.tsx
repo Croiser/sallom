@@ -11,6 +11,8 @@ import {
 import { Transaction, Appointment } from '../types';
 import { useSubscription } from '../hooks/useSubscription';
 import { Crown, Lock } from 'lucide-react';
+import { useAuth } from '../contexts/AuthContext';
+import { api } from '../services/api';
 import { 
   BarChart, 
   Bar, 
@@ -24,47 +26,44 @@ import {
   Cell,
   Legend
 } from 'recharts';
-import { apiFetch } from '../lib/api';
 
 interface ReportsProps {
   onNavigate?: (tab: string, data?: { planId?: string, cycle?: 'monthly' | 'yearly' }) => void;
 }
 
 export default function Reports({ onNavigate }: ReportsProps) {
+  const { user } = useAuth();
   const { plan, loading: subLoading } = useSubscription();
   const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [appointments, setAppointments] = useState<Appointment[]>([]);
-  const [loading, setLoading] = useState(false); // Change to false initially
+  const [loading, setLoading] = useState(true);
   const [dateRange, setDateRange] = useState('month'); // 'week', 'month', 'year'
 
   useEffect(() => {
-    // Only fetch if plan is loaded and reports are enabled
-    if (subLoading || !plan?.features.reports) return;
+    if (subLoading || !user) return;
+
+    if (!plan?.features.reports) {
+      setLoading(false);
+      return;
+    }
 
     const fetchData = async () => {
-      setLoading(true);
       try {
-        const [transData, appData] = await Promise.all([
-          apiFetch('/transactions'),
-          apiFetch('/appointments')
+        const [transData, appsData] = await Promise.all([
+          api.get('/transactions'),
+          api.get('/appointments')
         ]);
-        
-        // Sort transactions by date asc for reports
-        const sortedTrans = [...transData].sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
-        setTransactions(sortedTrans);
-        
-        // Filter only completed appointments
-        const completedApps = appData.filter((a: Appointment) => a.status === 'completed');
-        setAppointments(completedApps);
-      } catch (error) {
-        console.error('Failed to fetch report data:', error);
-      } finally {
+        setTransactions(transData);
+        setAppointments(appsData.filter((a: any) => a.status === 'completed'));
+        setLoading(false);
+      } catch (err) {
+        console.error('Failed to fetch reports data:', err);
         setLoading(false);
       }
     };
 
     fetchData();
-  }, []);
+  }, [subLoading, plan?.features.reports, user]);
 
   // Filter data based on dateRange
   const getFilteredData = () => {

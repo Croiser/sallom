@@ -15,15 +15,18 @@ import {
   ChevronRight
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
-import { Appointment, Client, Service, Staff } from '../types';
+import { Appointment, Client, Service, Staff, ShopSettings } from '../types';
 import { whatsappService } from '../services/whatsappService';
-import { apiFetch } from '../lib/api';
+import { useAuth } from '../contexts/AuthContext';
+import { api } from '../services/api';
 
 export default function Appointments() {
+  const { user } = useAuth();
   const [appointments, setAppointments] = useState<Appointment[]>([]);
   const [clients, setClients] = useState<Client[]>([]);
   const [services, setServices] = useState<Service[]>([]);
   const [staff, setStaff] = useState<Staff[]>([]);
+  const [settings, setSettings] = useState<ShopSettings | null>(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState<string>('all');
@@ -44,24 +47,28 @@ export default function Appointments() {
 
   const fetchData = async () => {
     try {
-      const [appsData, clientsData, servicesData, staffData] = await Promise.all([
-        apiFetch('/appointments'),
-        apiFetch('/clients'),
-        apiFetch('/services'),
-        apiFetch('/staff')
+      const [appsData, clientsData, servicesData, staffData, settingsData] = await Promise.all([
+        api.get('/appointments'),
+        api.get('/clients'),
+        api.get('/services'),
+        api.get('/staff'),
+        api.get('/settings')
       ]);
       setAppointments(appsData);
       setClients(clientsData);
       setServices(servicesData);
       setStaff(staffData);
+      setSettings(settingsData);
     } catch (err) {
       console.error('Failed to fetch data:', err);
     }
   };
 
   useEffect(() => {
-    fetchData();
-  }, []);
+    if (user) {
+      fetchData();
+    }
+  }, [user]);
 
   const handleCreate = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -75,33 +82,31 @@ export default function Appointments() {
     const appointmentDate = new Date(`${date}T${time}`);
 
     try {
-      await apiFetch('/appointments', {
-        method: 'POST',
-        body: JSON.stringify({
-          clientId: client.id,
-          clientName: client.name,
-          phone: client.phone || '',
-          serviceId: service.id,
-          serviceName: service.name,
-          barberId: '', // Will be set by backend
-          barberName: '', // Will be set by backend
-          staffId: staffMember?.id || '',
-          staffName: staffMember?.name || 'Geral',
-          date: appointmentDate.toISOString(),
-          price: service.price,
-          isFitIn
-        })
+      await api.post('/appointments', {
+        clientId: client.id,
+        clientName: client.name,
+        phone: client.phone || '',
+        serviceId: service.id,
+        serviceName: service.name,
+        barberId: staffMember?.id || '',
+        barberName: staffMember?.name || 'Geral',
+        staffId: staffMember?.id || '',
+        staffName: staffMember?.name || 'Geral',
+        date: appointmentDate.toISOString(),
+        price: service.price,
+        isFitIn
       });
 
       // Trigger WhatsApp Confirmation
-      if (client.phone) {
+      if (client.phone && user?.uid) {
         whatsappService.triggerMessage(
+          user.uid,
           'confirmation',
           client.phone,
           client.name,
           {
             nome_cliente: client.name,
-            shop_name: 'Salão', // Could be fetched from settings
+            shop_name: settings?.name || 'Salão',
             data: appointmentDate.toLocaleDateString('pt-BR'),
             hora: appointmentDate.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })
           }
@@ -115,9 +120,8 @@ export default function Appointments() {
       setDate('');
       setTime('');
       setIsFitIn(false);
-
+      fetchData();
       setToast({ message: 'Agendamento criado com sucesso!', type: 'success' });
-      fetchData(); // Refresh data
       setTimeout(() => setToast(null), 3000);
     } catch (err) {
       console.error('Failed to create appointment:', err);
@@ -128,63 +132,17 @@ export default function Appointments() {
 
   const updateStatus = async (id: string, status: Appointment['status']) => {
     try {
-      await apiFetch(`/appointments/${id}/status`, {
-        method: 'PUT',
-        body: JSON.stringify({ status })
-      });
-
+      await api.put(`/appointments/${id}/status`, { status });
+      fetchData();
+      
       if (status === 'completed') {
-        const app = appointments.find(a => a.id === id);
-        if (app) {
-          // 1. Financial Transaction (Income)
-          await apiFetch('/transactions', {
-            method: 'POST',
-            body: JSON.stringify({
-              type: 'income',
-              amount: app.price,
-              description: `Serviço: ${app.serviceName} - ${app.clientName}`,
-              date: new Date().toISOString(),
-              category: 'Serviços'
-            })
-          });
-
-          // 2. Loyalty System (Update client)
-          const client = clients.find(c => c.id === app.clientId);
-          if (client) {
-            await apiFetch(`/clients/${client.id}`, {
-              method: 'PUT',
-              body: JSON.stringify({
-                ...client,
-                loyaltyPoints: (client.loyaltyPoints || 0) + 10,
-                loyaltyVisits: (client.loyaltyVisits || 0) + 1
-              })
-            });
-          }
-
-          // 3. Commission Calculation
-          if (app.staffId) {
-            const staffMember = staff.find(s => s.id === app.staffId);
-            if (staffMember && staffMember.commissionPercentage > 0) {
-              const commissionAmount = (app.price * staffMember.commissionPercentage) / 100;
-                await apiFetch('/transactions', {
-                  method: 'POST',
-                  body: JSON.stringify({
-                    type: 'expense',
-                    amount: commissionAmount,
-                    description: `Comissão: ${staffMember.name} - Ref: ${app.serviceName} (${app.clientName})`,
-                    date: new Date().toISOString(),
-                    category: 'Comissões'
-                  })
-                });
-            }
-          }
-        }
         setToast({ message: 'Agendamento concluído! Pontos de fidelidade adicionados.', type: 'success' });
       } else if (status === 'cancelled') {
         setToast({ message: 'Agendamento cancelado.', type: 'success' });
+      } else {
+        setToast({ message: 'Status atualizado com sucesso!', type: 'success' });
       }
       
-      fetchData(); // Refresh data
       setTimeout(() => setToast(null), 3000);
     } catch (error) {
       console.error('Error updating status:', error);
@@ -196,10 +154,14 @@ export default function Appointments() {
   const handleDelete = async (id: string) => {
     if (confirm('Deseja realmente excluir este agendamento?')) {
       try {
-        await apiFetch(`/appointments/${id}`, { method: 'DELETE' });
+        await api.delete(`/appointments/${id}`);
         fetchData();
+        setToast({ message: 'Agendamento excluído com sucesso!', type: 'success' });
+        setTimeout(() => setToast(null), 3000);
       } catch (err) {
         console.error('Failed to delete appointment:', err);
+        setToast({ message: 'Erro ao excluir agendamento.', type: 'error' });
+        setTimeout(() => setToast(null), 3000);
       }
     }
   };
@@ -353,8 +315,10 @@ export default function Appointments() {
                           <div className="space-y-2">
                             <p className="text-[10px] font-bold text-zinc-400 uppercase tracking-wider mb-1">Preview</p>
                             {dayApps.slice(0, 2).map(app => (
-                              <div key={app.id} className="border-l-2 border-rose-500 pl-2 py-0.5">
-                                <p className="text-[11px] font-bold truncate">{app.clientName}</p>
+                              <div key={app.id} className={`border-l-2 ${app.isFitIn ? 'border-amber-500' : 'border-rose-500'} pl-2 py-0.5`}>
+                                <p className="text-[11px] font-bold truncate">
+                                  {app.clientName} {app.isFitIn && '⚡'}
+                                </p>
                                 <p className="text-[9px] text-zinc-400 truncate">{app.serviceName}</p>
                               </div>
                             ))}
@@ -395,7 +359,14 @@ export default function Appointments() {
                   </span>
                 </div>
                 <div className="flex items-center justify-between mb-2">
-                  <h4 className="font-bold text-zinc-900">{app.clientName}</h4>
+                  <h4 className="font-bold text-zinc-900 flex items-center gap-2">
+                    {app.clientName}
+                    {app.isFitIn && (
+                      <span className="text-[9px] bg-amber-100 text-amber-700 px-1.5 py-0.5 rounded-md font-bold uppercase">
+                        Encaixe
+                      </span>
+                    )}
+                  </h4>
                   {app.status === 'scheduled' && (
                     <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
                       <button 
@@ -588,8 +559,22 @@ export default function Appointments() {
                   </tr>
                 )) : (
                   <tr>
-                    <td colSpan={6} className="px-6 py-10 text-center text-zinc-500">
-                      Nenhum agendamento encontrado.
+                    <td colSpan={6} className="px-6 py-20 text-center space-y-4">
+                      <div className="w-16 h-16 bg-rose-50 text-rose-500 rounded-2xl flex items-center justify-center mx-auto">
+                        <CalendarIcon size={32} />
+                      </div>
+                      <div>
+                        <h3 className="text-xl font-bold text-zinc-900">Nenhum agendamento</h3>
+                        <p className="text-zinc-500 max-w-xs mx-auto text-sm">
+                          Seus agendamentos aparecerão aqui. Comece marcando um horário para um cliente.
+                        </p>
+                      </div>
+                      <button
+                        onClick={() => setIsModalOpen(true)}
+                        className="bg-rose-500 text-white px-8 py-3 rounded-2xl font-bold hover:bg-rose-400 transition-all shadow-lg shadow-rose-500/20"
+                      >
+                        Marcar Primeiro Horário
+                      </button>
                     </td>
                   </tr>
                 )}
@@ -666,10 +651,13 @@ export default function Appointments() {
                               mb-1 p-1.5 rounded-lg text-[10px] leading-tight shadow-sm border
                               ${app.status === 'completed' ? 'bg-emerald-50 border-emerald-100 text-emerald-700' : 
                                 app.status === 'cancelled' ? 'bg-rose-50 border-rose-100 text-rose-700' : 
+                                app.isFitIn ? 'bg-amber-50 border-amber-100 text-amber-700' :
                                 'bg-rose-50 border-rose-100 text-rose-700'}
                             `}
                           >
-                            <p className="font-bold truncate">{app.clientName}</p>
+                            <p className="font-bold truncate">
+                              {app.clientName} {app.isFitIn && '⚡'}
+                            </p>
                             <p className="opacity-70 truncate">{app.serviceName}</p>
                           </div>
                         ))}

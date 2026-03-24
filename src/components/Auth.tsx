@@ -1,9 +1,9 @@
-import React, { useState } from 'react';
-import { Sparkles, Mail, Lock, User as UserIcon, ArrowRight, ArrowLeft } from 'lucide-react';
-import { apiFetch } from '../lib/api';
+import React, { useState, useEffect } from 'react';
+import { Scissors, Mail, Lock, User as UserIcon, ArrowRight, ArrowLeft } from 'lucide-react';
+import { api } from '../services/api';
 
-export default function Auth({ onBack, onLoginSuccess }: { onBack?: () => void, onLoginSuccess?: (user: any) => void }) {
-  const [view, setView] = useState<'login' | 'register' | 'forgot-password' | 'reset-password'>('login');
+export default function Auth({ onBack, onLoginSuccess, initialView = 'login' }: { onBack?: () => void, onLoginSuccess?: (user: any) => void, initialView?: 'login' | 'register' }) {
+  const [view, setView] = useState<'login' | 'register' | 'forgot-password' | 'reset-password'>(initialView);
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [name, setName] = useState('');
@@ -14,12 +14,39 @@ export default function Auth({ onBack, onLoginSuccess }: { onBack?: () => void, 
   const [success, setSuccess] = useState('');
   const [loading, setLoading] = useState(false);
 
+  useEffect(() => {
+    if (view === 'register') {
+      const quickRegData = localStorage.getItem('quickReg');
+      if (quickRegData) {
+        try {
+          const { name: qName, shopName: qShopName } = JSON.parse(quickRegData);
+          if (qName) setName(qName);
+          if (qShopName) setShopName(qShopName);
+          // Clear it so it doesn't persist forever
+          localStorage.removeItem('quickReg');
+        } catch (e) {
+          console.error('Error parsing quickReg data', e);
+        }
+      }
+    }
+  }, [view]);
+
   const validateEmail = (email: string) => {
     return String(email)
       .toLowerCase()
       .match(
         /^(([^<>()[\]\\.,;:\s@"]+(\.[^<>()[\]\\.,;:\s@"]+)*)|(".+"))@((\[[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\])|(([a-zA-Z\-0-9]+\.)+[a-zA-Z]{2,}))$/
       );
+  };
+
+  const slugify = (text: string) => {
+    return text
+      .toString()
+      .toLowerCase()
+      .trim()
+      .replace(/\s+/g, '-')
+      .replace(/[^\w-]+/g, '')
+      .replace(/--+/g, '-');
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -35,23 +62,17 @@ export default function Auth({ onBack, onLoginSuccess }: { onBack?: () => void, 
     setSuccess('');
 
     try {
-      const endpoint = view === 'login' ? '/auth/login' : '/auth/register';
-      const body = view === 'login' 
-        ? { email, password } 
-        : { name, email, password, shopName };
-
-      const data = await apiFetch(endpoint, {
-        method: 'POST',
-        body: JSON.stringify(body)
-      });
-
-      // Save token
-      localStorage.setItem('token', data.token);
-      
-      if (onLoginSuccess) {
-        onLoginSuccess(data.user);
+      if (view === 'login') {
+        const { token, user } = await api.post('/auth/login', { email, password });
+        localStorage.setItem('token', token);
+        if (onLoginSuccess) onLoginSuccess(user);
+        window.location.reload(); // Force refresh to update AuthContext
       } else {
-        window.location.reload();
+        // Register
+        const { token, user } = await api.post('/auth/register', { name, email, password, shopName });
+        localStorage.setItem('token', token);
+        if (onLoginSuccess) onLoginSuccess(user);
+        window.location.reload(); // Force refresh to update AuthContext
       }
     } catch (err: any) {
       setError('Erro: ' + err.message);
@@ -67,32 +88,8 @@ export default function Auth({ onBack, onLoginSuccess }: { onBack?: () => void, 
     setSuccess('');
 
     try {
-      await apiFetch('/auth/forgot-password', {
-        method: 'POST',
-        body: JSON.stringify({ email })
-      });
-      setSuccess('Token de recuperação enviado! Verifique seu console (em produção seria seu e-mail).');
-      setView('reset-password');
-    } catch (err: any) {
-      setError(err.message);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const handleResetPassword = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setLoading(true);
-    setError('');
-    setSuccess('');
-
-    try {
-      await apiFetch('/auth/reset-password', {
-        method: 'POST',
-        body: JSON.stringify({ email, token, newPassword })
-      });
-      setSuccess('Senha alterada com sucesso! Faça login.');
-      setView('login');
+      const { message, token: resetToken } = await api.post('/auth/forgot-password', { email });
+      setSuccess(`${message}! Token: ${resetToken}`);
     } catch (err: any) {
       setError(err.message);
     } finally {
@@ -115,10 +112,10 @@ export default function Auth({ onBack, onLoginSuccess }: { onBack?: () => void, 
         <div className="text-center mb-10">
           <div className="inline-flex items-center justify-center mb-6">
             <div className="w-20 h-20 bg-rose-500 rounded-2xl flex items-center justify-center shadow-lg shadow-rose-500/20">
-              <Sparkles className="text-white" size={40} />
+              <Scissors className="text-white" size={40} />
             </div>
           </div>
-          <h1 className="text-3xl font-bold text-white tracking-tight mb-2 bg-gradient-to-r from-rose-400 to-rose-600 bg-clip-text text-transparent">Salão Pro Manager</h1>
+          <h1 className="text-3xl font-bold text-white tracking-tight mb-2 bg-gradient-to-r from-rose-400 to-rose-600 bg-clip-text text-transparent uppercase italic">Dodile</h1>
           <p className="text-zinc-400">Gestão profissional para seu salão de beleza</p>
         </div>
 
@@ -161,57 +158,6 @@ export default function Auth({ onBack, onLoginSuccess }: { onBack?: () => void, 
                 Voltar para o Login
               </button>
             </form>
-          ) : view === 'reset-password' ? (
-            <form onSubmit={handleResetPassword} className="space-y-5">
-              <h2 className="text-xl font-bold text-white mb-2">Definir Nova Senha</h2>
-              <p className="text-sm text-zinc-400 mb-6">Insira o token recebido e sua nova senha.</p>
-              
-              <div className="space-y-2">
-                <label className="text-sm font-medium text-zinc-400 ml-1">Token</label>
-                <input
-                  type="text"
-                  required
-                  value={token}
-                  onChange={(e) => setToken(e.target.value)}
-                  className="w-full bg-zinc-800/50 border border-zinc-700 text-white px-4 py-3 rounded-xl focus:outline-none focus:ring-2 focus:ring-rose-500/50 focus:border-rose-500 transition-all"
-                  placeholder="6 dígitos"
-                />
-              </div>
-
-              <div className="space-y-2">
-                <label className="text-sm font-medium text-zinc-400 ml-1">Nova Senha</label>
-                <div className="relative">
-                  <Lock className="absolute left-4 top-1/2 -translate-y-1/2 text-zinc-500" size={18} />
-                  <input
-                    type="password"
-                    required
-                    value={newPassword}
-                    onChange={(e) => setNewPassword(e.target.value)}
-                    className="w-full bg-zinc-800/50 border border-zinc-700 text-white pl-12 pr-4 py-3 rounded-xl focus:outline-none focus:ring-2 focus:ring-rose-500/50 focus:border-rose-500 transition-all"
-                    placeholder="••••••••"
-                  />
-                </div>
-              </div>
-
-              {error && <p className="text-red-400 text-sm bg-red-400/10 p-3 rounded-lg">{error}</p>}
-              {success && <p className="text-emerald-400 text-sm bg-emerald-400/10 p-3 rounded-lg">{success}</p>}
-              
-              <button
-                type="submit"
-                disabled={loading}
-                className="w-full bg-rose-500 hover:bg-rose-400 text-white font-bold py-4 rounded-xl transition-all"
-              >
-                {loading ? 'Processando...' : 'Alterar Senha'}
-              </button>
-
-              <button
-                type="button"
-                onClick={() => setView('login')}
-                className="w-full text-zinc-500 text-sm hover:text-white transition-colors"
-              >
-                Cancelar
-              </button>
-            </form>
           ) : (
             <form onSubmit={handleSubmit} className="space-y-5">
               {view === 'register' && (
@@ -233,7 +179,7 @@ export default function Auth({ onBack, onLoginSuccess }: { onBack?: () => void, 
                   <div className="space-y-2">
                     <label className="text-sm font-medium text-zinc-400 ml-1">Nome do Salão</label>
                     <div className="relative">
-                      <Sparkles className="absolute left-4 top-1/2 -translate-y-1/2 text-zinc-500" size={18} />
+                      <Scissors className="absolute left-4 top-1/2 -translate-y-1/2 text-zinc-500" size={18} />
                       <input
                         type="text"
                         required

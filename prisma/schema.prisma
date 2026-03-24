@@ -3,8 +3,8 @@ generator client {
 }
 
 datasource db {
-  provider = "sqlite"
-  url      = "file:./dev.db"
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
 }
 
 model User {
@@ -14,8 +14,11 @@ model User {
   password         String
   role             String            @default("admin")
   shopName         String?
+  slug             String?           @unique
   status           String            @default("active")
   planId           String?
+  phone            String?
+  billingCycle     String?           @default("monthly")
   createdAt        DateTime          @default(now())
   resetPasswordToken   String?
   resetPasswordExpires DateTime?
@@ -121,6 +124,7 @@ model Setting {
   businessHours  String? // JSON string
   whatsappConfig String? // JSON string
   holidays       String? // JSON string
+  fidelityConfig String? // JSON string
   user           User    @relation(fields: [uid], references: [id], onDelete: Cascade)
 
   @@map("settings")
@@ -168,7 +172,11 @@ model Subscription {
   uid              String   @id
   planId           String
   status           String
-  currentPeriodEnd DateTime
+  billingCycle     String   @default("monthly")
+  startDate        DateTime @default(now())
+  endDate          DateTime
+  currentPeriodEnd DateTime?
+  updatedAt        DateTime @updatedAt
   user             User     @relation(fields: [uid], references: [id], onDelete: Cascade)
   plan             Plan     @relation(fields: [planId], references: [id])
 
@@ -178,6 +186,7 @@ model Subscription {
 model WhatsappSettings {
   uid            String  @id
   enabled        Boolean @default(false)
+  apiKey         String?
   templates      String? // JSON string
   instanceName   String?
   instanceStatus String?

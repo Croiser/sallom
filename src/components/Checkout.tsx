@@ -16,7 +16,8 @@ import {
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { Plan } from '../types';
-import { apiFetch } from '../lib/api';
+import { api } from '../services/api';
+import { useAuth } from '../contexts/AuthContext';
 
 import { asaasService } from '../services/asaasService';
 
@@ -28,32 +29,30 @@ interface CheckoutProps {
 }
 
 export default function Checkout({ plan, billingCycle, onBack, onSuccess }: CheckoutProps) {
+  const { user } = useAuth();
   const [paymentMethod, setPaymentMethod] = useState<'pix' | 'card' | 'boleto'>('pix');
   const [step, setStep] = useState<'billing' | 'payment' | 'success'>('billing');
   const [loading, setLoading] = useState(false);
   const [pixCode, setPixCode] = useState<string | null>(null);
+  const [pixQrCode, setPixQrCode] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
   
   // Form State
   const [billingInfo, setBillingInfo] = useState({
     cpfCnpj: '',
     phone: '',
-    name: ''
+    name: '',
+    email: ''
   });
 
   useEffect(() => {
-    const fetchProfile = async () => {
-      try {
-        const data = await apiFetch('/auth/me');
-        if (data && data.user) {
-          setBillingInfo(prev => ({ ...prev, name: data.user.name }));
-        }
-      } catch (err) {
-        console.error('Error fetching profile:', err);
-      }
-    };
-    fetchProfile();
-  }, []);
+    if (!user) return;
+    setBillingInfo(prev => ({ 
+      ...prev, 
+      name: user.name || '',
+      email: user.email || '' 
+    }));
+  }, [user]);
 
   const price = billingCycle === 'monthly' ? plan.priceMonthly : plan.priceYearly;
   const formattedPrice = price.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
@@ -89,16 +88,42 @@ export default function Checkout({ plan, billingCycle, onBack, onSuccess }: Chec
     }
   };
 
+  const [cardInfo, setCardInfo] = useState({
+    number: '',
+    expiry: '',
+    cvv: '',
+    holderName: ''
+  });
+
   const handlePayment = async () => {
     setLoading(true);
     try {
       if (paymentMethod === 'pix') {
-        const response = await asaasService.createPixPayment(price, billingInfo);
+        const response = await asaasService.createPixPayment(price, billingInfo, plan.id, billingCycle);
         setPixCode(response.pixCopyPaste || null);
+        // If it returns a base64 image, we might want to use it
+        if (response.pixQrCode) {
+          setPixQrCode(`data:image/png;base64,${response.pixQrCode}`);
+        }
       } else if (paymentMethod === 'card') {
-        const response = await asaasService.createCardPayment(price, billingInfo, {});
-        if (response.status === 'CONFIRMED') {
-          await completeSubscription();
+        const [expiryMonth, expiryYear] = cardInfo.expiry.split('/');
+        const cardData = {
+          holderName: cardInfo.holderName,
+          number: cardInfo.number.replace(/\s/g, ''),
+          expiryMonth: expiryMonth,
+          expiryYear: '20' + expiryYear,
+          ccv: cardInfo.cvv
+        };
+        const holderData = {
+          name: cardInfo.holderName,
+          email: billingInfo.email || '', // need to make sure we have email
+          cpfCnpj: billingInfo.cpfCnpj.replace(/\D/g, ''),
+          postalCode: '00000000', // Mocking postal code for now
+          addressNumber: '0',
+          phone: billingInfo.phone.replace(/\D/g, '')
+        };
+        const response = await asaasService.createCardPayment(price, billingInfo, cardData, holderData, plan.id, billingCycle);
+        if (response.status === 'CONFIRMED' || response.status === 'RECEIVED') {
           setStep('success');
         }
       } else {
@@ -117,17 +142,47 @@ export default function Checkout({ plan, billingCycle, onBack, onSuccess }: Chec
   };
 
   const completeSubscription = async () => {
+    if (!user) return;
     try {
-      await apiFetch('/subscription', {
-        method: 'POST',
-        body: JSON.stringify({ planId: plan.id, billingCycle })
+      const startDate = new Date();
+      const endDate = new Date();
+      if (billingCycle === 'monthly') {
+        endDate.setMonth(startDate.getMonth() + 1);
+      } else {
+        endDate.setFullYear(startDate.getFullYear() + 1);
+      }
+
+      await api.post('/subscriptions', {
+        planId: plan.id,
+        billingCycle,
+        startDate: startDate.toISOString(),
+        endDate: endDate.toISOString()
       });
+      
       setStep('success');
     } catch (err) {
       console.error('Error completing subscription:', err);
       alert('Erro ao concluir assinatura.');
     }
   };
+
+  useEffect(() => {
+    let interval: NodeJS.Timeout;
+    if (pixCode && step === 'payment') {
+      interval = setInterval(async () => {
+        try {
+          const status = await asaasService.checkPaymentStatus('');
+          if (status === 'CONFIRMED') {
+            setStep('success');
+            clearInterval(interval);
+          }
+        } catch (err) {
+          console.error('Error polling payment status:', err);
+        }
+      }, 5000);
+    }
+    return () => clearInterval(interval);
+  }, [pixCode, step]);
 
   const copyPix = () => {
     if (pixCode) {
@@ -211,6 +266,16 @@ export default function Checkout({ plan, billingCycle, onBack, onSuccess }: Chec
                     />
                   </div>
                   <div className="space-y-2">
+                    <label className="text-sm font-medium text-zinc-700">E-mail</label>
+                    <input 
+                      type="email"
+                      value={billingInfo.email}
+                      onChange={(e) => setBillingInfo({...billingInfo, email: e.target.value})}
+                      className="w-full bg-zinc-50 border border-zinc-200 px-4 py-3 rounded-xl focus:ring-2 focus:ring-rose-500/20 outline-none transition-all"
+                      placeholder="seu@email.com"
+                    />
+                  </div>
+                  <div className="space-y-2">
                     <label className="text-sm font-medium text-zinc-700">CPF ou CNPJ</label>
                     <input 
                       type="text"
@@ -273,17 +338,45 @@ export default function Checkout({ plan, billingCycle, onBack, onSuccess }: Chec
                   {paymentMethod === 'card' && (
                     <div className="space-y-4 pt-4">
                       <div className="space-y-2">
+                        <label className="text-sm font-medium text-zinc-700">Nome no Cartão</label>
+                        <input 
+                          type="text" 
+                          value={cardInfo.holderName}
+                          onChange={(e) => setCardInfo({...cardInfo, holderName: e.target.value})}
+                          className="w-full bg-zinc-50 border border-zinc-200 px-4 py-3 rounded-xl outline-none" 
+                          placeholder="Como está no cartão" 
+                        />
+                      </div>
+                      <div className="space-y-2">
                         <label className="text-sm font-medium text-zinc-700">Número do Cartão</label>
-                        <input type="text" className="w-full bg-zinc-50 border border-zinc-200 px-4 py-3 rounded-xl outline-none" placeholder="0000 0000 0000 0000" />
+                        <input 
+                          type="text" 
+                          value={cardInfo.number}
+                          onChange={(e) => setCardInfo({...cardInfo, number: e.target.value})}
+                          className="w-full bg-zinc-50 border border-zinc-200 px-4 py-3 rounded-xl outline-none" 
+                          placeholder="0000 0000 0000 0000" 
+                        />
                       </div>
                       <div className="grid grid-cols-2 gap-4">
                         <div className="space-y-2">
                           <label className="text-sm font-medium text-zinc-700">Validade</label>
-                          <input type="text" className="w-full bg-zinc-50 border border-zinc-200 px-4 py-3 rounded-xl outline-none" placeholder="MM/AA" />
+                          <input 
+                            type="text" 
+                            value={cardInfo.expiry}
+                            onChange={(e) => setCardInfo({...cardInfo, expiry: e.target.value})}
+                            className="w-full bg-zinc-50 border border-zinc-200 px-4 py-3 rounded-xl outline-none" 
+                            placeholder="MM/AA" 
+                          />
                         </div>
                         <div className="space-y-2">
                           <label className="text-sm font-medium text-zinc-700">CVV</label>
-                          <input type="text" className="w-full bg-zinc-50 border border-zinc-200 px-4 py-3 rounded-xl outline-none" placeholder="000" />
+                          <input 
+                            type="text" 
+                            value={cardInfo.cvv}
+                            onChange={(e) => setCardInfo({...cardInfo, cvv: e.target.value})}
+                            className="w-full bg-zinc-50 border border-zinc-200 px-4 py-3 rounded-xl outline-none" 
+                            placeholder="000" 
+                          />
                         </div>
                       </div>
                     </div>
@@ -293,7 +386,7 @@ export default function Checkout({ plan, billingCycle, onBack, onSuccess }: Chec
                     <div className="bg-zinc-50 p-8 rounded-3xl border border-zinc-200 text-center space-y-6">
                       <div className="bg-white p-4 rounded-2xl inline-block shadow-sm border border-zinc-100">
                         <img 
-                          src={`https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=${encodeURIComponent(pixCode)}`} 
+                          src={pixQrCode || `https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=${encodeURIComponent(pixCode)}`} 
                           alt="Pix QR Code" 
                           className="w-48 h-48"
                         />

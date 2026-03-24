@@ -23,17 +23,78 @@ import HelpGuide from './components/HelpGuide';
 import BookingPage from './components/BookingPage';
 import { Plan } from './types';
 import { ShieldAlert } from 'lucide-react';
-import { apiFetch } from './lib/api';
-
+import { api } from './services/api';
 import ErrorBoundary from './components/ErrorBoundary';
+import { useAuth } from './contexts/AuthContext';
 
 export default function App() {
-  const [user, setUser] = useState<any>(null);
-  const [loading, setLoading] = useState(true);
+  const { user, loading, logout } = useAuth();
   const [activeTab, setActiveTab] = useState('dashboard');
-  const [showAuth, setShowAuth] = useState(false);
+  const [showAuth, setShowAuth] = useState<'login' | 'register' | null>(null);
   const [plans, setPlans] = useState<Plan[]>([]);
   const [checkoutData, setCheckoutData] = useState<{ plan: Plan, cycle: 'monthly' | 'yearly' } | null>(null);
+  const [tenant, setTenant] = useState<any>(null);
+  const [tenantLoading, setTenantLoading] = useState(false);
+
+  // Subdomain Detection Logic
+  const hostname = window.location.hostname;
+  const isLocalhost = hostname === 'localhost' || hostname === '127.0.0.1';
+  const parts = hostname.split('.');
+  
+  const path = window.location.pathname;
+  let subdomainSlug = '';
+  
+  if (path.startsWith('/t/')) {
+    subdomainSlug = path.split('/')[2];
+  } else if (!isLocalhost) {
+    // Check if it's a run.app domain (AI Studio environment)
+    const isRunApp = hostname.endsWith('.run.app');
+    
+    if (isRunApp) {
+      // In AI Studio, the base URL usually has 4 parts: [unique-id, region, run, app]
+      // A subdomain would have 5 or more parts.
+      if (parts.length > 4) {
+        subdomainSlug = parts[0];
+      }
+    } else if (parts.length >= 3) {
+      // Standard domain logic (e.g., salon.myapp.com)
+      if (parts[0] !== 'www' && parts[0] !== 'app') {
+        subdomainSlug = parts[0];
+      }
+    }
+  } else if (isLocalhost && parts.length > 1 && parts[0] !== 'localhost') {
+    subdomainSlug = parts[0];
+  }
+
+  useEffect(() => {
+    if (subdomainSlug) {
+      const fetchTenant = async () => {
+        setTenantLoading(true);
+        try {
+          const tenantData = await api.get(`/tenants/${subdomainSlug}`);
+          setTenant(tenantData);
+        } catch (err) {
+          console.error('Failed to fetch tenant:', err);
+          setTenant(null);
+        } finally {
+          setTenantLoading(false);
+        }
+      };
+      fetchTenant();
+    }
+  }, [subdomainSlug]);
+
+  useEffect(() => {
+    const fetchPlans = async () => {
+      try {
+        const plansData = await api.get('/plans');
+        setPlans(plansData);
+      } catch (err) {
+        console.error('Failed to fetch plans:', err);
+      }
+    };
+    fetchPlans();
+  }, []);
 
   const handleNavigate = (tab: string, data?: { planId?: string, cycle?: 'monthly' | 'yearly' }) => {
     setActiveTab(tab);
@@ -61,39 +122,42 @@ export default function App() {
     return () => window.removeEventListener('hashchange', handleHashChange);
   }, [user]);
 
-  useEffect(() => {
-    const checkAuth = async () => {
-      const token = localStorage.getItem('token');
-      if (token) {
-        try {
-          const data = await apiFetch('/auth/me');
-          setUser(data.user);
-        } catch (err) {
-          console.error('Auth check failed:', err);
-          localStorage.removeItem('token');
-          setUser(null);
-        }
-      } else {
-        setUser(null);
-      }
-      setLoading(false);
-    };
+  // Tenant View (Booking Page)
+  if (subdomainSlug) {
+    if (tenantLoading) {
+      return (
+        <div className="min-h-screen bg-zinc-950 flex items-center justify-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-rose-500"></div>
+        </div>
+      );
+    }
 
-    const fetchPlans = async () => {
-      try {
-        const data = await apiFetch('/public/plans');
-        setPlans(data);
-      } catch (err) {
-        console.error('Failed to fetch plans:', err);
-      }
-    };
+    if (!tenant) {
+      return (
+        <div className="min-h-screen bg-zinc-950 flex items-center justify-center p-6 text-center">
+          <div className="max-w-md space-y-4">
+            <h2 className="text-3xl font-bold text-white tracking-tight">Salão não encontrado</h2>
+            <p className="text-zinc-400">O endereço <span className="text-rose-500 font-bold">{subdomainSlug}</span> não está cadastrado no Salão Pro Manager.</p>
+            <a href="/" className="inline-block bg-rose-500 text-white px-8 py-3 rounded-xl font-bold">Voltar para o Início</a>
+          </div>
+        </div>
+      );
+    }
 
-    checkAuth();
-    fetchPlans();
-  }, []);
+    // If on a subdomain, we show the booking page by default
+    // unless the path is /admin
+    if (path.includes('/admin')) {
+      // Allow login/admin view even on subdomain
+    } else {
+      return (
+        <ErrorBoundary>
+          <BookingPage slug={subdomainSlug} />
+        </ErrorBoundary>
+      );
+    }
+  }
 
-  // Public Booking Route
-  const path = window.location.pathname;
+  // Public Booking Route (Legacy /book/:slug)
   if (path.startsWith('/book/')) {
     const slug = path.split('/')[2];
     if (slug) {
@@ -115,9 +179,14 @@ export default function App() {
 
   if (!user) {
     if (showAuth) {
-      return <Auth onBack={() => setShowAuth(false)} onLoginSuccess={(u) => setUser(u)} />;
+      return <Auth 
+        onBack={() => setShowAuth(null)} 
+        initialView={showAuth}
+      />;
     }
-    return <LandingPage onAuthClick={() => setShowAuth(true)} />;
+    return <LandingPage 
+      onAuthClick={(view = 'login') => setShowAuth(view)} 
+    />;
   }
 
   if (user?.status === 'suspended') {
@@ -144,7 +213,7 @@ export default function App() {
   }
 
   const renderContent = () => {
-    const props = { onNavigate: setActiveTab };
+    const props = { onNavigate: handleNavigate };
     switch (activeTab) {
       case 'dashboard':
         return <Dashboard {...props} />;
@@ -181,7 +250,7 @@ export default function App() {
       case 'whatsapp':
         return <WhatsApp onNavigate={handleNavigate} />;
       case 'help':
-        return <HelpGuide />;
+        return <HelpGuide onNavigate={handleNavigate} />;
       default:
         return <Dashboard onNavigate={handleNavigate} />;
     }

@@ -1,10 +1,10 @@
 import React, { useState, useEffect } from 'react';
-import { apiFetch } from '../lib/api';
 import { ShopSettings, Service, Staff, BusinessHours, Appointment } from '../types';
 import { Sparkles, Calendar, Clock, User, CheckCircle2, ChevronRight, ChevronLeft, MapPin, Phone } from 'lucide-react';
-import { motion, AnimatePresence } from 'framer-motion';
+import { motion, AnimatePresence } from 'motion/react';
 import { format, addDays, startOfToday, isSameDay, parse, isAfter, isBefore } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
+import { api } from '../services/api';
 
 interface BookingPageProps {
   slug: string;
@@ -27,17 +27,23 @@ export default function BookingPage({ slug }: BookingPageProps) {
   const [clientInfo, setClientInfo] = useState({ name: '', phone: '' });
   const [isBooking, setIsBooking] = useState(false);
   const [bookingSuccess, setBookingSuccess] = useState(false);
+  const [showCustomAlert, setShowCustomAlert] = useState(false);
+
+  const triggerAlert = () => {
+    setShowCustomAlert(true);
+    setTimeout(() => setShowCustomAlert(false), 1500);
+  };
 
   useEffect(() => {
     const fetchShopData = async () => {
       try {
-        const data = await apiFetch(`/public/shop/${slug}`);
-        setShop(data.shop);
-        setOwnerProfile(data.owner);
+        const { shop: shopData, owner } = await api.get(`/public/shop/${slug}`);
+        setShop(shopData);
+        setOwnerProfile(owner);
 
         const [servicesData, staffData] = await Promise.all([
-          apiFetch(`/public/services/${data.shop.uid}`),
-          apiFetch(`/public/staff/${data.shop.uid}`)
+          api.get(`/public/services/${shopData.uid}`),
+          api.get(`/public/staff/${shopData.uid}`)
         ]);
 
         setServices(servicesData);
@@ -45,7 +51,7 @@ export default function BookingPage({ slug }: BookingPageProps) {
         setLoading(false);
       } catch (err) {
         console.error('Error fetching shop data:', err);
-        setError('Salão não encontrado.');
+        setError('Erro ao carregar dados do salão.');
         setLoading(false);
       }
     };
@@ -75,7 +81,6 @@ export default function BookingPage({ slug }: BookingPageProps) {
       } else {
         slots.push(timeStr);
       }
-      current = addDays(current, 0); // This is just to keep the date object, but we need to add minutes
       current.setMinutes(current.getMinutes() + 30); // 30 min slots
     }
 
@@ -89,19 +94,17 @@ export default function BookingPage({ slug }: BookingPageProps) {
     try {
       const appointmentDate = parse(selectedTime, 'HH:mm', selectedDate);
       
-      await apiFetch('/public/appointments', {
-        method: 'POST',
-        body: JSON.stringify({
-          ownerUid: shop.uid,
-          clientName: clientInfo.name,
-          phone: clientInfo.phone,
-          serviceId: selectedService.id,
-          serviceName: selectedService.name,
-          staffId: selectedStaff.id,
-          staffName: selectedStaff.name,
-          date: appointmentDate.toISOString(),
-          price: selectedService.price
-        })
+      await api.post('/public/appointments', {
+        ownerUid: shop.uid,
+        clientName: clientInfo.name,
+        phone: clientInfo.phone,
+        serviceId: selectedService.id,
+        serviceName: selectedService.name,
+        staffId: selectedStaff.id,
+        staffName: selectedStaff.name,
+        date: appointmentDate.toISOString(),
+        price: selectedService.price,
+        status: 'pending'
       });
 
       setBookingSuccess(true);
@@ -205,6 +208,30 @@ export default function BookingPage({ slug }: BookingPageProps) {
           ))}
         </div>
 
+        {/* Custom Alert Modal */}
+        <AnimatePresence>
+          {showCustomAlert && (
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              className="fixed inset-0 z-[100] flex items-center justify-center p-6 bg-black/60 backdrop-blur-sm"
+            >
+              <motion.div
+                initial={{ scale: 0.9, opacity: 0 }}
+                animate={{ scale: 1, opacity: 1 }}
+                exit={{ scale: 0.9, opacity: 0 }}
+                className="bg-zinc-900 border border-zinc-800 p-8 rounded-3xl shadow-2xl text-center space-y-4 max-w-xs w-full"
+              >
+                <div className="w-16 h-16 bg-rose-500/20 rounded-full flex items-center justify-center mx-auto text-rose-500">
+                  <CheckCircle2 size={32} />
+                </div>
+                <p className="text-xl font-bold text-white">Elemento clicado!</p>
+              </motion.div>
+            </motion.div>
+          )}
+        </AnimatePresence>
+
         <AnimatePresence mode="wait">
           {step === 1 && (
             <motion.div 
@@ -224,6 +251,7 @@ export default function BookingPage({ slug }: BookingPageProps) {
                     key={service.id}
                     onClick={() => {
                       setSelectedService(service);
+                      triggerAlert();
                       setStep(2);
                     }}
                     className={`flex items-center justify-between p-6 rounded-3xl border-2 transition-all text-left ${
@@ -293,6 +321,7 @@ export default function BookingPage({ slug }: BookingPageProps) {
                       <button
                         onClick={() => {
                           setSelectedStaff(member);
+                          triggerAlert();
                           setStep(3);
                         }}
                         className="bg-rose-500 text-white px-4 py-2 rounded-xl font-bold text-sm hover:bg-rose-600 transition-all"
@@ -339,27 +368,38 @@ export default function BookingPage({ slug }: BookingPageProps) {
               </div>
 
               {/* Date Selector */}
-              <div className="flex gap-3 overflow-x-auto pb-4 scrollbar-hide">
-                {[...Array(14)].map((_, i) => {
-                  const date = addDays(startOfToday(), i);
-                  const isSelected = isSameDay(date, selectedDate);
-                  return (
-                    <button
-                      key={i}
-                      onClick={() => setSelectedDate(date)}
-                      className={`flex flex-col items-center justify-center min-w-[80px] h-24 rounded-2xl border-2 transition-all ${
-                        isSelected 
-                          ? 'bg-rose-500 border-rose-500 text-white' 
-                          : 'bg-zinc-900 border-zinc-800 text-zinc-400 hover:border-zinc-700'
-                      }`}
-                    >
-                      <span className="text-[10px] font-bold uppercase tracking-widest mb-1">
-                        {format(date, 'EEE', { locale: ptBR })}
-                      </span>
-                      <span className="text-xl font-bold">{format(date, 'dd')}</span>
-                    </button>
-                  );
-                })}
+              <div className="space-y-4">
+                <div className="flex items-center justify-between">
+                  <h3 className="text-sm font-bold text-zinc-500 uppercase tracking-widest flex items-center gap-2">
+                    <Calendar size={14} />
+                    {format(selectedDate, 'MMMM yyyy', { locale: ptBR })}
+                  </h3>
+                </div>
+                <div className="flex gap-3 overflow-x-auto pb-4 scrollbar-hide">
+                  {[...Array(14)].map((_, i) => {
+                    const date = addDays(startOfToday(), i);
+                    const isSelected = isSameDay(date, selectedDate);
+                    return (
+                      <button
+                        key={i}
+                        onClick={() => {
+                          setSelectedDate(date);
+                          triggerAlert();
+                        }}
+                        className={`flex flex-col items-center justify-center min-w-[80px] h-24 rounded-2xl border-2 transition-all ${
+                          isSelected 
+                            ? 'bg-rose-500 border-rose-500 text-white shadow-lg shadow-rose-500/20' 
+                            : 'bg-zinc-900 border-zinc-800 text-zinc-400 hover:border-zinc-700'
+                        }`}
+                      >
+                        <span className="text-[10px] font-bold uppercase tracking-widest mb-1">
+                          {format(date, 'EEE', { locale: ptBR })}
+                        </span>
+                        <span className="text-xl font-bold">{format(date, 'dd')}</span>
+                      </button>
+                    );
+                  })}
+                </div>
               </div>
 
               {/* Time Slots */}
@@ -374,6 +414,7 @@ export default function BookingPage({ slug }: BookingPageProps) {
                       key={time}
                       onClick={() => {
                         setSelectedTime(time);
+                        triggerAlert();
                         setStep(4);
                       }}
                       className={`py-4 rounded-2xl border-2 font-bold transition-all ${

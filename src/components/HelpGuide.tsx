@@ -13,7 +13,11 @@ import {
 } from 'lucide-react';
 import { motion } from 'motion/react';
 
-export default function HelpGuide() {
+interface HelpGuideProps {
+  onNavigate: (tab: string) => void;
+}
+
+export default function HelpGuide({ onNavigate }: HelpGuideProps) {
   const steps = [
     {
       title: '1. Configure seus Serviços',
@@ -66,7 +70,8 @@ export default function HelpGuide() {
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: index * 0.1 }}
-            className="bg-white p-6 rounded-[2rem] border border-zinc-200 shadow-sm hover:border-rose-500/30 transition-all group"
+            onClick={() => onNavigate(step.tab)}
+            className="bg-white p-6 rounded-[2rem] border border-zinc-200 shadow-sm hover:border-rose-500/30 transition-all group cursor-pointer"
           >
             <div className="flex items-start gap-6">
               <div className="w-12 h-12 bg-zinc-50 rounded-2xl flex items-center justify-center flex-shrink-0 group-hover:bg-rose-500/10 transition-colors">
@@ -114,7 +119,10 @@ export default function HelpGuide() {
             <p className="text-zinc-800/70 text-sm mb-6 leading-relaxed">
               Mantenha o controle de seus produtos e receba alertas quando o estoque estiver baixo. Evite faltas inesperadas.
             </p>
-            <button className="bg-zinc-900 text-white px-6 py-2 rounded-xl text-sm font-bold hover:bg-zinc-800 transition-colors">
+            <button 
+              onClick={() => onNavigate('inventory')}
+              className="bg-zinc-900 text-white px-6 py-2 rounded-xl text-sm font-bold hover:bg-zinc-800 transition-colors"
+            >
               Configurar Agora
             </button>
           </div>

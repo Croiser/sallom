@@ -1,27 +1,35 @@
 import { useState, useEffect } from 'react';
-import { apiFetch } from '../lib/api';
 import { Subscription, Plan } from '../types';
+import { useAuth } from '../contexts/AuthContext';
+import { api } from '../services/api';
 
 export function useSubscription() {
+  const { user } = useAuth();
   const [subscription, setSubscription] = useState<Subscription | null>(null);
   const [plan, setPlan] = useState<Plan | null>(null);
+  const [plans, setPlans] = useState<Plan[]>([]);
   const [loading, setLoading] = useState(true);
 
-  useEffect(() => {
-    const fetchSubscription = async () => {
-      try {
-        const data = await apiFetch('/subscription');
-        setSubscription(data.subscription);
-        setPlan(data.plan);
-      } catch (err) {
-        console.error('Error fetching subscription:', err);
-      } finally {
-        setLoading(false);
+  const fetchData = async () => {
+    try {
+      const plansData = await api.get('/plans');
+      setPlans(plansData.sort((a: any, b: any) => a.priceMonthly - b.priceMonthly));
+
+      if (user) {
+        const subResponse = await api.get('/subscription');
+        setSubscription(subResponse.subscription);
+        setPlan(subResponse.plan);
       }
-    };
+    } catch (error) {
+      console.error('Error fetching subscription data:', error);
+    } finally {
+      setLoading(false);
+    }
+  };
 
-    fetchSubscription();
-  }, []);
+  useEffect(() => {
+    fetchData();
+  }, [user]);
 
-  return { subscription, plan, loading };
+  return { subscription, plan, plans, loading, refresh: fetchData };
 }

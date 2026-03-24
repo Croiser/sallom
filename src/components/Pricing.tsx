@@ -1,7 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { Check, X, Star, Zap, Crown, ArrowRight, ShieldCheck } from 'lucide-react';
 import { motion } from 'motion/react';
-import { apiFetch } from '../lib/api';
+import { api } from '../services/api';
+import { useAuth } from '../contexts/AuthContext';
 import { Plan, Subscription } from '../types';
 
 interface PricingProps {
@@ -9,6 +10,7 @@ interface PricingProps {
 }
 
 export default function Pricing({ onSelectPlan }: PricingProps) {
+  const { user } = useAuth();
   const [plans, setPlans] = useState<Plan[]>([]);
   const [subscription, setSubscription] = useState<Subscription | null>(null);
   const [billingCycle, setBillingCycle] = useState<'monthly' | 'yearly'>('monthly');
@@ -17,27 +19,23 @@ export default function Pricing({ onSelectPlan }: PricingProps) {
   useEffect(() => {
     const fetchData = async () => {
       try {
-        const plansData = await apiFetch('/public/plans');
+        const [plansData, subData] = await Promise.all([
+          api.get('/public/plans'),
+          user ? api.get('/subscriptions/me').catch(() => null) : Promise.resolve(null)
+        ]);
         setPlans(plansData.sort((a: Plan, b: Plan) => a.priceMonthly - b.priceMonthly));
-
-        const token = localStorage.getItem('token');
-        if (token) {
-          const subData = await apiFetch('/subscription');
-          setSubscription(subData.subscription);
-        }
-      } catch (err) {
-        console.error('Error fetching pricing data:', err);
-      } finally {
+        setSubscription(subData);
+        setLoading(false);
+      } catch (error) {
+        console.error('Error fetching pricing data:', error);
         setLoading(false);
       }
     };
 
     fetchData();
-  }, []);
+  }, [user]);
 
   const handleSubscribe = (plan: Plan) => {
-    const token = localStorage.getItem('token');
-    if (!token) return;
     onSelectPlan(plan, billingCycle);
   };
 
@@ -64,7 +62,7 @@ export default function Pricing({ onSelectPlan }: PricingProps) {
             <div className={`w-5 h-5 bg-white rounded-full shadow-sm transition-transform ${billingCycle === 'yearly' ? 'translate-x-7' : 'translate-x-0'}`} />
           </button>
           <span className={`text-sm font-medium ${billingCycle === 'yearly' ? 'text-zinc-900' : 'text-zinc-500'}`}>
-            Anual <span className="text-emerald-500 text-xs font-bold ml-1">(-15%)</span>
+            Anual <span className="text-emerald-500 text-xs font-bold ml-1">(até -23%)</span>
           </span>
         </div>
       </div>
@@ -133,7 +131,7 @@ export default function Pricing({ onSelectPlan }: PricingProps) {
                       : 'bg-zinc-900 text-white hover:bg-zinc-800'
                 }`}
               >
-                {isCurrent ? 'Plano Atual' : 'Começar Agora'}
+                {isCurrent ? 'Plano Atual' : 'Cadastre-se Agora'}
                 {!isCurrent && <ArrowRight size={18} />}
               </button>
             </motion.div>

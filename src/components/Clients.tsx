@@ -1,13 +1,20 @@
 import React, { useState, useEffect } from 'react';
-import { Plus, Search, Phone, Mail, Trash2, User, X } from 'lucide-react';
-import { Client } from '../types';
+import { Plus, Search, Phone, Mail, Trash2, User, X, Users, Gift, Star, ArrowRight, Check } from 'lucide-react';
+import { Client, ShopSettings } from '../types';
 import { whatsappService } from '../services/whatsappService';
-import { apiFetch } from '../lib/api';
+import { useAuth } from '../contexts/AuthContext';
+import { motion, AnimatePresence } from 'motion/react';
+import { api } from '../services/api';
 
 export default function Clients() {
+  const { user } = useAuth();
   const [clients, setClients] = useState<Client[]>([]);
+  const [settings, setSettings] = useState<ShopSettings | null>(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [isRedeemModalOpen, setIsRedeemModalOpen] = useState(false);
+  const [selectedClientForRedeem, setSelectedClientForRedeem] = useState<Client | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
+  const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' } | null>(null);
   
   // Form State
   const [name, setName] = useState('');
@@ -15,42 +22,46 @@ export default function Clients() {
   const [email, setEmail] = useState('');
   const [notes, setNotes] = useState('');
 
-  const fetchClients = async () => {
+  const fetchData = async () => {
     try {
-      const data = await apiFetch('/clients');
-      setClients(data);
+      const [clientsData, settingsData] = await Promise.all([
+        api.get('/clients'),
+        api.get('/settings')
+      ]);
+      setClients(clientsData);
+      setSettings(settingsData);
     } catch (err) {
-      console.error('Failed to fetch clients:', err);
+      console.error('Failed to fetch data:', err);
     }
   };
 
   useEffect(() => {
-    fetchClients();
-  }, []);
+    if (user) {
+      fetchData();
+    }
+  }, [user]);
 
   const handleCreate = async (e: React.FormEvent) => {
     e.preventDefault();
 
     try {
-      await apiFetch('/clients', {
-        method: 'POST',
-        body: JSON.stringify({
-          name,
-          phone,
-          email,
-          notes
-        })
+      await api.post('/clients', {
+        name,
+        phone,
+        email,
+        notes
       });
 
       // Trigger WhatsApp Welcome
-      if (phone) {
+      if (phone && user?.uid) {
         whatsappService.triggerMessage(
+          user.uid,
           'welcome',
           phone,
           name,
           {
             nome_cliente: name,
-            shop_name: 'Salão' // Could be fetched from settings
+            shop_name: settings?.name || 'Salão'
           }
         );
       }
@@ -60,20 +71,46 @@ export default function Clients() {
       setPhone('');
       setEmail('');
       setNotes('');
-      fetchClients();
+      fetchData();
+      setToast({ message: 'Cliente cadastrado com sucesso!', type: 'success' });
+      setTimeout(() => setToast(null), 3000);
     } catch (err) {
       console.error('Failed to create client:', err);
+      setToast({ message: 'Erro ao cadastrar cliente.', type: 'error' });
+      setTimeout(() => setToast(null), 3000);
     }
   };
 
   const handleDelete = async (id: string) => {
     if (confirm('Deseja realmente excluir este cliente?')) {
       try {
-        await apiFetch(`/clients/${id}`, { method: 'DELETE' });
-        fetchClients();
+        await api.delete(`/clients/${id}`);
+        fetchData();
+        setToast({ message: 'Cliente excluído com sucesso!', type: 'success' });
+        setTimeout(() => setToast(null), 3000);
       } catch (err) {
         console.error('Failed to delete client:', err);
+        setToast({ message: 'Erro ao excluir cliente.', type: 'error' });
+        setTimeout(() => setToast(null), 3000);
       }
+    }
+  };
+
+  const handleRedeem = async () => {
+    if (!selectedClientForRedeem || !settings?.fidelityConfig) return;
+    
+    try {
+      await api.post(`/clients/${selectedClientForRedeem.id}/redeem`, {});
+      
+      setToast({ message: 'Resgate realizado com sucesso!', type: 'success' });
+      setIsRedeemModalOpen(false);
+      setSelectedClientForRedeem(null);
+      fetchData();
+      setTimeout(() => setToast(null), 3000);
+    } catch (err: any) {
+      console.error('Failed to redeem points:', err);
+      setToast({ message: err.message || 'Erro ao realizar resgate.', type: 'error' });
+      setTimeout(() => setToast(null), 3000);
     }
   };
 
@@ -136,15 +173,29 @@ export default function Clients() {
             </div>
 
             <div className="mt-4 grid grid-cols-2 gap-2">
-              <div className="bg-rose-50 p-3 rounded-2xl border border-rose-100">
+              <div className="bg-rose-50 p-3 rounded-2xl border border-rose-100 relative overflow-hidden">
                 <p className="text-[10px] text-rose-600 uppercase font-bold">Pontos</p>
                 <p className="text-lg font-bold text-rose-900">{client.loyaltyPoints || 0}</p>
+                <Gift className="absolute -right-2 -bottom-2 text-rose-200/50" size={40} />
               </div>
               <div className="bg-zinc-50 p-3 rounded-2xl border border-zinc-100">
                 <p className="text-[10px] text-zinc-500 uppercase font-bold">Visitas</p>
                 <p className="text-lg font-bold text-zinc-900">{client.loyaltyVisits || 0}</p>
               </div>
             </div>
+
+            {settings?.fidelityConfig?.enabled && client.loyaltyPoints >= (settings.fidelityConfig.minPointsToRedeem || 100) && (
+              <button
+                onClick={() => {
+                  setSelectedClientForRedeem(client);
+                  setIsRedeemModalOpen(true);
+                }}
+                className="mt-4 w-full bg-emerald-500 hover:bg-emerald-400 text-white font-bold py-2 rounded-xl transition-all flex items-center justify-center gap-2 shadow-lg shadow-emerald-500/20"
+              >
+                <Star size={16} fill="currentColor" />
+                Resgatar Prêmio
+              </button>
+            )}
 
             {client.notes && (
               <div className="mt-4 pt-4 border-t border-zinc-100">
@@ -154,11 +205,103 @@ export default function Clients() {
             )}
           </div>
         )) : (
-          <div className="col-span-full py-20 text-center text-zinc-500 bg-white rounded-3xl border border-zinc-200 border-dashed">
-            Nenhum cliente cadastrado.
+          <div className="col-span-full py-20 text-center bg-white rounded-[2.5rem] border border-zinc-200 border-dashed space-y-4">
+            <div className="w-16 h-16 bg-blue-50 text-blue-500 rounded-2xl flex items-center justify-center mx-auto">
+              <Users size={32} />
+            </div>
+            <div>
+              <h3 className="text-xl font-bold text-zinc-900">Sua lista está vazia</h3>
+              <p className="text-zinc-500 max-w-xs mx-auto text-sm">
+                Cadastre seus clientes para facilitar o agendamento e manter o histórico de visitas.
+              </p>
+            </div>
+            <button
+              onClick={() => setIsModalOpen(true)}
+              className="bg-blue-500 text-white px-8 py-3 rounded-2xl font-bold hover:bg-blue-400 transition-all shadow-lg shadow-blue-500/20"
+            >
+              Cadastrar Primeiro Cliente
+            </button>
           </div>
         )}
       </div>
+
+      {/* Redeem Modal */}
+      {isRedeemModalOpen && selectedClientForRedeem && settings?.fidelityConfig && (
+        <div className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm">
+          <div className="bg-white w-full max-w-md rounded-3xl shadow-2xl overflow-hidden">
+            <div className="p-6 border-b border-zinc-100 flex items-center justify-between bg-emerald-50">
+              <h3 className="text-xl font-bold text-emerald-900 flex items-center gap-2">
+                <Gift size={24} />
+                Resgatar Prêmio
+              </h3>
+              <button onClick={() => setIsRedeemModalOpen(false)} className="text-emerald-400 hover:text-emerald-600">
+                <X size={24} />
+              </button>
+            </div>
+            <div className="p-6 space-y-6">
+              <div className="text-center space-y-2">
+                <p className="text-zinc-500">O cliente <span className="font-bold text-zinc-900">{selectedClientForRedeem.name}</span> possui</p>
+                <div className="text-4xl font-black text-rose-500">{selectedClientForRedeem.loyaltyPoints}</div>
+                <p className="text-sm font-medium text-zinc-400 uppercase tracking-widest">Pontos Acumulados</p>
+              </div>
+
+              <div className="bg-zinc-50 p-6 rounded-2xl border border-zinc-100 space-y-4">
+                <div className="flex items-center justify-between">
+                  <span className="text-zinc-500">Custo do Resgate</span>
+                  <span className="font-bold text-rose-600">-{settings.fidelityConfig.minPointsToRedeem} pontos</span>
+                </div>
+                <div className="flex items-center justify-between pt-4 border-t border-zinc-200">
+                  <span className="text-zinc-900 font-bold">Valor do Prêmio</span>
+                  <span className="text-2xl font-black text-emerald-600">R$ {settings.fidelityConfig.redeemValue.toFixed(2)}</span>
+                </div>
+              </div>
+
+              <div className="flex flex-col gap-3">
+                <button
+                  onClick={handleRedeem}
+                  className="w-full bg-emerald-500 hover:bg-emerald-400 text-white font-bold py-4 rounded-xl transition-all shadow-lg shadow-emerald-500/20 flex items-center justify-center gap-2"
+                >
+                  Confirmar Resgate
+                  <ArrowRight size={18} />
+                </button>
+                <button
+                  onClick={() => setIsRedeemModalOpen(false)}
+                  className="w-full bg-zinc-100 hover:bg-zinc-200 text-zinc-600 font-bold py-4 rounded-xl transition-all"
+                >
+                  Cancelar
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Toast Notification */}
+      <AnimatePresence>
+        {toast && (
+          <motion.div
+            initial={{ opacity: 0, y: 50, x: '-50%' }}
+            animate={{ opacity: 1, y: 0, x: '-50%' }}
+            exit={{ opacity: 0, y: 50, x: '-50%' }}
+            className={`fixed bottom-8 left-1/2 z-[100] px-6 py-3 rounded-2xl shadow-2xl flex items-center gap-3 border ${
+              toast.type === 'success' 
+                ? 'bg-emerald-900 border-emerald-500/50 text-emerald-50' 
+                : 'bg-rose-900 border-rose-500/50 text-rose-50'
+            }`}
+          >
+            {toast.type === 'success' ? (
+              <div className="w-6 h-6 bg-emerald-500 rounded-full flex items-center justify-center">
+                <Check size={14} className="text-emerald-900" />
+              </div>
+            ) : (
+              <div className="w-6 h-6 bg-rose-500 rounded-full flex items-center justify-center">
+                <X size={14} className="text-rose-900" />
+              </div>
+            )}
+            <span className="font-bold text-sm tracking-tight">{toast.message}</span>
+          </motion.div>
+        )}
+      </AnimatePresence>
 
       {/* Modal */}
       {isModalOpen && (

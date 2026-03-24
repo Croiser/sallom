@@ -1,9 +1,11 @@
 import React, { useState, useEffect } from 'react';
 import { Plus, Sparkles, Clock, DollarSign, Trash2, X } from 'lucide-react';
 import { Service } from '../types';
-import { apiFetch } from '../lib/api';
+import { useAuth } from '../contexts/AuthContext';
+import { api } from '../services/api';
 
 export default function Services() {
+  const { user } = useAuth();
   const [services, setServices] = useState<Service[]>([]);
   const [isModalOpen, setIsModalOpen] = useState(false);
   
@@ -12,37 +14,36 @@ export default function Services() {
   const [price, setPrice] = useState('');
   const [duration, setDuration] = useState('');
 
-  const fetchServices = async () => {
+  const fetchData = async () => {
     try {
-      const data = await apiFetch('/services');
-      setServices(data);
+      const servicesData = await api.get('/services');
+      setServices(servicesData);
     } catch (err) {
       console.error('Failed to fetch services:', err);
     }
   };
 
   useEffect(() => {
-    fetchServices();
-  }, []);
+    if (user) {
+      fetchData();
+    }
+  }, [user]);
 
   const handleCreate = async (e: React.FormEvent) => {
     e.preventDefault();
 
     try {
-      await apiFetch('/services', {
-        method: 'POST',
-        body: JSON.stringify({
-          name,
-          price: parseFloat(price),
-          duration: parseInt(duration)
-        })
+      await api.post('/services', {
+        name,
+        price: parseFloat(price),
+        duration: parseInt(duration)
       });
 
       setIsModalOpen(false);
       setName('');
       setPrice('');
       setDuration('');
-      fetchServices();
+      fetchData();
     } catch (err) {
       console.error('Failed to create service:', err);
     }
@@ -51,8 +52,8 @@ export default function Services() {
   const handleDelete = async (id: string) => {
     if (confirm('Deseja realmente excluir este serviço?')) {
       try {
-        await apiFetch(`/services/${id}`, { method: 'DELETE' });
-        fetchServices();
+        await api.delete(`/services/${id}`);
+        fetchData();
       } catch (err) {
         console.error('Failed to delete service:', err);
       }
@@ -102,8 +103,22 @@ export default function Services() {
             </div>
           </div>
         )) : (
-          <div className="col-span-full py-20 text-center text-zinc-500 bg-white rounded-3xl border border-zinc-200 border-dashed">
-            Nenhum serviço cadastrado.
+          <div className="col-span-full py-20 text-center bg-white rounded-[2.5rem] border border-zinc-200 border-dashed space-y-4">
+            <div className="w-16 h-16 bg-rose-50 text-rose-500 rounded-2xl flex items-center justify-center mx-auto">
+              <Sparkles size={32} />
+            </div>
+            <div>
+              <h3 className="text-xl font-bold text-zinc-900">Nenhum serviço ainda</h3>
+              <p className="text-zinc-500 max-w-xs mx-auto text-sm">
+                Cadastre os serviços que seu salão oferece para começar a realizar agendamentos.
+              </p>
+            </div>
+            <button
+              onClick={() => setIsModalOpen(true)}
+              className="bg-rose-500 text-white px-8 py-3 rounded-2xl font-bold hover:bg-rose-400 transition-all shadow-lg shadow-rose-500/20"
+            >
+              Cadastrar Primeiro Serviço
+            </button>
           </div>
         )}
       </div>

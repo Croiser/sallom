@@ -2,14 +2,15 @@ import { PrismaClient } from '@prisma/client';
 const prisma = new PrismaClient();
 
 async function main() {
+  await prisma.plan.deleteMany();
   await prisma.plan.createMany({
     data: [
       {
         id: 'plan_bronze',
         name: 'Bronze',
         slug: 'bronze',
-        priceMonthly: 49.90,
-        priceYearly: 499.00,
+        priceMonthly: 27.90,
+        priceYearly: 257.90,
         features: JSON.stringify({ staffLimit: 1, inventory: false, reports: false, whatsapp: false })
       },
       {
@@ -17,15 +18,15 @@ async function main() {
         name: 'Silver',
         slug: 'silver',
         priceMonthly: 89.90,
-        priceYearly: 899.00,
+        priceYearly: 830.90,
         features: JSON.stringify({ staffLimit: 3, inventory: true, reports: true, whatsapp: false })
       },
       {
         id: 'plan_gold',
         name: 'Gold',
         slug: 'gold',
-        priceMonthly: 149.90,
-        priceYearly: 1499.00,
+        priceMonthly: 229.90,
+        priceYearly: 2124.90,
         features: JSON.stringify({ staffLimit: null, inventory: true, reports: true, whatsapp: true })
       }
     ]

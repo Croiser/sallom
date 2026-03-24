@@ -27,14 +27,6 @@ async function startServer() {
   // API Routes
   app.use('/api', apiRoutes);
 
-  // Global Error Handler for API
-  app.use('/api', (err: any, req: any, res: any, next: any) => {
-    console.error('API Error:', err);
-    res.status(err.status || 500).json({
-      error: err.message || 'Internal Server Error',
-    });
-  });
-  
   app.get('/api/diag', async (req, res) => {
     try {
       const plans = await (prisma as any).plan.findMany();
@@ -47,6 +39,20 @@ async function startServer() {
   
   app.get('/api/health', (req, res) => {
     res.json({ status: 'ok', message: 'Salão Pro Manager API is running' });
+  });
+
+  // 404 Handler for API (to prevent falling through to Vite/SPA fallback)
+  app.use('/api', (req, res) => {
+    console.warn(`API 404: ${req.method} ${req.url}`);
+    res.status(404).json({ error: `API route not found: ${req.method} ${req.url}` });
+  });
+
+  // Global Error Handler for API
+  app.use('/api', (err: any, req: any, res: any, next: any) => {
+    console.error('API Error:', err);
+    res.status(err.status || 500).json({
+      error: err.message || 'Internal Server Error',
+    });
   });
 
   // Vite middleware for development

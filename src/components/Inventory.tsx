@@ -16,16 +16,18 @@ import { Product } from '../types';
 import { motion, AnimatePresence } from 'motion/react';
 import { useSubscription } from '../hooks/useSubscription';
 import { Crown, Lock } from 'lucide-react';
-import { apiFetch } from '../lib/api';
+import { useAuth } from '../contexts/AuthContext';
+import { api } from '../services/api';
 
 interface InventoryProps {
   onNavigate?: (tab: string, data?: { planId?: string, cycle?: 'monthly' | 'yearly' }) => void;
 }
 
 export default function Inventory({ onNavigate }: InventoryProps) {
+  const { user } = useAuth();
   const { plan, loading: subLoading } = useSubscription();
   const [products, setProducts] = useState<Product[]>([]);
-  const [loading, setLoading] = useState(false); // Change to false initially
+  const [loading, setLoading] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingProduct, setEditingProduct] = useState<Product | null>(null);
@@ -37,65 +39,42 @@ export default function Inventory({ onNavigate }: InventoryProps) {
     category: ''
   });
 
-  // Moved fetchProducts logic into useEffect or a memoized callback
-  useEffect(() => {
-    // Only fetch if plan is loaded and inventory is enabled
-    if (subLoading) return; // Wait for subscription to load
+  const fetchData = async () => {
+    if (subLoading || !user) return;
 
     if (!plan?.features.inventory) {
-      setLoading(false); // Ensure loading is false if inventory is not available
-      return; // Don't fetch if inventory feature is not enabled
+      setLoading(false);
+      return;
     }
 
-    const fetchProductsData = async () => {
-      setLoading(true); // Set loading to true when starting fetch
-      try {
-        const data = await apiFetch('/products');
-        setProducts(data);
-      } catch (err) {
-        console.error('Failed to fetch products:', err);
-      } finally {
-        setLoading(false); // Set loading to false after fetch, regardless of success/failure
-      }
-    };
+    try {
+      const data = await api.get('/products');
+      setProducts(data);
+      setLoading(false);
+    } catch (error) {
+      console.error('Failed to fetch products:', error);
+      setLoading(false);
+    }
+  };
 
-    fetchProductsData();
-  }, [subLoading, plan?.features.inventory]); // Dependencies
+  useEffect(() => {
+    fetchData();
+  }, [subLoading, plan?.features.inventory, user]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (!user) return;
 
     try {
       if (editingProduct) {
-        await apiFetch(`/products/${editingProduct.id}`, {
-          method: 'PUT',
-          body: JSON.stringify(formData)
-        });
+        await api.put(`/products/${editingProduct.id}`, formData);
       } else {
-        await apiFetch('/products', {
-          method: 'POST',
-          body: JSON.stringify(formData)
-        });
+        await api.post('/products', formData);
       }
       setIsModalOpen(false);
       setEditingProduct(null);
       setFormData({ name: '', price: 0, cost: 0, stock: 0, category: '' });
-      // Re-fetch products after successful submission
-      // This will trigger the useEffect again if plan?.features.inventory is true
-      if (plan?.features.inventory) {
-        const fetchProductsAfterSubmit = async () => {
-          setLoading(true);
-          try {
-            const data = await apiFetch('/products');
-            setProducts(data);
-          } catch (err) {
-            console.error('Failed to fetch products:', err);
-          } finally {
-            setLoading(false);
-          }
-        };
-        fetchProductsAfterSubmit();
-      }
+      fetchData();
     } catch (error) {
       console.error('Error saving product:', error);
     }
@@ -104,22 +83,8 @@ export default function Inventory({ onNavigate }: InventoryProps) {
   const handleDelete = async (id: string) => {
     if (window.confirm('Tem certeza que deseja excluir este produto?')) {
       try {
-        await apiFetch(`/products/${id}`, { method: 'DELETE' });
-        // Re-fetch products after successful deletion
-        if (plan?.features.inventory) {
-          const fetchProductsAfterDelete = async () => {
-            setLoading(true);
-            try {
-              const data = await apiFetch('/products');
-              setProducts(data);
-            } catch (err) {
-              console.error('Failed to fetch products:', err);
-            } finally {
-              setLoading(false);
-            }
-          };
-          fetchProductsAfterDelete();
-        }
+        await api.delete(`/products/${id}`);
+        fetchData();
       } catch (error) {
         console.error('Error deleting product:', error);
       }
@@ -134,7 +99,7 @@ export default function Inventory({ onNavigate }: InventoryProps) {
   const stats = {
     totalValue: products.reduce((acc, p) => acc + (p.price * p.stock), 0),
     totalCost: products.reduce((acc, p) => acc + (p.cost * p.stock), 0),
-    lowStock: products.filter(p => p.stock <= 5).length,
+    lowStock: products.filter(p => p.stock < 5).length,
     totalItems: products.reduce((acc, p) => acc + p.stock, 0)
   };
 
@@ -255,7 +220,7 @@ export default function Inventory({ onNavigate }: InventoryProps) {
               </tr>
             </thead>
             <tbody className="divide-y divide-zinc-100">
-              {filteredProducts.map((product) => (
+              {filteredProducts.length > 0 ? filteredProducts.map((product) => (
                 <tr key={product.id} className="hover:bg-zinc-50/50 transition-colors group">
                   <td className="px-6 py-4">
                     <div className="flex items-center gap-3">
@@ -271,9 +236,17 @@ export default function Inventory({ onNavigate }: InventoryProps) {
                     </span>
                   </td>
                   <td className="px-6 py-4">
-                    <span className={`font-bold ${product.stock <= 5 ? 'text-rose-600' : 'text-zinc-900'}`}>
-                      {product.stock}
-                    </span>
+                    <div className="flex items-center gap-2">
+                      <span className={`font-bold ${product.stock < 5 ? 'text-rose-600' : 'text-zinc-900'}`}>
+                        {product.stock}
+                      </span>
+                      {product.stock < 5 && (
+                        <span className="flex items-center gap-1 text-[10px] font-bold uppercase bg-rose-100 text-rose-600 px-2 py-0.5 rounded-full animate-pulse">
+                          <AlertTriangle size={10} />
+                          Baixo
+                        </span>
+                      )}
+                    </div>
                   </td>
                   <td className="px-6 py-4 font-medium text-zinc-900">R$ {product.price.toLocaleString('pt-BR')}</td>
                   <td className="px-6 py-4 text-zinc-500">R$ {product.cost.toLocaleString('pt-BR')}</td>
@@ -304,7 +277,31 @@ export default function Inventory({ onNavigate }: InventoryProps) {
                     </div>
                   </td>
                 </tr>
-              ))}
+              )) : (
+                <tr>
+                  <td colSpan={6} className="px-6 py-20 text-center space-y-4">
+                    <div className="w-16 h-16 bg-zinc-50 text-zinc-400 rounded-2xl flex items-center justify-center mx-auto">
+                      <Package size={32} />
+                    </div>
+                    <div>
+                      <h3 className="text-xl font-bold text-zinc-900">Nenhum produto</h3>
+                      <p className="text-zinc-500 max-w-xs mx-auto text-sm">
+                        Sua lista de produtos está vazia. Comece cadastrando seu primeiro produto.
+                      </p>
+                    </div>
+                    <button
+                      onClick={() => {
+                        setEditingProduct(null);
+                        setFormData({ name: '', price: 0, cost: 0, stock: 0, category: '' });
+                        setIsModalOpen(true);
+                      }}
+                      className="bg-zinc-900 text-white px-8 py-3 rounded-2xl font-bold hover:bg-zinc-800 transition-all shadow-lg shadow-zinc-200"
+                    >
+                      Cadastrar Primeiro Produto
+                    </button>
+                  </td>
+                </tr>
+              )}
             </tbody>
           </table>
         </div>

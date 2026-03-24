@@ -19,15 +19,17 @@ import {
   Crown
 } from 'lucide-react';
 import { whatsappService, WhatsAppSettings } from '../services/whatsappService';
-import { apiFetch } from '../lib/api';
 import { useSubscription } from '../hooks/useSubscription';
 import { motion } from 'motion/react';
+import { useAuth } from '../contexts/AuthContext';
+import { api } from '../services/api';
 
 interface WhatsAppProps {
   onNavigate?: (tab: string, data?: { planId?: string, cycle?: 'monthly' | 'yearly' }) => void;
 }
 
 export default function WhatsApp({ onNavigate }: WhatsAppProps) {
+  const { user } = useAuth();
   const { plan, loading: subLoading } = useSubscription();
   const [activeTab, setActiveTabInternal] = useState<'config' | 'history'>('config');
   const [settings, setSettings] = useState<WhatsAppSettings | null>(null);
@@ -39,39 +41,36 @@ export default function WhatsApp({ onNavigate }: WhatsAppProps) {
   const [connecting, setConnecting] = useState(false);
 
   useEffect(() => {
-    const loadSettings = async () => {
+    if (!user) return;
+
+    const loadData = async () => {
       try {
-        const data = await whatsappService.getSettings('current-user'); // uid is handled by token
-        setSettings(data);
+        const [settingsData, messagesData] = await Promise.all([
+          whatsappService.getSettings(user.uid),
+          api.get('/whatsapp-messages')
+        ]);
         
-        if (data.instanceName) {
-          checkInstanceStatus(data.instanceName);
+        setSettings(settingsData);
+        setMessages(messagesData);
+        
+        if (settingsData.instanceName) {
+          checkInstanceStatus(settingsData.instanceName);
         }
       } catch (error) {
-        console.error('Failed to load settings:', error);
+        console.error('Failed to load WhatsApp data:', error);
       } finally {
         setLoading(false);
       }
     };
 
-    const loadMessages = async () => {
-      try {
-        const data = await apiFetch('/whatsapp/messages');
-        setMessages(data || []);
-      } catch (error) {
-        console.error('Failed to load messages:', error);
-      }
-    };
-
-    loadSettings();
-    loadMessages();
-  }, []);
+    loadData();
+  }, [user]);
 
   const handleSave = async () => {
-    if (!settings) return;
+    if (!settings || !user?.uid) return;
     setSaving(true);
     try {
-      await whatsappService.updateSettings('current-user', settings);
+      await whatsappService.updateSettings(user.uid, settings);
       setSuccess(true);
       setTimeout(() => setSuccess(false), 3000);
     } catch (error) {
@@ -92,15 +91,12 @@ export default function WhatsApp({ onNavigate }: WhatsAppProps) {
   };
 
   const handleConnect = async () => {
+    if (!user?.uid) return;
     setConnecting(true);
     try {
       let instanceName = settings?.instanceName;
       if (!instanceName) {
-        // We need the user ID for the instance name, let's fetch profile
-        const profile = await apiFetch('/auth/me');
-        if (profile) {
-          instanceName = await whatsappService.createInstance(profile.id);
-        }
+        instanceName = await whatsappService.createInstance(user.uid);
       }
       
       if (instanceName) {

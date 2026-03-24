@@ -8,6 +8,9 @@ export interface UserProfile {
   createdAt: string;
   status?: 'active' | 'suspended' | 'trial';
   planId?: string;
+  phone?: string;
+  billingCycle?: 'monthly' | 'yearly';
+  slug?: string;
 }
 
 export interface Client {
@@ -69,6 +72,7 @@ export interface Staff {
 
 export interface ShopSettings {
   uid: string;
+  name?: string;
   logoUrl?: string;
   address?: string;
   addressNumber?: string;
@@ -85,6 +89,10 @@ export interface ShopSettings {
   facebook?: string;
   tiktok?: string;
   siteUrl?: string;
+  website?: string;
+  logo?: string;
+  primaryColor?: string;
+  secondaryColor?: string;
   businessHours?: BusinessHours[];
   whatsappConfig?: {
     enabled: boolean;
@@ -92,6 +100,15 @@ export interface ShopSettings {
     confirmations: boolean;
   };
   holidays?: Holiday[];
+  fidelityConfig?: FidelityConfig;
+}
+
+export interface FidelityConfig {
+  enabled: boolean;
+  pointsPerVisit: number;
+  pointsPerCurrency: number;
+  minPointsToRedeem: number;
+  redeemValue: number;
 }
 
 export interface Holiday {

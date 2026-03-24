@@ -26,69 +26,52 @@ import {
   Bar,
   Cell
 } from 'recharts';
-import { apiFetch } from '../lib/api';
+import OnboardingChecklist from './OnboardingChecklist';
+import { useAuth } from '../contexts/AuthContext';
+import { api } from '../services/api';
 
 interface DashboardProps {
-  onNavigate?: (tab: string, data?: { planId?: string, cycle?: 'monthly' | 'yearly' }) => void;
+  onNavigate: (tab: string, data?: { planId?: string, cycle?: 'monthly' | 'yearly' }) => void;
 }
 
 export default function Dashboard({ onNavigate }: DashboardProps) {
+  const { user } = useAuth();
   const [appointments, setAppointments] = useState<Appointment[]>([]);
   const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [loading, setLoading] = useState(true);
   const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' } | null>(null);
 
+  const fetchData = async () => {
+    if (!user) return;
+    try {
+      const [appsData, transData] = await Promise.all([
+        api.get('/appointments'),
+        api.get('/transactions')
+      ]);
+      setAppointments(appsData);
+      setTransactions(transData);
+      setLoading(false);
+    } catch (error) {
+      console.error('Error fetching dashboard data:', error);
+      setLoading(false);
+    }
+  };
+
   useEffect(() => {
-    const fetchData = async () => {
-      try {
-        const [appsData, transData] = await Promise.all([
-          apiFetch('/appointments'),
-          apiFetch('/transactions')
-        ]);
-        setAppointments(appsData);
-        setTransactions(transData);
-      } catch (err) {
-        console.error('Failed to fetch dashboard data:', err);
-      } finally {
-        setLoading(false);
-      }
-    };
     fetchData();
-  }, []);
+  }, [user]);
 
   const updateStatus = async (id: string, status: Appointment['status']) => {
     try {
-      await apiFetch(`/appointments/${id}/status`, {
-        method: 'PUT',
-        body: JSON.stringify({ status })
-      });
-
+      await api.put(`/appointments/${id}/status`, { status });
+      
       if (status === 'completed') {
-        const app = appointments.find(a => a.id === id);
-        if (app) {
-          await apiFetch('/transactions', {
-            method: 'POST',
-            body: JSON.stringify({
-              type: 'income',
-              amount: app.price,
-              description: `Serviço: ${app.serviceName} - ${app.clientName}`,
-              date: new Date().toISOString(),
-              category: 'Serviços'
-            })
-          });
-          // Refresh transactions
-          const transData = await apiFetch('/transactions');
-          setTransactions(transData);
-        }
         setToast({ message: 'Agendamento concluído e financeiro atualizado!', type: 'success' });
       } else if (status === 'cancelled') {
         setToast({ message: 'Agendamento cancelado.', type: 'success' });
       }
       
-      // Refresh appointments
-      const appsData = await apiFetch('/appointments');
-      setAppointments(appsData);
-
+      fetchData();
       setTimeout(() => setToast(null), 3000);
     } catch (error) {
       console.error('Error updating status:', error);
@@ -138,6 +121,9 @@ export default function Dashboard({ onNavigate }: DashboardProps) {
 
   return (
     <div className="space-y-8">
+      {/* Onboarding Checklist */}
+      <OnboardingChecklist onNavigate={(tab) => onNavigate(tab)} />
+
       {/* Stats Grid */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
         <div className="bg-white p-6 rounded-3xl border border-zinc-200 shadow-sm group hover:border-emerald-200 transition-all">

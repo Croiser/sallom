@@ -1,4 +1,4 @@
-import { apiFetch } from '../lib/api';
+import { api } from './api';
 
 export type WhatsAppMessageType = 'welcome' | 'reminder' | 'confirmation';
 
@@ -18,26 +18,10 @@ export interface WhatsAppSettings {
 const EVOLUTION_API_URL = (import.meta as any).env.VITE_EVOLUTION_API_URL || 'http://localhost:8080';
 const EVOLUTION_API_KEY = (import.meta as any).env.VITE_EVOLUTION_API_KEY || 'global_api_key_here';
 
-const DEFAULT_TEMPLATES = {
-  welcome: "Olá {nome_cliente}, bem-vindo à {shop_name}! É um prazer ter você conosco.",
-  reminder: "Lembrete: Você tem um agendamento na {shop_name} dia {data} às {hora}. Até logo!",
-  confirmation: "Confirmado! Seu agendamento na {shop_name} foi marcado para {data} às {hora}. Obrigado!"
-};
-
 export const whatsappService = {
   async getSettings(uid: string): Promise<WhatsAppSettings> {
     try {
-      const settings = await apiFetch('/whatsapp/settings');
-      if (settings) {
-        return settings as WhatsAppSettings;
-      } else {
-        const defaultSettings: WhatsAppSettings = {
-          enabled: false,
-          templates: DEFAULT_TEMPLATES
-        };
-        await this.updateSettings(uid, defaultSettings);
-        return defaultSettings;
-      }
+      return await api.get('/whatsapp-settings');
     } catch (error) {
       console.error('Error getting whatsapp settings:', error);
       throw error;
@@ -46,10 +30,7 @@ export const whatsappService = {
 
   async updateSettings(uid: string, settings: Partial<WhatsAppSettings>) {
     try {
-      await apiFetch('/whatsapp/settings', {
-        method: 'PUT',
-        body: JSON.stringify(settings)
-      });
+      await api.put('/whatsapp-settings', settings);
     } catch (error) {
       console.error('Error updating whatsapp settings:', error);
       throw error;
@@ -57,14 +38,14 @@ export const whatsappService = {
   },
 
   async triggerMessage(
+    uid: string,
     type: WhatsAppMessageType,
     recipientNumber: string,
     recipientName: string,
     variables: Record<string, string>
   ) {
-    // Note: uid is not strictly needed here since apiFetch uses the token
     try {
-      const settings = await apiFetch('/whatsapp/settings');
+      const settings = await this.getSettings(uid);
       if (!settings || !settings.enabled || !settings.instanceName) return;
 
       let content = settings.templates[type];
@@ -95,17 +76,14 @@ export const whatsappService = {
 
       const status = response.ok ? 'Enviada' : 'Falha';
 
-      // Log the message
-      await apiFetch('/whatsapp/messages', {
-        method: 'POST',
-        body: JSON.stringify({
-          recipientNumber,
-          recipientName,
-          content,
-          type,
-          status,
-          externalId: messageId
-        })
+      // Log the message in Backend
+      await api.post('/whatsapp-messages', {
+        recipientNumber,
+        recipientName,
+        content,
+        type,
+        status,
+        externalId: messageId
       });
 
       console.log(`WhatsApp Message Triggered (${type}):`, content);

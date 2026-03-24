@@ -24,26 +24,27 @@ import {
   ShieldCheck,
   Smartphone,
   Facebook,
-  Music2
+  Music2,
+  Gift
 } from 'lucide-react';
 import { Staff, ShopSettings, Holiday, Plan } from '../types';
 import { useSubscription } from '../hooks/useSubscription';
 import { motion } from 'motion/react';
-import { apiFetch } from '../lib/api';
+import { useAuth } from '../contexts/AuthContext';
+import { api } from '../services/api';
 
 interface SettingsProps {
   onNavigate?: (tab: string, data?: { planId?: string, cycle?: 'monthly' | 'yearly' }) => void;
 }
 
 export default function Settings({ onNavigate }: SettingsProps) {
+  const { user } = useAuth();
   const { plan, loading: subLoading } = useSubscription();
   const [settings, setSettings] = useState<ShopSettings | null>(null);
   const [staff, setStaff] = useState<Staff[]>([]);
   const [holidays, setHolidays] = useState<Holiday[]>([]);
   const [loading, setLoading] = useState(true);
 
-  // We can get user info from localStorage if needed, or from a context.
-  // For now, let's assume we can check if they are super admin from the profile.
   const [isSuperAdmin, setIsSuperAdmin] = useState(false);
 
   const [newStaffName, setNewStaffName] = useState('');
@@ -68,55 +69,43 @@ export default function Settings({ onNavigate }: SettingsProps) {
 
   const fetchData = async () => {
     try {
-      const [settingsData, staffData, profileData] = await Promise.all([
-        apiFetch('/settings'),
-        apiFetch('/staff'),
-        apiFetch('/auth/me')
+      const [settingsData, staffData] = await Promise.all([
+        api.get('/settings'),
+        api.get('/staff')
       ]);
-
-      if (profileData.email === 'renatadouglas739@gmail.com') {
-        setIsSuperAdmin(true);
-      }
-
+      
       if (settingsData) {
-        if (!settingsData.businessHours) {
-          settingsData.businessHours = daysOfWeek.map(day => ({
-            day: day.label,
-            open: '09:00',
-            close: '18:00',
-            closed: day.id === 'sunday'
-          }));
-        }
         setSettings(settingsData);
         setHolidays(settingsData.holidays || []);
       } else {
-        const initialSettings: ShopSettings = {
-          uid: profileData.id,
-          timezone: 'America/Sao_Paulo',
-          whatsappConfig: { enabled: false, reminders: true, confirmations: true },
+        // Default settings if none exist
+        setSettings({
+          name: '',
+          slug: '',
           businessHours: daysOfWeek.map(day => ({
             day: day.label,
             open: '09:00',
             close: '18:00',
             closed: day.id === 'sunday'
-          })),
-          holidays: []
-        };
-        setSettings(initialSettings);
-        setHolidays([]);
+          }))
+        } as ShopSettings);
       }
-
       setStaff(staffData);
-      setLoading(false);
     } catch (err) {
-      console.error('Failed to fetch settings data:', err);
+      console.error('Failed to fetch settings:', err);
+    } finally {
       setLoading(false);
     }
   };
 
   useEffect(() => {
-    fetchData();
-  }, []);
+    if (user) {
+      if (user.email === 'renatadouglas739@gmail.com' || user.email === 'barbeiromanager@gmail.com') {
+        setIsSuperAdmin(true);
+      }
+      fetchData();
+    }
+  }, [user]);
 
   const handleGenerateQR = async () => {
     setIsGeneratingQR(true);
@@ -138,7 +127,7 @@ export default function Settings({ onNavigate }: SettingsProps) {
 
   const handleSaveSettings = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!settings) return;
+    if (!settings || !user?.uid) return;
 
     // Validation
     if (settings.businessHours) {
@@ -152,14 +141,12 @@ export default function Settings({ onNavigate }: SettingsProps) {
 
     setTimeError(null);
     try {
-      await apiFetch('/settings', {
-        method: 'PUT',
-        body: JSON.stringify({
-          ...settings,
-          holidays
-        })
+      await api.put('/settings', {
+        ...settings,
+        holidays
       });
       alert('Configurações salvas com sucesso!');
+      fetchData();
     } catch (err) {
       console.error('Failed to save settings:', err);
       alert('Erro ao salvar configurações.');
@@ -167,7 +154,7 @@ export default function Settings({ onNavigate }: SettingsProps) {
   };
 
   const handleAddStaff = async () => {
-    if (!newStaffName) return;
+    if (!newStaffName || !user?.uid) return;
     
     // Check barber limit
     const staffLimit = plan?.features?.staffLimit;
@@ -177,17 +164,14 @@ export default function Settings({ onNavigate }: SettingsProps) {
     }
 
     try {
-      await apiFetch('/staff', {
-        method: 'POST',
-        body: JSON.stringify({
-          name: newStaffName,
-          active: true,
-          commissionPercentage: 0,
-          portfolio: []
-        })
+      await api.post('/staff', {
+        name: newStaffName,
+        active: true,
+        commissionPercentage: 0,
+        portfolio: []
       });
       setNewStaffName('');
-      await fetchData();
+      fetchData();
       alert('Profissional adicionado com sucesso!');
     } catch (err: any) {
       console.error('Failed to add staff:', err);
@@ -197,10 +181,7 @@ export default function Settings({ onNavigate }: SettingsProps) {
 
   const handleUpdateStaff = async (id: string, updates: Partial<Staff>) => {
     try {
-      await apiFetch(`/staff/${id}`, {
-        method: 'PUT',
-        body: JSON.stringify(updates)
-      });
+      await api.put(`/staff/${id}`, updates);
       fetchData();
     } catch (err) {
       console.error('Failed to update staff:', err);
@@ -208,7 +189,7 @@ export default function Settings({ onNavigate }: SettingsProps) {
   };
 
   const handleAddHoliday = async () => {
-    if (!newHolidayName || !newHolidayDate) return;
+    if (!newHolidayName || !newHolidayDate || !user?.uid) return;
     
     const newHoliday: Holiday = {
       id: Math.random().toString(36).substr(2, 9),
@@ -223,13 +204,11 @@ export default function Settings({ onNavigate }: SettingsProps) {
     
     if (settings) {
       try {
-        await apiFetch('/settings', {
-          method: 'PUT',
-          body: JSON.stringify({
-            ...settings,
-            holidays: updatedHolidays
-          })
+        await api.put('/settings', {
+          ...settings,
+          holidays: updatedHolidays
         });
+        fetchData();
       } catch (err) {
         console.error('Failed to save holiday:', err);
       }
@@ -237,9 +216,10 @@ export default function Settings({ onNavigate }: SettingsProps) {
   };
 
   const handleDelete = async (coll: string, id: string) => {
+    if (!user?.uid) return;
     if (coll === 'staff') {
       try {
-        await apiFetch(`/staff/${id}`, { method: 'DELETE' });
+        await api.delete(`/staff/${id}`);
         fetchData();
       } catch (err) {
         console.error('Failed to delete staff:', err);
@@ -250,13 +230,11 @@ export default function Settings({ onNavigate }: SettingsProps) {
       
       if (settings) {
         try {
-          await apiFetch('/settings', {
-            method: 'PUT',
-            body: JSON.stringify({
-              ...settings,
-              holidays: updatedHolidays
-            })
+          await api.put('/settings', {
+            ...settings,
+            holidays: updatedHolidays
           });
+          fetchData();
         } catch (err) {
           console.error('Failed to delete holiday:', err);
         }
@@ -282,11 +260,13 @@ export default function Settings({ onNavigate }: SettingsProps) {
               <p className="text-zinc-400 text-sm mb-2">Seu link exclusivo para clientes:</p>
               <div className="flex items-center gap-3 bg-zinc-800 p-3 rounded-xl border border-zinc-700">
                 <code className="text-rose-400 font-mono text-sm flex-1 truncate">
-                  {window.location.origin}/book/{settings?.slug || 'seu-salao'}
+                  {settings?.slug ? `${settings.slug}.dodile.com.br` : `${window.location.origin}/book/seu-salao`}
                 </code>
                 <button
                   onClick={() => {
-                    const url = `${window.location.origin}/book/${settings?.slug || 'seu-salao'}`;
+                    const url = settings?.slug 
+                      ? `https://${settings.slug}.dodile.com.br` 
+                      : `${window.location.origin}/book/seu-salao`;
                     navigator.clipboard.writeText(url);
                     setCopied(true);
                     setTimeout(() => setCopied(false), 2000);
@@ -316,17 +296,19 @@ export default function Settings({ onNavigate }: SettingsProps) {
         <form onSubmit={handleSaveSettings} className="p-6 space-y-6">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             <div className="space-y-2">
-              <label className="text-sm font-medium text-zinc-700">Nome/Slug do Salão</label>
+              <label className="text-sm font-medium text-zinc-700">Subdomínio (Seu Link Exclusivo)</label>
               <div className="relative">
                 <Globe className="absolute left-3 top-1/2 -translate-y-1/2 text-zinc-400" size={18} />
                 <input
                   type="text"
                   value={settings?.slug || ''}
-                  onChange={e => setSettings(s => s ? {...s, slug: e.target.value} : null)}
-                  className="w-full pl-10 pr-4 py-2 border border-zinc-200 rounded-xl focus:ring-2 focus:ring-rose-500 outline-none"
-                  placeholder="ex: salao-da-maria"
+                  onChange={e => setSettings(s => s ? {...s, slug: e.target.value.toLowerCase().replace(/[^a-z0-9-]/g, '')} : null)}
+                  className="w-full pl-10 pr-24 py-2 border border-zinc-200 rounded-xl focus:ring-2 focus:ring-rose-500 outline-none font-bold text-rose-500"
+                  placeholder="ex: studio-glow"
                 />
+                <span className="absolute right-4 top-1/2 -translate-y-1/2 text-zinc-400 text-xs font-bold">.dodile.com.br</span>
               </div>
+              <p className="text-[10px] text-zinc-400 italic">Este será o endereço que suas clientes usarão para agendar.</p>
             </div>
             <div className="space-y-2">
               <label className="text-sm font-medium text-zinc-700">CNPJ (Opcional)</label>
@@ -687,6 +669,230 @@ export default function Settings({ onNavigate }: SettingsProps) {
                 </button>
               </div>
             ))}
+          </div>
+        </div>
+      </section>
+
+      {/* Fidelity Program */}
+      <section className="bg-white rounded-2xl border border-zinc-200 overflow-hidden shadow-sm">
+        <div className="p-6 border-b border-zinc-100 bg-zinc-50/50">
+          <h3 className="text-lg font-semibold flex items-center gap-2">
+            <Gift size={20} className="text-rose-500" />
+            Programa de Fidelidade
+          </h3>
+        </div>
+        <div className="p-6 space-y-6">
+          <div className="flex items-center justify-between p-4 bg-zinc-50 rounded-xl border border-zinc-100">
+            <div className="space-y-1">
+              <p className="font-bold text-zinc-900">Ativar Programa de Fidelidade</p>
+              <p className="text-sm text-zinc-500">Recompense seus clientes por visitas e gastos.</p>
+            </div>
+            <button
+              onClick={() => {
+                if (!settings) return;
+                const config = settings.fidelityConfig || {
+                  enabled: false,
+                  pointsPerVisit: 10,
+                  pointsPerCurrency: 0,
+                  minPointsToRedeem: 100,
+                  redeemValue: 10
+                };
+                setSettings({
+                  ...settings,
+                  fidelityConfig: { ...config, enabled: !config.enabled }
+                });
+              }}
+              className={`w-12 h-6 rounded-full transition-colors relative ${
+                settings?.fidelityConfig?.enabled ? 'bg-emerald-500' : 'bg-zinc-300'
+              }`}
+            >
+              <div className={`absolute top-1 w-4 h-4 bg-white rounded-full transition-all ${
+                settings?.fidelityConfig?.enabled ? 'right-1' : 'left-1'
+              }`} />
+            </button>
+          </div>
+
+          {settings?.fidelityConfig?.enabled && (
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              <div className="space-y-2">
+                <label className="text-sm font-medium text-zinc-700">Pontos por Visita</label>
+                <input
+                  type="number"
+                  value={settings.fidelityConfig.pointsPerVisit}
+                  onChange={e => setSettings({
+                    ...settings,
+                    fidelityConfig: { ...settings.fidelityConfig!, pointsPerVisit: Number(e.target.value) }
+                  })}
+                  className="w-full px-4 py-2 border border-zinc-200 rounded-xl focus:ring-2 focus:ring-rose-500 outline-none"
+                  placeholder="10"
+                />
+                <p className="text-xs text-zinc-400">Quantos pontos o cliente ganha ao completar um serviço.</p>
+              </div>
+              <div className="space-y-2">
+                <label className="text-sm font-medium text-zinc-700">Pontos por R$ 1,00 gasto</label>
+                <input
+                  type="number"
+                  value={settings.fidelityConfig.pointsPerCurrency}
+                  onChange={e => setSettings({
+                    ...settings,
+                    fidelityConfig: { ...settings.fidelityConfig!, pointsPerCurrency: Number(e.target.value) }
+                  })}
+                  className="w-full px-4 py-2 border border-zinc-200 rounded-xl focus:ring-2 focus:ring-rose-500 outline-none"
+                  placeholder="0"
+                />
+                <p className="text-xs text-zinc-400">Opcional: ganhe pontos baseado no valor do serviço.</p>
+              </div>
+              <div className="space-y-2">
+                <label className="text-sm font-medium text-zinc-700">Mínimo de Pontos para Resgate</label>
+                <input
+                  type="number"
+                  value={settings.fidelityConfig.minPointsToRedeem}
+                  onChange={e => setSettings({
+                    ...settings,
+                    fidelityConfig: { ...settings.fidelityConfig!, minPointsToRedeem: Number(e.target.value) }
+                  })}
+                  className="w-full px-4 py-2 border border-zinc-200 rounded-xl focus:ring-2 focus:ring-rose-500 outline-none"
+                  placeholder="100"
+                />
+                <p className="text-xs text-zinc-400">Pontuação necessária para liberar o resgate.</p>
+              </div>
+              <div className="space-y-2">
+                <label className="text-sm font-medium text-zinc-700">Valor do Desconto (R$)</label>
+                <input
+                  type="number"
+                  value={settings.fidelityConfig.redeemValue}
+                  onChange={e => setSettings({
+                    ...settings,
+                    fidelityConfig: { ...settings.fidelityConfig!, redeemValue: Number(e.target.value) }
+                  })}
+                  className="w-full px-4 py-2 border border-zinc-200 rounded-xl focus:ring-2 focus:ring-rose-500 outline-none"
+                  placeholder="10"
+                />
+                <p className="text-xs text-zinc-400">Valor em dinheiro que os pontos resgatados valem.</p>
+              </div>
+            </div>
+          )}
+          
+          <div className="flex justify-end">
+            <button
+              onClick={handleSaveSettings}
+              className="flex items-center gap-2 bg-zinc-900 text-white px-6 py-2.5 rounded-xl hover:bg-zinc-800 transition-colors font-medium"
+            >
+              <Save size={18} />
+              Salvar Configurações de Fidelidade
+            </button>
+          </div>
+        </div>
+      </section>
+
+      {/* Fidelity Program */}
+      <section className="bg-white rounded-2xl border border-zinc-200 overflow-hidden shadow-sm">
+        <div className="p-6 border-b border-zinc-100 bg-zinc-50/50">
+          <h3 className="text-lg font-semibold flex items-center gap-2">
+            <Gift size={20} className="text-rose-500" />
+            Programa de Fidelidade
+          </h3>
+        </div>
+        <div className="p-6 space-y-6">
+          <div className="flex items-center justify-between p-4 bg-zinc-50 rounded-xl border border-zinc-100">
+            <div className="space-y-1">
+              <p className="font-bold text-zinc-900">Ativar Programa de Fidelidade</p>
+              <p className="text-sm text-zinc-500">Recompense seus clientes por visitas e gastos.</p>
+            </div>
+            <button
+              onClick={() => {
+                if (!settings) return;
+                const config = settings.fidelityConfig || {
+                  enabled: false,
+                  pointsPerVisit: 10,
+                  pointsPerCurrency: 0,
+                  minPointsToRedeem: 100,
+                  redeemValue: 10
+                };
+                setSettings({
+                  ...settings,
+                  fidelityConfig: { ...config, enabled: !config.enabled }
+                });
+              }}
+              className={`w-12 h-6 rounded-full transition-colors relative ${
+                settings?.fidelityConfig?.enabled ? 'bg-emerald-500' : 'bg-zinc-300'
+              }`}
+            >
+              <div className={`absolute top-1 w-4 h-4 bg-white rounded-full transition-all ${
+                settings?.fidelityConfig?.enabled ? 'right-1' : 'left-1'
+              }`} />
+            </button>
+          </div>
+
+          {settings?.fidelityConfig?.enabled && (
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              <div className="space-y-2">
+                <label className="text-sm font-medium text-zinc-700">Pontos por Visita</label>
+                <input
+                  type="number"
+                  value={settings.fidelityConfig.pointsPerVisit}
+                  onChange={e => setSettings({
+                    ...settings,
+                    fidelityConfig: { ...settings.fidelityConfig!, pointsPerVisit: Number(e.target.value) }
+                  })}
+                  className="w-full px-4 py-2 border border-zinc-200 rounded-xl focus:ring-2 focus:ring-rose-500 outline-none"
+                  placeholder="10"
+                />
+                <p className="text-xs text-zinc-400">Quantos pontos o cliente ganha ao completar um serviço.</p>
+              </div>
+              <div className="space-y-2">
+                <label className="text-sm font-medium text-zinc-700">Pontos por R$ 1,00 gasto</label>
+                <input
+                  type="number"
+                  value={settings.fidelityConfig.pointsPerCurrency}
+                  onChange={e => setSettings({
+                    ...settings,
+                    fidelityConfig: { ...settings.fidelityConfig!, pointsPerCurrency: Number(e.target.value) }
+                  })}
+                  className="w-full px-4 py-2 border border-zinc-200 rounded-xl focus:ring-2 focus:ring-rose-500 outline-none"
+                  placeholder="0"
+                />
+                <p className="text-xs text-zinc-400">Opcional: ganhe pontos baseado no valor do serviço.</p>
+              </div>
+              <div className="space-y-2">
+                <label className="text-sm font-medium text-zinc-700">Mínimo de Pontos para Resgate</label>
+                <input
+                  type="number"
+                  value={settings.fidelityConfig.minPointsToRedeem}
+                  onChange={e => setSettings({
+                    ...settings,
+                    fidelityConfig: { ...settings.fidelityConfig!, minPointsToRedeem: Number(e.target.value) }
+                  })}
+                  className="w-full px-4 py-2 border border-zinc-200 rounded-xl focus:ring-2 focus:ring-rose-500 outline-none"
+                  placeholder="100"
+                />
+                <p className="text-xs text-zinc-400">Pontuação necessária para liberar o resgate.</p>
+              </div>
+              <div className="space-y-2">
+                <label className="text-sm font-medium text-zinc-700">Valor do Desconto (R$)</label>
+                <input
+                  type="number"
+                  value={settings.fidelityConfig.redeemValue}
+                  onChange={e => setSettings({
+                    ...settings,
+                    fidelityConfig: { ...settings.fidelityConfig!, redeemValue: Number(e.target.value) }
+                  })}
+                  className="w-full px-4 py-2 border border-zinc-200 rounded-xl focus:ring-2 focus:ring-rose-500 outline-none"
+                  placeholder="10"
+                />
+                <p className="text-xs text-zinc-400">Valor em dinheiro que os pontos resgatados valem.</p>
+              </div>
+            </div>
+          )}
+          
+          <div className="flex justify-end">
+            <button
+              onClick={handleSaveSettings}
+              className="flex items-center gap-2 bg-zinc-900 text-white px-6 py-2.5 rounded-xl hover:bg-zinc-800 transition-colors font-medium"
+            >
+              <Save size={18} />
+              Salvar Configurações de Fidelidade
+            </button>
           </div>
         </div>
       </section>
