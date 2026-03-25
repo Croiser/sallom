@@ -23,7 +23,16 @@ export default function Pricing({ onSelectPlan }: PricingProps) {
           api.get('/public/plans'),
           user ? api.get('/subscriptions/me').catch(() => null) : Promise.resolve(null)
         ]);
-        setPlans(plansData.sort((a: Plan, b: Plan) => a.priceMonthly - b.priceMonthly));
+        const filteredPlans = plansData
+          .filter((p: Plan) => p.slug === 'bronze' || p.slug === 'silver')
+          .map((p: Plan) => {
+            if (p.slug === 'silver') return { ...p, name: 'Prata' };
+            // Ensure whatsapp is false in the UI for both
+            return { ...p, features: { ...p.features, whatsapp: false } };
+          })
+          .sort((a: Plan, b: Plan) => a.priceMonthly - b.priceMonthly);
+          
+        setPlans(filteredPlans);
         setSubscription(subData);
         setLoading(false);
       } catch (error) {

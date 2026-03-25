@@ -7,7 +7,7 @@ const prisma = new PrismaClient();
 // Initialize Firebase Admin
 if (!admin.apps.length) {
   admin.initializeApp({
-    projectId: process.env.FIREBASE_PROJECT_ID || 'dodile-barbearia'
+    projectId: process.env.FIREBASE_PROJECT_ID || 'sallonpromanager'
   });
 }
 
@@ -64,15 +64,15 @@ export function initDb() {
       await prisma.user.create({
         data: {
           name: 'Administrador',
-          email: 'admin@dodile.com.br',
+          email: 'admin@sallonpromanager.com.br',
           password: hashedPassword,
           role: 'admin',
-          shopName: 'Dodile Studio',
-          slug: 'dodile-studio',
+          shopName: 'SallonProManager Studio',
+          slug: 'sallonpromanager-studio',
           status: 'active'
         }
       });
-      console.log('Seeded default admin user: admin@dodile.com.br / password123');
+      console.log('Seeded default admin user: admin@sallonpromanager.com.br / password123');
     }
   }).catch(e => {
     console.error('Error seeding user: ', e);

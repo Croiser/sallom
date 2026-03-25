@@ -100,7 +100,7 @@ export default function Settings({ onNavigate }: SettingsProps) {
 
   useEffect(() => {
     if (user) {
-      if (user.email === 'renatadouglas739@gmail.com' || user.email === 'barbeiromanager@gmail.com') {
+      if (user.email === 'renatadouglas739@gmail.com' || user.email === 'sallonpromanager@gmail.com') {
         setIsSuperAdmin(true);
       }
       fetchData();
@@ -260,12 +260,12 @@ export default function Settings({ onNavigate }: SettingsProps) {
               <p className="text-zinc-400 text-sm mb-2">Seu link exclusivo para clientes:</p>
               <div className="flex items-center gap-3 bg-zinc-800 p-3 rounded-xl border border-zinc-700">
                 <code className="text-rose-400 font-mono text-sm flex-1 truncate">
-                  {settings?.slug ? `${settings.slug}.dodile.com.br` : `${window.location.origin}/book/seu-salao`}
+                  {settings?.slug ? `${settings.slug}.sallonpromanager.com.br` : `${window.location.origin}/book/seu-salao`}
                 </code>
                 <button
                   onClick={() => {
                     const url = settings?.slug 
-                      ? `https://${settings.slug}.dodile.com.br` 
+                      ? `https://${settings.slug}.sallonpromanager.com.br` 
                       : `${window.location.origin}/book/seu-salao`;
                     navigator.clipboard.writeText(url);
                     setCopied(true);
@@ -306,7 +306,7 @@ export default function Settings({ onNavigate }: SettingsProps) {
                   className="w-full pl-10 pr-24 py-2 border border-zinc-200 rounded-xl focus:ring-2 focus:ring-rose-500 outline-none font-bold text-rose-500"
                   placeholder="ex: studio-glow"
                 />
-                <span className="absolute right-4 top-1/2 -translate-y-1/2 text-zinc-400 text-xs font-bold">.dodile.com.br</span>
+                <span className="absolute right-4 top-1/2 -translate-y-1/2 text-zinc-400 text-xs font-bold">.sallonpromanager.com.br</span>
               </div>
               <p className="text-[10px] text-zinc-400 italic">Este será o endereço que suas clientes usarão para agendar.</p>
             </div>
@@ -425,7 +425,7 @@ export default function Settings({ onNavigate }: SettingsProps) {
                   value={settings?.facebook || ''}
                   onChange={e => setSettings(s => s ? {...s, facebook: e.target.value} : null)}
                   className="w-full pl-10 pr-4 py-2 border border-zinc-200 rounded-xl focus:ring-2 focus:ring-rose-500 outline-none"
-                  placeholder="facebook.com/seusalaopro"
+                  placeholder="facebook.com/seusallonpromanager"
                 />
               </div>
             </div>
@@ -438,7 +438,7 @@ export default function Settings({ onNavigate }: SettingsProps) {
                   value={settings?.tiktok || ''}
                   onChange={e => setSettings(s => s ? {...s, tiktok: e.target.value} : null)}
                   className="w-full pl-10 pr-4 py-2 border border-zinc-200 rounded-xl focus:ring-2 focus:ring-rose-500 outline-none"
-                  placeholder="@seusalaopro"
+                  placeholder="@seusallonpromanager"
                 />
               </div>
             </div>

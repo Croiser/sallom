@@ -21,6 +21,8 @@ import Reports from './components/Reports';
 import Checkout from './components/Checkout';
 import HelpGuide from './components/HelpGuide';
 import BookingPage from './components/BookingPage';
+import AutomationSettings from './components/AutomationSettings';
+import WhatsAppConnection from './components/WhatsAppConnection';
 import { Plan } from './types';
 import { ShieldAlert } from 'lucide-react';
 import { api } from './services/api';
@@ -249,6 +251,10 @@ export default function App() {
         return <SuperAdmin />;
       case 'whatsapp':
         return <WhatsApp onNavigate={handleNavigate} />;
+      case 'automation':
+        return <AutomationSettings />;
+      case 'whatsapp-connection':
+        return <WhatsAppConnection />;
       case 'help':
         return <HelpGuide onNavigate={handleNavigate} />;
       default:

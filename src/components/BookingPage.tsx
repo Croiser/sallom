@@ -87,6 +87,8 @@ export default function BookingPage({ slug }: BookingPageProps) {
     return slots;
   };
 
+  const [appointmentId, setAppointmentId] = useState<string | null>(null);
+
   const handleBooking = async () => {
     if (!selectedService || !selectedStaff || !selectedTime || !shop) return;
     setIsBooking(true);
@@ -94,7 +96,7 @@ export default function BookingPage({ slug }: BookingPageProps) {
     try {
       const appointmentDate = parse(selectedTime, 'HH:mm', selectedDate);
       
-      await api.post('/public/appointments', {
+      const response = await api.post('/public/appointments', {
         ownerUid: shop.uid,
         clientName: clientInfo.name,
         phone: clientInfo.phone,
@@ -107,6 +109,9 @@ export default function BookingPage({ slug }: BookingPageProps) {
         status: 'pending'
       });
 
+      if (response.appointmentId) {
+        setAppointmentId(response.appointmentId);
+      }
       setBookingSuccess(true);
     } catch (err) {
       console.error('Error creating appointment:', err);
@@ -114,6 +119,15 @@ export default function BookingPage({ slug }: BookingPageProps) {
     } finally {
       setIsBooking(false);
     }
+  };
+
+  const getWhatsAppLink = () => {
+    if (!shop || !appointmentId) return '#';
+    const message = `Olá! Gostaria de confirmar meu agendamento na ${shop.name || 'Barbearia'}.\n\n✅ Serviço: ${selectedService?.name}\n📅 Data: ${format(selectedDate, "dd/MM/yyyy")}\n⏰ Hora: ${selectedTime}\n\nID: ${appointmentId}`;
+    const encodedMessage = encodeURIComponent(message);
+    // Use the shop phone or a default
+    const phone = shop.phone?.replace(/\D/g, '') || '';
+    return `https://wa.me/55${phone}?text=${encodedMessage}`;
   };
 
   if (loading) {
@@ -150,28 +164,45 @@ export default function BookingPage({ slug }: BookingPageProps) {
             <h2 className="text-2xl font-bold text-white">Agendamento Realizado!</h2>
             <p className="text-zinc-400">Tudo pronto para o seu atendimento no {ownerProfile?.shopName || 'nosso salão'}.</p>
           </div>
-          <div className="bg-zinc-950 rounded-2xl p-4 text-left space-y-3">
-            <div className="flex justify-between text-sm">
-              <span className="text-zinc-500">Serviço:</span>
-              <span className="text-white font-medium">{selectedService?.name}</span>
-            </div>
-            <div className="flex justify-between text-sm">
-              <span className="text-zinc-500">Profissional:</span>
-              <span className="text-white font-medium">{selectedStaff?.name}</span>
-            </div>
-            <div className="flex justify-between text-sm">
-              <span className="text-zinc-500">Data e Hora:</span>
-              <span className="text-white font-medium">
-                {format(selectedDate, "dd 'de' MMMM", { locale: ptBR })} às {selectedTime}
-              </span>
+          
+          <div className="bg-zinc-950 rounded-2xl p-6 text-left space-y-4 border border-zinc-800">
+            <h3 className="text-sm font-bold text-zinc-500 uppercase tracking-widest">Resumo do Pedido</h3>
+            <div className="space-y-3">
+              <div className="flex justify-between text-sm">
+                <span className="text-zinc-400">Serviço:</span>
+                <span className="text-white font-medium">{selectedService?.name}</span>
+              </div>
+              <div className="flex justify-between text-sm">
+                <span className="text-zinc-400">Data e Hora:</span>
+                <span className="text-white font-medium uppercase text-xs">
+                  {format(selectedDate, "dd 'de' MMMM", { locale: ptBR })} às {selectedTime}
+                </span>
+              </div>
             </div>
           </div>
-          <button 
-            onClick={() => window.location.reload()}
-            className="w-full bg-rose-500 text-white py-4 rounded-2xl font-bold hover:bg-rose-600 transition-all"
-          >
-            Fazer outro agendamento
-          </button>
+
+          <div className="space-y-4">
+            <a 
+              href={getWhatsAppLink()}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="flex items-center justify-center gap-3 w-full bg-emerald-600 text-white py-5 rounded-2xl font-bold hover:bg-emerald-700 transition-all shadow-lg shadow-emerald-500/20"
+            >
+              <Phone size={20} />
+              Confirmar no WhatsApp
+            </a>
+            
+            <p className="text-[10px] text-zinc-500 px-6">
+              Ao clicar no botão acima, você enviará uma mensagem de confirmação e receberá seu <strong>comprovante digital</strong> automaticamente.
+            </p>
+
+            <button 
+              onClick={() => window.location.reload()}
+              className="text-zinc-500 hover:text-white text-sm font-medium transition-colors pt-4"
+            >
+              Voltar ao início
+            </button>
+          </div>
         </motion.div>
       </div>
     );

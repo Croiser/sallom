@@ -62,7 +62,13 @@ export default function SuperAdmin() {
   const [searchTerm, setSearchTerm] = useState('');
   const [editingPlan, setEditingPlan] = useState<Plan | null>(null);
   const [selectedTenant, setSelectedTenant] = useState<UserProfile | null>(null);
-  const [tenantUsage, setTenantUsage] = useState<{ appointments: number, staff: number } | null>(null);
+  const [tenantUsage, setTenantUsage] = useState<{ 
+    appointments: number, 
+    staff: number, 
+    wallet?: any, 
+    whatsapp?: any 
+  } | null>(null);
+  const [rechargeAmount, setRechargeAmount] = useState('');
   const [isEditingTenant, setIsEditingTenant] = useState(false);
   const [apiStatus, setApiStatus] = useState({
     database: 'online',
@@ -164,12 +170,55 @@ export default function SuperAdmin() {
     e.preventDefault();
     if (!editingPlan) return;
     try {
-      const { id, ...data } = editingPlan;
-      await api.put(`/superadmin/plans/${id}`, data);
-      setPlans(prev => prev.map(p => p.id === id ? { ...p, ...data } : p));
+      const { id, name, priceMonthly, priceYearly, features, slug } = editingPlan;
+      const payload = { 
+        id,
+        name, 
+        slug: slug || name.toLowerCase().replace(/\s+/g, '-'),
+        priceMonthly: Number(priceMonthly), 
+        priceYearly: Number(priceYearly), 
+        features 
+      };
+      
+      if (plans.find(p => p.id === id)) {
+        await api.put(`/superadmin/plans/${id}`, payload);
+        setPlans(prev => prev.map(p => p.id === id ? { ...p, ...payload } : p));
+        alert('Plano atualizado com sucesso!');
+      } else {
+        const newPlan = await api.post('/superadmin/plans', payload);
+        setPlans(prev => [...prev, newPlan]);
+        alert('Novo plano criado com sucesso!');
+      }
       setEditingPlan(null);
-    } catch (error) {
+    } catch (error: any) {
       console.error("Error saving plan:", error);
+      alert(`Erro ao salvar plano: ${error.message}`);
+    }
+  };
+
+  const handleDeletePlan = async (planId: string) => {
+    if (!confirm('Você tem certeza que deseja excluir este plano? Esta ação pode afetar assinaturas existentes!')) return;
+    try {
+      await api.delete(`/superadmin/plans/${planId}`);
+      setPlans(prev => prev.filter(p => p.id !== planId));
+      alert('Plano removido com sucesso!');
+    } catch (error: any) {
+      alert('Erro ao remover plano: ' + error.message);
+    }
+  };
+
+  const handleManualRecharge = async (userId: string) => {
+    if (!rechargeAmount || isNaN(Number(rechargeAmount))) return;
+    try {
+      await api.post(`/superadmin/tenants/${userId}/wallet/recharge`, {
+        amount: Number(rechargeAmount),
+        description: 'Crédito manual via SuperAdmin'
+      });
+      setRechargeAmount('');
+      fetchTenantUsage(userId); // Refresh data
+      alert('Créditos adicionados com sucesso!');
+    } catch (error: any) {
+      alert('Erro ao recarregar: ' + error.message);
     }
   };
 
@@ -194,11 +243,15 @@ export default function SuperAdmin() {
     { name: 'Jun', value: 7500 },
   ];
 
-  const planDistribution = [
-    { name: 'Bronze', value: 45, color: '#a1a1aa' },
-    { name: 'Silver', value: 30, color: '#f43f5e' },
-    { name: 'Gold', value: 25, color: '#e11d48' },
-  ];
+  const planDistribution = plans.map((p, i) => {
+    const colors = ['#a1a1aa', '#f43f5e', '#e11d48', '#fbbf24', '#8b5cf6'];
+    const count = tenants.filter(t => t.planId === p.id).length;
+    return {
+      name: p.name,
+      value: tenants.length > 0 ? Math.round((count / tenants.length) * 100) : 0,
+      color: colors[i % colors.length]
+    };
+  });
 
   return (
     <div className="space-y-8 pb-20 bg-zinc-950 -m-10 p-10 min-h-screen text-white">
@@ -340,21 +393,44 @@ export default function SuperAdmin() {
 
         {/* Plan Pricing Config */}
         <div className="lg:col-span-2 bg-zinc-900/50 backdrop-blur-xl p-8 rounded-3xl border border-zinc-800 shadow-2xl">
-          <h3 className="text-lg font-bold mb-6 flex items-center gap-2">
-            <Settings size={20} className="text-rose-500" />
-            Configurações de SaaS
-          </h3>
+          <div className="flex items-center justify-between mb-6">
+            <h3 className="text-lg font-bold flex items-center gap-2">
+              <Settings size={20} className="text-rose-500" />
+              Configurações de SaaS
+            </h3>
+            <button 
+              onClick={() => setEditingPlan({
+                id: '',
+                name: '',
+                slug: '',
+                priceMonthly: 0,
+                priceYearly: 0,
+                features: { staffLimit: 1, inventory: false, reports: false, whatsapp: false }
+              } as any)}
+              className="flex items-center gap-2 px-3 py-1.5 bg-rose-500 text-zinc-900 rounded-xl text-xs font-bold hover:bg-rose-400 transition-all"
+            >
+              <Plus size={14} /> Novo Plano
+            </button>
+          </div>
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
             {plans.map(plan => (
               <div key={plan.id} className="p-6 bg-zinc-800/50 rounded-2xl border border-zinc-700 group relative">
                 <div className="flex items-center justify-between mb-4">
                   <h4 className="font-bold text-rose-500">{plan.name}</h4>
-                  <button 
-                    onClick={() => setEditingPlan(plan)}
-                    className="p-2 text-zinc-500 hover:text-white hover:bg-zinc-700 rounded-lg transition-all"
-                  >
-                    <Settings size={16} />
-                  </button>
+                  <div className="flex gap-1">
+                    <button 
+                      onClick={() => setEditingPlan(plan)}
+                      className="p-2 text-zinc-500 hover:text-white hover:bg-zinc-700 rounded-lg transition-all"
+                    >
+                      <Settings size={16} />
+                    </button>
+                    <button 
+                      onClick={() => handleDeletePlan(plan.id)}
+                      className="p-2 text-zinc-500 hover:text-rose-500 hover:bg-rose-500/10 rounded-lg transition-all"
+                    >
+                      <Trash2 size={16} />
+                    </button>
+                  </div>
                 </div>
                 <div className="space-y-4">
                   <div>
@@ -396,10 +472,36 @@ export default function SuperAdmin() {
               className="relative w-full max-w-2xl bg-zinc-900 border border-zinc-800 rounded-3xl shadow-2xl overflow-hidden"
             >
               <div className="p-8 border-b border-zinc-800 bg-zinc-900/50">
-                <h3 className="text-xl font-bold">Editar Plano: {editingPlan.name}</h3>
-                <p className="text-sm text-zinc-500">Ajuste preços e recursos do plano global</p>
+                <h3 className="text-xl font-bold">{editingPlan.id ? `Editar Plano: ${editingPlan.name}` : 'Criar Novo Plano'}</h3>
+                <p className="text-sm text-zinc-500">{editingPlan.id ? 'Ajuste preços e recursos do plano global' : 'Configure as opções do novo pacote do SaaS'}</p>
               </div>
-              <form onSubmit={handleSavePlan} className="p-8 space-y-8">
+              <form onSubmit={handleSavePlan} className="p-8 space-y-6 max-h-[70vh] overflow-y-auto custom-scrollbar">
+                {!editingPlan.id && (
+                  <div className="grid grid-cols-2 gap-4">
+                    <div className="space-y-1">
+                      <label className="text-xs font-bold text-zinc-500 uppercase">Nome do Plano</label>
+                      <input 
+                        type="text"
+                        required
+                        value={editingPlan.name}
+                        onChange={e => setEditingPlan({...editingPlan, name: e.target.value})}
+                        className="w-full bg-zinc-950 border border-zinc-800 rounded-xl px-4 py-2 text-sm text-white focus:border-rose-500 outline-none"
+                        placeholder="Ex: Platinum"
+                      />
+                    </div>
+                    <div className="space-y-1">
+                      <label className="text-xs font-bold text-zinc-500 uppercase">Identificador (Slug)</label>
+                      <input 
+                        type="text"
+                        required
+                        value={editingPlan.slug}
+                        onChange={e => setEditingPlan({...editingPlan, slug: e.target.value})}
+                        className="w-full bg-zinc-950 border border-zinc-800 rounded-xl px-4 py-2 text-sm text-white focus:border-rose-500 outline-none"
+                        placeholder="ex: platinum"
+                      />
+                    </div>
+                  </div>
+                )}
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                   <div className="space-y-2">
                     <label className="text-sm font-medium text-zinc-400">Preço Mensal (R$)</label>
@@ -625,8 +727,8 @@ export default function SuperAdmin() {
                           </div>
                         </div>
                         <div className="p-4 bg-zinc-950 rounded-2xl border border-zinc-800">
-                          <p className="text-xs font-bold text-zinc-500 uppercase mb-2">Métricas de Uso</p>
-                          <div className="space-y-2">
+                          <p className="text-xs font-bold text-zinc-500 uppercase mb-2">Métricas e Automação</p>
+                          <div className="space-y-3">
                             <div className="flex items-center justify-between text-sm">
                               <span className="text-zinc-500 flex items-center gap-1"><CalendarIcon size={14} /> Agendamentos:</span>
                               <span className="font-bold text-white">{tenantUsage?.appointments || 0}</span>
@@ -635,8 +737,47 @@ export default function SuperAdmin() {
                               <span className="text-zinc-500 flex items-center gap-1"><Scissors size={14} /> Profissionais:</span>
                               <span className="font-bold text-white">{tenantUsage?.staff || 0}</span>
                             </div>
+                            <div className="pt-2 border-t border-zinc-900">
+                                <div className="flex items-center justify-between text-sm mb-1">
+                                    <span className="text-zinc-500 flex items-center gap-1"><CreditCard size={14} /> Saldo Wallet:</span>
+                                    <span className="font-bold text-emerald-400">R$ {Number(tenantUsage?.wallet?.balance || 0).toFixed(2)}</span>
+                                </div>
+                                <div className="flex items-center justify-between text-sm">
+                                    <span className="text-zinc-500 flex items-center gap-1"><Phone size={14} /> WhatsApp:</span>
+                                    <span className={`font-bold ${tenantUsage?.whatsapp?.status === 'CONNECTED' ? 'text-emerald-400' : 'text-rose-400'}`}>
+                                        {tenantUsage?.whatsapp?.status || 'Desconectado'}
+                                    </span>
+                                </div>
+                            </div>
                           </div>
                         </div>
+                      </div>
+
+                      {/* Manual Recharge Section */}
+                      <div className="p-6 bg-zinc-950 rounded-2xl border border-zinc-800 border-dashed border-zinc-700">
+                          <h4 className="text-sm font-bold mb-4 flex items-center gap-2">
+                              <Zap size={16} className="text-amber-500" />
+                              Gestão Manual de Créditos
+                          </h4>
+                          <div className="flex gap-3">
+                              <div className="relative flex-1">
+                                  <span className="absolute left-4 top-1/2 -translate-y-1/2 text-zinc-500 text-sm">R$</span>
+                                  <input 
+                                    type="number" 
+                                    placeholder="0,00"
+                                    value={rechargeAmount}
+                                    onChange={e => setRechargeAmount(e.target.value)}
+                                    className="w-full bg-zinc-900 border border-zinc-800 rounded-xl pl-10 pr-4 py-2 text-sm outline-none focus:border-amber-500"
+                                  />
+                              </div>
+                              <button 
+                                onClick={() => handleManualRecharge(selectedTenant.id!)}
+                                className="bg-amber-500 text-amber-950 px-6 py-2 rounded-xl font-bold text-sm hover:bg-amber-400 transition-all flex items-center gap-2"
+                              >
+                                <Plus size={16} /> Adicionar Créditos
+                              </button>
+                          </div>
+                          <p className="text-[10px] text-zinc-500 mt-2 italic">* O valor será creditado instantaneamente na carteira do lojista.</p>
                       </div>
 
                       <div className="flex flex-wrap gap-3">
@@ -727,7 +868,11 @@ export default function SuperAdmin() {
             </thead>
             <tbody className="divide-y divide-zinc-800">
               {tenants
-                .filter(t => t.shopName.toLowerCase().includes(searchTerm.toLowerCase()) || t.email.toLowerCase().includes(searchTerm.toLowerCase()))
+                .filter(t => 
+                  (t.shopName?.toLowerCase() || '').includes(searchTerm.toLowerCase()) || 
+                  (t.email?.toLowerCase() || '').includes(searchTerm.toLowerCase())
+                )
+                .filter(t => t.role !== 'admin') // Opcional: oculte outros admin masters da lista de tenants
                 .map(tenant => (
                 <tr key={tenant.id} className="hover:bg-zinc-800/30 transition-colors">
                   <td className="px-8 py-6">

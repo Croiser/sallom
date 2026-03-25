@@ -9,14 +9,10 @@ export interface WhatsAppSettings {
     reminder: string;
     confirmation: string;
   };
-  apiKey?: string;
-  instanceName?: string;
-  instanceStatus?: 'connected' | 'disconnected' | 'connecting';
-  batteryLevel?: number;
+  apiKey?: string; // This will be the Meta Access Token
+  phoneNumberId?: string;
+  wabaId?: string;
 }
-
-const EVOLUTION_API_URL = (import.meta as any).env.VITE_EVOLUTION_API_URL || 'http://localhost:8080';
-const EVOLUTION_API_KEY = (import.meta as any).env.VITE_EVOLUTION_API_KEY || 'global_api_key_here';
 
 export const whatsappService = {
   async getSettings(uid: string): Promise<WhatsAppSettings> {
@@ -37,124 +33,36 @@ export const whatsappService = {
     }
   },
 
+  async testMessage(number: string, templateName: string, languageCode: string = 'pt_BR', components: any[] = []) {
+    try {
+      return await api.post('/whatsapp/test', {
+        number,
+        templateName,
+        languageCode,
+        components
+      });
+    } catch (error) {
+      console.error('Error testing whatsapp message:', error);
+      throw error;
+    }
+  },
+
   async triggerMessage(
-    uid: string,
-    type: WhatsAppMessageType,
     recipientNumber: string,
     recipientName: string,
-    variables: Record<string, string>
+    type: string,
+    variables: Record<string, any>
   ) {
     try {
-      const settings = await this.getSettings(uid);
-      if (!settings || !settings.enabled || !settings.instanceName) return;
-
-      let content = settings.templates[type];
-      
-      // Replace variables
-      Object.entries(variables).forEach(([key, value]) => {
-        content = content.replace(new RegExp(`{${key}}`, 'g'), value);
-      });
-
-      // Send via Evolution API
-      const response = await fetch(`${EVOLUTION_API_URL}/message/sendText/${settings.instanceName}`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'apikey': EVOLUTION_API_KEY
-        },
-        body: JSON.stringify({
-          number: recipientNumber.replace(/\D/g, ''),
-          text: content
-        })
-      });
-
-      let messageId = null;
-      if (response.ok) {
-        const data = await response.json();
-        messageId = data?.key?.id || data?.messageId || null;
-      }
-
-      const status = response.ok ? 'Enviada' : 'Falha';
-
-      // Log the message in Backend
-      await api.post('/whatsapp-messages', {
+      return await api.post('/whatsapp/trigger', {
         recipientNumber,
         recipientName,
-        content,
         type,
-        status,
-        externalId: messageId
+        variables
       });
-
-      console.log(`WhatsApp Message Triggered (${type}):`, content);
     } catch (error) {
       console.error('Error triggering whatsapp message:', error);
-    }
-  },
-
-  async createInstance(uid: string) {
-    const instanceName = `salao_${uid.substring(0, 8)}`;
-    try {
-      const response = await fetch(`${EVOLUTION_API_URL}/instance/create`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'apikey': EVOLUTION_API_KEY
-        },
-        body: JSON.stringify({
-          instanceName,
-          token: uid,
-          qrcode: true
-        })
-      });
-
-      if (!response.ok) throw new Error('Failed to create instance');
-      
-      await this.updateSettings(uid, { 
-        instanceName,
-        instanceStatus: 'connecting'
-      });
-      
-      return instanceName;
-    } catch (error) {
-      console.error('Error creating instance:', error);
       throw error;
-    }
-  },
-
-  async getQRCode(instanceName: string) {
-    try {
-      const response = await fetch(`${EVOLUTION_API_URL}/instance/connect/${instanceName}`, {
-        method: 'GET',
-        headers: {
-          'apikey': EVOLUTION_API_KEY
-        }
-      });
-
-      if (!response.ok) throw new Error('Failed to get QR Code');
-      const data = await response.json();
-      return data.base64; // Evolution API returns base64 in the response
-    } catch (error) {
-      console.error('Error fetching QR Code:', error);
-      throw error;
-    }
-  },
-
-  async checkStatus(instanceName: string) {
-    try {
-      const response = await fetch(`${EVOLUTION_API_URL}/instance/connectionStatus/${instanceName}`, {
-        method: 'GET',
-        headers: {
-          'apikey': EVOLUTION_API_KEY
-        }
-      });
-
-      if (!response.ok) return null;
-      const data = await response.json();
-      return data; // Returns { instance: { state: 'open' | 'close', ... } }
-    } catch (error) {
-      console.error('Error checking status:', error);
-      return null;
     }
   }
 };

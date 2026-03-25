@@ -37,7 +37,6 @@ export default function WhatsApp({ onNavigate }: WhatsAppProps) {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [success, setSuccess] = useState(false);
-  const [qrCode, setQrCode] = useState<string | null>(null);
   const [connecting, setConnecting] = useState(false);
 
   useEffect(() => {
@@ -52,10 +51,6 @@ export default function WhatsApp({ onNavigate }: WhatsAppProps) {
         
         setSettings(settingsData);
         setMessages(messagesData);
-        
-        if (settingsData.instanceName) {
-          checkInstanceStatus(settingsData.instanceName);
-        }
       } catch (error) {
         console.error('Failed to load WhatsApp data:', error);
       } finally {
@@ -80,31 +75,20 @@ export default function WhatsApp({ onNavigate }: WhatsAppProps) {
     }
   };
 
-  const checkInstanceStatus = async (instanceName: string) => {
-    const status = await whatsappService.checkStatus(instanceName);
-    if (status && status.instance.state === 'open') {
-      setSettings(s => s ? ({ ...s, instanceStatus: 'connected' }) : null);
-      setQrCode(null);
-    } else {
-      setSettings(s => s ? ({ ...s, instanceStatus: 'disconnected' }) : null);
-    }
-  };
 
-  const handleConnect = async () => {
+  const handleTest = async () => {
     if (!user?.uid) return;
+    const testNumber = prompt('Digite o número para teste (formato 55119...):');
+    if (!testNumber) return;
+    
     setConnecting(true);
     try {
-      let instanceName = settings?.instanceName;
-      if (!instanceName) {
-        instanceName = await whatsappService.createInstance(user.uid);
-      }
-      
-      if (instanceName) {
-        const base64 = await whatsappService.getQRCode(instanceName);
-        setQrCode(base64);
-      }
-    } catch (error) {
-      console.error(error);
+      // For testing, we use a generic hello_world template if available, 
+      // or the user can specify. For now, let's try to send a template.
+      await whatsappService.testMessage(testNumber, 'hello_world', 'en_US');
+      alert('Mensagem de teste enviada! Verifique o WhatsApp.');
+    } catch (error: any) {
+      alert('Erro no teste: ' + (error.response?.data?.error?.message || error.message));
     } finally {
       setConnecting(false);
     }
@@ -167,70 +151,86 @@ export default function WhatsApp({ onNavigate }: WhatsAppProps) {
             <div className="bg-white p-8 rounded-[2.5rem] border border-zinc-200 shadow-sm">
               <div className="flex items-center gap-3 mb-8">
                 <div className="w-12 h-12 bg-zinc-100 rounded-2xl flex items-center justify-center">
-                  <Smartphone className="text-zinc-600" size={24} />
+                  <Lock className="text-zinc-600" size={24} />
                 </div>
                 <div>
-                  <h3 className="text-lg font-bold text-zinc-900">Conectar Celular</h3>
-                  <p className="text-sm text-zinc-500">Vincule seu WhatsApp para começar a enviar mensagens</p>
+                  <h3 className="text-lg font-bold text-zinc-900">Configuração Meta API</h3>
+                  <p className="text-sm text-zinc-500">Insira suas credenciais do WhatsApp Business Platform</p>
                 </div>
               </div>
 
-              {settings?.instanceStatus === 'connected' ? (
-                <div className="flex items-center justify-between p-6 bg-emerald-50 rounded-3xl border border-emerald-100">
-                  <div className="flex items-center gap-4">
-                    <div className="w-12 h-12 bg-emerald-500 rounded-2xl flex items-center justify-center text-white">
-                      <Wifi size={24} />
-                    </div>
-                    <div>
-                      <p className="font-bold text-emerald-900">WhatsApp Conectado</p>
-                      <p className="text-xs text-emerald-700">Sua automação está pronta para uso</p>
-                    </div>
+              <div className="space-y-6">
+                <div className="space-y-2">
+                  <label className="text-sm font-bold text-zinc-700">Token de Acesso Temporário ou Permanente</label>
+                  <input 
+                    type="password"
+                    value={settings?.apiKey || ''}
+                    onChange={(e) => setSettings(s => s ? ({ ...s, apiKey: e.target.value }) : null)}
+                    className="w-full bg-zinc-50 border border-zinc-200 rounded-2xl p-4 text-sm outline-none focus:ring-2 focus:ring-zinc-900/5 focus:border-zinc-900 transition-all font-mono"
+                    placeholder="EAAG..."
+                  />
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <label className="text-sm font-bold text-zinc-700">Phone Number ID</label>
+                    <input 
+                      type="text"
+                      value={settings?.phoneNumberId || ''}
+                      onChange={(e) => setSettings(s => s ? ({ ...s, phoneNumberId: e.target.value }) : null)}
+                      className="w-full bg-zinc-50 border border-zinc-200 rounded-2xl p-4 text-sm outline-none focus:ring-2 focus:ring-zinc-900/5 focus:border-zinc-900 transition-all"
+                      placeholder="1234567890..."
+                    />
                   </div>
-                  <div className="flex items-center gap-2 text-emerald-700 font-bold text-sm">
-                    <Battery size={18} />
-                    {settings.batteryLevel || 100}%
+                  <div className="space-y-2">
+                    <label className="text-sm font-bold text-zinc-700">WhatsApp Business Account ID</label>
+                    <input 
+                      type="text"
+                      value={settings?.wabaId || ''}
+                      onChange={(e) => setSettings(s => s ? ({ ...s, wabaId: e.target.value }) : null)}
+                      className="w-full bg-zinc-50 border border-zinc-200 rounded-2xl p-4 text-sm outline-none focus:ring-2 focus:ring-zinc-900/5 focus:border-zinc-900 transition-all"
+                      placeholder="9876543210..."
+                    />
                   </div>
                 </div>
-              ) : (
-                <div className="space-y-6">
-                  {qrCode ? (
-                    <div className="flex flex-col items-center gap-6 p-8 bg-zinc-50 rounded-3xl border border-zinc-200">
-                      <p className="text-sm font-medium text-zinc-600 text-center">
-                        Escaneie o QR Code abaixo com seu WhatsApp para conectar
-                      </p>
-                      <div className="bg-white p-4 rounded-2xl shadow-sm border border-zinc-100">
-                        <img src={qrCode} alt="WhatsApp QR Code" className="w-64 h-64" />
-                      </div>
-                      <button 
-                        onClick={() => settings?.instanceName && checkInstanceStatus(settings.instanceName)}
-                        className="flex items-center gap-2 text-zinc-900 font-bold text-sm hover:underline"
-                      >
-                        <RefreshCw size={16} />
-                        Já escaneei, verificar status
-                      </button>
-                    </div>
-                  ) : (
-                    <div className="flex flex-col items-center gap-4 py-8">
-                      <div className="w-20 h-20 bg-zinc-50 rounded-full flex items-center justify-center mb-2">
-                        <QrCode size={40} className="text-zinc-300" />
-                      </div>
-                      <button
-                        onClick={handleConnect}
-                        disabled={connecting}
-                        className="bg-zinc-900 text-white px-8 py-4 rounded-2xl font-bold hover:bg-zinc-800 transition-all disabled:opacity-50 flex items-center gap-2"
-                      >
-                        {connecting ? (
-                          <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white"></div>
-                        ) : (
-                          <QrCode size={20} />
-                        )}
-                        Gerar QR Code de Conexão
-                      </button>
-                      <p className="text-xs text-zinc-400">Isso criará uma nova instância segura para seu salão</p>
-                    </div>
-                  )}
+
+                <div className="flex gap-4">
+                  <button
+                    onClick={handleSave}
+                    disabled={saving}
+                    className="flex-1 bg-zinc-900 text-white px-6 py-4 rounded-2xl font-bold hover:bg-zinc-800 transition-all disabled:opacity-50 flex items-center justify-center gap-2"
+                  >
+                    {saving ? <RefreshCw className="animate-spin" size={20} /> : <Save size={20} />}
+                    Salvar Credenciais
+                  </button>
+                  <button
+                    onClick={handleTest}
+                    disabled={connecting || !settings?.phoneNumberId}
+                    className="px-6 py-4 rounded-2xl font-bold border border-zinc-900 text-zinc-900 hover:bg-zinc-50 transition-all disabled:opacity-50 flex items-center justify-center gap-2"
+                  >
+                    <Zap size={20} />
+                    Testar Envio
+                  </button>
                 </div>
-              )}
+
+                <div className="p-6 bg-rose-50 rounded-3xl border border-rose-100 space-y-3">
+                  <h4 className="text-sm font-bold text-rose-900 flex items-center gap-2">
+                    <LifeBuoy size={16} /> Como conectar sem QR Code?
+                  </h4>
+                  <p className="text-xs text-rose-800 leading-relaxed">
+                    A API Oficial da Meta é mais segura e estável. Para conectar o WhatsApp do salão:
+                  </p>
+                  <ul className="text-[11px] text-rose-700 space-y-2">
+                    <li className="flex gap-2"><span>1.</span> <span>Crie um App (Business) no <a href="https://developers.facebook.com" target="_blank" className="underline font-bold">Meta Developers</a>.</span></li>
+                    <li className="flex gap-2"><span>2.</span> <span>Adicione o produto <strong>WhatsApp</strong> ao seu App.</span></li>
+                    <li className="flex gap-2"><span>3.</span> <span>Copie o <strong>Token Permanente</strong>, <strong>Phone ID</strong> e <strong>WABA ID</strong>.</span></li>
+                    <li className="flex gap-2"><span>4.</span> <span>Cole os códigos acima e clique em <strong>Salvar Credenciais</strong>.</span></li>
+                  </ul>
+                  <p className="text-[10px] text-rose-400 italic">
+                    *Não é mais necessário escanear QR Code. A conexão é direta via API.
+                  </p>
+                </div>
+              </div>
             </div>
 
             <div className="bg-white p-8 rounded-[2.5rem] border border-zinc-200 shadow-sm">

@@ -66,7 +66,7 @@ export default function LandingPage({ onAuthClick }: { onAuthClick: (view?: 'log
         }
 
         // Generate Logo
-        const logoPrompt = `A modern and elegant logo for a women's beauty salon management app named 'Dodile'. The logo should feature minimalist and sophisticated elements representing hair styling or aesthetics (like a stylized hair strand or a subtle silhouette). Use a luxury color palette: rose gold, deep charcoal, and soft white. The design must be clean, professional, and suitable for a high-end mobile app icon. Vector style, isolated on a white background.`;
+        const logoPrompt = `A modern and elegant logo for a women's beauty salon management app named 'SallonProManager'. The logo should feature minimalist and sophisticated elements representing hair styling or aesthetics (like a stylized hair strand or a subtle silhouette). Use a luxury color palette: rose gold, deep charcoal, and soft white. The design must be clean, professional, and suitable for a high-end mobile app icon. Vector style, isolated on a white background.`;
 
         const logoResponse = await ai.models.generateContent({
           model: 'gemini-2.5-flash-image',
@@ -101,12 +101,12 @@ export default function LandingPage({ onAuthClick }: { onAuthClick: (view?: 'log
               {loadingLogo ? (
                 <Loader2 className="text-white animate-spin" size={20} />
               ) : logoImage ? (
-                <img src={logoImage} alt="Dodile Logo" className="w-full h-full object-cover" referrerPolicy="no-referrer" />
+                <img src={logoImage} alt="SallonProManager Logo" className="w-full h-full object-cover" referrerPolicy="no-referrer" />
               ) : (
                 <Scissors className="text-white" size={24} />
               )}
             </div>
-            <span className="text-xl font-bold text-zinc-900 tracking-tight bg-gradient-to-r from-zinc-900 to-rose-600 bg-clip-text text-transparent italic uppercase">Dodile</span>
+            <span className="text-xl font-bold text-zinc-900 tracking-tight bg-gradient-to-r from-zinc-900 to-rose-600 bg-clip-text text-transparent italic uppercase">SallonProManager</span>
           </div>
           
           <div className="hidden md:flex items-center gap-8">
@@ -159,7 +159,7 @@ export default function LandingPage({ onAuthClick }: { onAuthClick: (view?: 'log
                 transition={{ delay: 0.2 }}
                 className="text-xl text-zinc-500 mb-10 max-w-2xl mx-auto lg:mx-0"
               >
-                Em 30 segundos você ganha seu próprio site de agendamento em <span className="font-bold text-zinc-900">seu-salao.dodile.com.br</span>. Automatize lembretes e recupere o controle do seu tempo.
+                Em 30 segundos você ganha seu próprio site de agendamento em <span className="font-bold text-zinc-900">seu-salao.sallonpromanager.com.br</span>. Automatize lembretes e recupere o controle do seu tempo.
               </motion.p>
               
               <motion.div 
@@ -290,7 +290,7 @@ export default function LandingPage({ onAuthClick }: { onAuthClick: (view?: 'log
       <section className="py-24 bg-white">
         <div className="max-w-7xl mx-auto px-4">
           <div className="text-center mb-16">
-            <h2 className="text-4xl font-bold text-zinc-900 mb-4">Como funciona o Dodile?</h2>
+            <h2 className="text-4xl font-bold text-zinc-900 mb-4">Como funciona o SallonProManager?</h2>
             <p className="text-zinc-500 text-lg">Três passos simples para profissionalizar sua agenda.</p>
           </div>
           <div className="grid grid-cols-1 md:grid-cols-3 gap-12">
@@ -355,7 +355,7 @@ export default function LandingPage({ onAuthClick }: { onAuthClick: (view?: 'log
         <div className="max-w-7xl mx-auto px-4">
           <div className="text-center mb-16">
             <h2 className="text-4xl font-bold text-zinc-900 mb-4">Perfeito para qualquer negócio de beleza</h2>
-            <p className="text-zinc-500 text-lg">O Dodile se adapta ao seu estilo de trabalho.</p>
+            <p className="text-zinc-500 text-lg">O SallonProManager se adapta ao seu estilo de trabalho.</p>
           </div>
           <div className="grid grid-cols-2 md:grid-cols-4 gap-6">
             <div className="bg-white p-6 rounded-3xl border border-zinc-100 text-center hover:shadow-xl transition-all">
@@ -398,9 +398,9 @@ export default function LandingPage({ onAuthClick }: { onAuthClick: (view?: 'log
 
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8">
             <FeatureCard 
-              icon={<MessageSquare className="text-rose-500" />}
+              icon={<MessageSquare className="text-zinc-400" />}
               title="Lembretes WhatsApp"
-              description="O sistema envia mensagens automáticas para suas clientes. Acabe com os furos e esquecimentos."
+              description="Notificações de agendamento simplificadas. (Recurso automático disponível em breve)."
             />
             <FeatureCard 
               icon={<MobileIcon className="text-rose-500" />}
@@ -415,7 +415,7 @@ export default function LandingPage({ onAuthClick }: { onAuthClick: (view?: 'log
             <FeatureCard 
               icon={<CheckCircle className="text-rose-500" />}
               title="Site Próprio"
-              description="Ganhe um endereço exclusivo seu-salao.dodile.com.br para passar mais profissionalismo."
+              description="Ganhe um endereço exclusivo seu-salao.sallonpromanager.com.br para passar mais profissionalismo."
             />
           </div>
         </div>
@@ -434,12 +434,12 @@ export default function LandingPage({ onAuthClick }: { onAuthClick: (view?: 'log
                 <tr className="bg-zinc-50/50">
                   <th className="px-8 py-6 text-sm font-bold text-zinc-400 uppercase tracking-wider">Recurso</th>
                   <th className="px-8 py-6 text-sm font-bold text-zinc-400 uppercase tracking-wider">Agenda Manual</th>
-                  <th className="px-8 py-6 text-sm font-bold text-rose-500 uppercase tracking-wider bg-rose-50/50">Dodile</th>
+                  <th className="px-8 py-6 text-sm font-bold text-rose-500 uppercase tracking-wider bg-rose-50/50">SallonProManager</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-zinc-100">
                 <ComparisonRow label="Agendamento 24/7" manual="Não (Só horário comercial)" dodile="Sim (Automático)" />
-                <ComparisonRow label="Lembretes WhatsApp" manual="Manual (Toma tempo)" dodile="Automático (Sem esforço)" />
+                <ComparisonRow label="Lembretes WhatsApp" manual="Manual (Toma tempo)" dodile="Em Breve (Automático)" />
                 <ComparisonRow label="Controle Financeiro" manual="Caderninho/Excel" dodile="Relatórios em 1 clique" />
                 <ComparisonRow label="Histórico de Clientes" manual="Difícil de achar" dodile="Busca instantânea" />
                 <ComparisonRow label="Profissionalismo" manual="Amador" dodile="Site Exclusivo" />
@@ -521,15 +521,15 @@ export default function LandingPage({ onAuthClick }: { onAuthClick: (view?: 'log
           <div className="space-y-4">
             <FAQItem 
               question="Preciso baixar algum aplicativo?"
-              answer="Não! O Dodile é uma plataforma web. Você e suas clientes acessam tudo pelo navegador do celular ou computador, sem ocupar espaço na memória."
+              answer="Não! O SallonProManager é uma plataforma web. Você e suas clientes acessam tudo pelo navegador do celular ou computador, sem ocupar espaço na memória."
             />
             <FAQItem 
               question="Como minhas clientes agendam?"
-              answer="Você recebe um link exclusivo (ex: seu-salao.dodile.com.br). Basta colocar esse link no seu Instagram ou enviar pelo WhatsApp. A cliente escolhe o serviço, o profissional e o horário disponível."
+              answer="Você recebe um link exclusivo (ex: seu-salao.sallonpromanager.com.br). Basta colocar esse link no seu Instagram ou enviar pelo WhatsApp. A cliente escolhe o serviço, o profissional e o horário disponível."
             />
             <FAQItem 
               question="O sistema envia lembretes automáticos?"
-              answer="Sim! No plano Silver e Gold, o sistema envia lembretes automáticos via WhatsApp para reduzir as faltas em até 80%."
+              answer="Sim! Em breve teremos integração total com a API Oficial da Meta para envios automáticos sem risco de bloqueio."
             />
             <FAQItem 
               question="Posso testar antes de pagar?"

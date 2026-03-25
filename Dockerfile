@@ -1,23 +1,24 @@
 FROM node:20-slim AS base
-ENV PNPM_HOME="/pnpm"
-ENV PATH="$PNPM_HOME:$PATH"
-RUN corepack enable
+RUN sed -i 's/deb.debian.org/ftp.br.debian.org/g' /etc/apt/sources.list.d/debian.sources || true
+RUN apt-get update -y && apt-get install -y --no-install-recommends openssl libssl-dev ca-certificates && rm -rf /var/lib/apt/lists/*
+RUN npm install -g pm2
+WORKDIR /usr/src/app
 
 FROM base AS build
-COPY . /usr/src/app
-WORKDIR /usr/src/app
-RUN --mount=type=cache,id=pnpm,target=/pnpm/store pnpm install --frozen-lockfile
+COPY package*.json ./
+RUN npm install
+COPY . .
 RUN npx prisma generate
-RUN pnpm run build
+RUN npm run build
 
 FROM base AS runner
-WORKDIR /usr/src/app
 COPY --from=build /usr/src/app/dist /usr/src/app/dist
+COPY --from=build /usr/src/app/dist-server /usr/src/app/dist-server
 COPY --from=build /usr/src/app/node_modules /usr/src/app/node_modules
 COPY --from=build /usr/src/app/package.json /usr/src/app/package.json
-COPY --from=build /usr/src/app/server.ts /usr/src/app/server.ts
-COPY --from=build /usr/src/app/server /usr/src/app/server
+COPY --from=build /usr/src/app/ecosystem.config.cjs /usr/src/app/ecosystem.config.cjs
 COPY --from=build /usr/src/app/prisma /usr/src/app/prisma
 
 EXPOSE 3000
-CMD [ "node", "server.ts" ]
+# Comando para iniciar a aplicação com PM2 após sincronizar o banco
+CMD ["sh", "-c", "npx prisma db push && npm run start:prod"]

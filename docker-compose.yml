@@ -5,9 +5,9 @@ services:
     image: postgres:15-alpine
     restart: always
     environment:
-      POSTGRES_USER: dodile_user
-      POSTGRES_PASSWORD: dodile_password
-      POSTGRES_DB: dodile_db
+      POSTGRES_USER: sallonpromanager_user
+      POSTGRES_PASSWORD: sallonpromanager_password
+      POSTGRES_DB: sallonpromanager_db
     volumes:
       - postgres_data:/var/lib/postgresql/data
     ports:
@@ -19,11 +19,22 @@ services:
     ports:
       - "3000:3000"
     environment:
-      DATABASE_URL: "postgresql://dodile_user:dodile_password@db:5432/dodile_db?schema=public"
+      DATABASE_URL: "postgresql://sallonpromanager_user:sallonpromanager_password@db:5432/sallonpromanager_db?schema=public"
       JWT_SECRET: "sua_chave_secreta_aqui"
+      WAHA_API_URL: "http://waha:3000"
       NODE_ENV: production
     depends_on:
       - db
+      - waha
+
+  waha:
+    image: devlikeapro/waha
+    restart: always
+    ports:
+      - "3001:3000"
+    environment:
+      WHATSAPP_DEFAULT_SESSION: default
+      WAHA_PRINT_QR: "true"
 
 volumes:
   postgres_data:

@@ -131,7 +131,7 @@ export interface Product {
 export interface Plan {
   id: string;
   name: string;
-  slug: 'bronze' | 'silver' | 'gold';
+  slug: string;
   priceMonthly: number;
   priceYearly: number;
   features: {

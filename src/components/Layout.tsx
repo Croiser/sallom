@@ -16,7 +16,9 @@ import {
   ShieldAlert,
   MessageSquare,
   HelpCircle,
-  Flower2
+  Flower2,
+  Settings2,
+  QrCode
 } from 'lucide-react';
 import { UserProfile } from '../types';
 import { motion, AnimatePresence } from 'motion/react';
@@ -40,7 +42,7 @@ export default function Layout({ children, activeTab, setActiveTab }: LayoutProp
       setLoadingLogo(true);
       try {
         const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
-        const logoPrompt = `A modern and elegant logo for a women's beauty salon management app named 'Dodile'. The logo should feature minimalist and sophisticated elements representing hair styling or aesthetics (like a stylized hair strand or a subtle silhouette). Use a luxury color palette: rose gold, deep charcoal, and soft white. The design must be clean, professional, and suitable for a high-end mobile app icon. Vector style, isolated on a white background.`;
+        const logoPrompt = `A modern and elegant logo for a women's beauty salon management app named 'SallonProManager'. The logo should feature minimalist and sophisticated elements representing hair styling or aesthetics (like a stylized hair strand or a subtle silhouette). Use a luxury color palette: rose gold, deep charcoal, and soft white. The design must be clean, professional, and suitable for a high-end mobile app icon. Vector style, isolated on a white background.`;
 
         const response = await ai.models.generateContent({
           model: 'gemini-2.5-flash-image',
@@ -74,14 +76,18 @@ export default function Layout({ children, activeTab, setActiveTab }: LayoutProp
     { id: 'whatsapp', label: 'WhatsApp', icon: MessageSquare },
     { id: 'settings', label: 'Configurações', icon: SettingsIcon },
     { id: 'subscription', label: 'Minha Assinatura', icon: CreditCard },
+    { id: 'automation', label: 'Automação', icon: Settings2 },
+    { id: 'whatsapp-connection', label: 'Conexão WhatsApp', icon: QrCode },
     { id: 'help', label: 'Ajuda', icon: HelpCircle },
   ];
 
-  const isSuperAdmin = userProfile?.email === 'renatadouglas739@gmail.com' || userProfile?.email === 'barbeiromanager@gmail.com';
+  const isSuperAdmin = userProfile?.role === 'admin' || userProfile?.email === 'renatadouglas739@gmail.com' || userProfile?.email === 'sallonpromanager@gmail.com';
+
+  const filteredMenuItems = menuItems.filter(item => item.id !== 'whatsapp');
 
   const fullMenuItems = isSuperAdmin 
-    ? [...menuItems, { id: 'superadmin', label: 'SaaS Admin', icon: ShieldAlert }]
-    : menuItems;
+    ? [...filteredMenuItems, { id: 'superadmin', label: 'SaaS Admin', icon: ShieldAlert }]
+    : filteredMenuItems;
 
   const handleLogout = async () => {
     await logout();
@@ -114,12 +120,12 @@ export default function Layout({ children, activeTab, setActiveTab }: LayoutProp
               {loadingLogo ? (
                 <Flower2 className="text-white animate-spin" size={24} />
               ) : logoImage ? (
-                <img src={logoImage} alt="Dodile Logo" className="w-full h-full object-cover" referrerPolicy="no-referrer" />
+                <img src={logoImage} alt="SallonProManager Logo" className="w-full h-full object-cover" referrerPolicy="no-referrer" />
               ) : (
                 <Flower2 className="text-white" size={24} />
               )}
             </div>
-            <h1 className="text-2xl font-black tracking-tighter text-white italic leading-tight">DODILE</h1>
+            <h1 className="text-2xl font-black tracking-tighter text-white italic leading-tight">SALLONPROMANAGER</h1>
           </div>
 
           <nav className="flex-1 space-y-1">

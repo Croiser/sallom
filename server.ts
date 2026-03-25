@@ -1,3 +1,4 @@
+import * as Sentry from "@sentry/node";
 import express from 'express';
 import cors from 'cors';
 import path from 'path';
@@ -10,6 +11,12 @@ import apiRoutes from './server/routes.js';
 async function startServer() {
   const app = express();
   const PORT = 3000;
+
+  Sentry.init({
+    dsn: process.env.SENTRY_DSN,
+    environment: process.env.NODE_ENV || 'development',
+    tracesSampleRate: 1.0,
+  });
 
   // Middleware
   app.use(cors());
@@ -71,7 +78,10 @@ async function startServer() {
     });
   }
 
-  app.listen(PORT, '0.0.0.0', () => {
+  // The error handler must be registered before any other error middleware and after all controllers
+  Sentry.setupExpressErrorHandler(app);
+
+app.listen(PORT, '0.0.0.0', () => {
     console.log(`Server running on http://localhost:${PORT}`);
   });
 }

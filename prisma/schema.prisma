@@ -12,7 +12,7 @@ model User {
   name             String
   email            String            @unique
   password         String
-  role             String            @default("admin")
+  role             String            @default("barber")
   shopName         String?
   slug             String?           @unique
   status           String            @default("active")
@@ -33,7 +33,9 @@ model User {
   products         Product[]
   subscription     Subscription?
   whatsappSettings WhatsappSettings?
-  whatsappMessages WhatsappMessage[]
+  whatsappMessages  WhatsappMessage[]
+  wallet            Wallet?
+  anamnesis         Anamnesis[]
 
   @@map("users")
 }
@@ -75,6 +77,7 @@ model Client {
   createdAt     DateTime      @default(now())
   owner         User          @relation(fields: [ownerUid], references: [id], onDelete: Cascade)
   appointments  Appointment[]
+  anamnesis     Anamnesis[]
 
   @@map("clients")
 }
@@ -188,9 +191,10 @@ model WhatsappSettings {
   enabled        Boolean @default(false)
   apiKey         String?
   templates      String? // JSON string
-  instanceName   String?
-  instanceStatus String?
-  batteryLevel   Int?
+  phoneNumberId  String?
+  wabaId         String?
+  wahaInstanceName String? @default("default")
+  status         String  @default("disconnected") // connected, disconnected, connecting
   user           User    @relation(fields: [uid], references: [id], onDelete: Cascade)
 
   @@map("whatsapp_settings")
@@ -209,4 +213,47 @@ model WhatsappMessage {
   owner           User     @relation(fields: [ownerUid], references: [id], onDelete: Cascade)
 
   @@map("whatsapp_messages")
+}
+
+model Wallet {
+  id           String              @id @default(uuid())
+  ownerUid     String              @unique
+  balance      Decimal             @default(0.00)
+  currency     String              @default("BRL")
+  isActive     Boolean             @default(true)
+  createdAt    DateTime            @default(now())
+  updatedAt    DateTime            @updatedAt
+  transactions WalletTransaction[]
+  user         User                @relation(fields: [ownerUid], references: [id], onDelete: Cascade)
+
+  @@map("wallets")
+}
+
+model WalletTransaction {
+  id          String   @id @default(uuid())
+  walletId    String
+  wallet      Wallet   @relation(fields: [walletId], references: [id], onDelete: Cascade)
+  type        String   // 'credit' | 'debit'
+  category    String   // 'recharge' | 'automation_usage'
+  amount      Decimal
+  description String?
+  createdAt   DateTime @default(now())
+
+  @@map("wallet_transactions")
+}
+
+model Anamnesis {
+  id           String   @id @default(uuid())
+  clientId     String
+  ownerUid     String
+  procedure    String   @default("Geral")
+  content      String   // JSON string with questions/answers
+  signatureUrl String?
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+  
+  client       Client   @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  owner        User     @relation(fields: [ownerUid], references: [id], onDelete: Cascade)
+
+  @@map("anamnesis")
 }

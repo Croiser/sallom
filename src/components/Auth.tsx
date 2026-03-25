@@ -115,7 +115,7 @@ export default function Auth({ onBack, onLoginSuccess, initialView = 'login' }: 
               <Scissors className="text-white" size={40} />
             </div>
           </div>
-          <h1 className="text-3xl font-bold text-white tracking-tight mb-2 bg-gradient-to-r from-rose-400 to-rose-600 bg-clip-text text-transparent uppercase italic">Dodile</h1>
+          <h1 className="text-3xl font-bold text-white tracking-tight mb-2 bg-gradient-to-r from-rose-400 to-rose-600 bg-clip-text text-transparent uppercase italic">SallonProManager</h1>
           <p className="text-zinc-400">Gestão profissional para seu salão de beleza</p>
         </div>
 

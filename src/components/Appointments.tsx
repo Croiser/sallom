@@ -100,10 +100,9 @@ export default function Appointments() {
       // Trigger WhatsApp Confirmation
       if (client.phone && user?.uid) {
         whatsappService.triggerMessage(
-          user.uid,
-          'confirmation',
           client.phone,
           client.name,
+          'confirmation',
           {
             nome_cliente: client.name,
             shop_name: settings?.name || 'Salão',

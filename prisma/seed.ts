@@ -2,6 +2,7 @@ import { PrismaClient } from '@prisma/client';
 const prisma = new PrismaClient();
 
 async function main() {
+  console.log('Using DATABASE_URL:', process.env.DATABASE_URL);
   await prisma.plan.deleteMany();
   await prisma.plan.createMany({
     data: [
@@ -10,24 +11,16 @@ async function main() {
         name: 'Bronze',
         slug: 'bronze',
         priceMonthly: 27.90,
-        priceYearly: 257.90,
+        priceYearly: 279.00,
         features: JSON.stringify({ staffLimit: 1, inventory: false, reports: false, whatsapp: false })
       },
       {
         id: 'plan_silver',
-        name: 'Silver',
+        name: 'Prata',
         slug: 'silver',
         priceMonthly: 89.90,
-        priceYearly: 830.90,
-        features: JSON.stringify({ staffLimit: 3, inventory: true, reports: true, whatsapp: false })
-      },
-      {
-        id: 'plan_gold',
-        name: 'Gold',
-        slug: 'gold',
-        priceMonthly: 229.90,
-        priceYearly: 2124.90,
-        features: JSON.stringify({ staffLimit: null, inventory: true, reports: true, whatsapp: true })
+        priceYearly: 899.00,
+        features: JSON.stringify({ staffLimit: null, inventory: true, reports: true, whatsapp: false })
       }
     ]
   });

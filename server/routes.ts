@@ -2,6 +2,9 @@ import express from 'express';
 import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
 import prisma from './db.js';
+import { WhatsAppMetaService } from './whatsappMeta.js';
+import { WAHAService } from './waha.js';
+import { WAHA_API_URL } from './config.js';
 import { JWT_SECRET } from './config.js';
 import { authenticateToken, AuthRequest } from './middleware.js';
 import { asaas } from './asaas.js';
@@ -42,8 +45,8 @@ router.post('/auth/register', async (req, res) => {
       }
     });
 
-    const token = jwt.sign({ id: user.id, email, role: 'admin' }, JWT_SECRET, { expiresIn: '7d' });
-    res.json({ token, user: { id: user.id, name, email, shopName, role: 'admin' } });
+    const token = jwt.sign({ id: user.id, email, role: 'barber' }, JWT_SECRET, { expiresIn: '7d' });
+    res.json({ token, user: { id: user.id, name, email, shopName, role: 'barber' } });
   } catch (err: any) {
     res.status(500).json({ error: err.message });
   }
@@ -233,20 +236,23 @@ router.post('/subscription', authenticateToken, async (req: AuthRequest, res) =>
   const currentPeriodEnd = new Date(Date.now() + (billingCycle === 'monthly' ? 30 : 365) * 24 * 60 * 60 * 1000);
   
   try {
+    const endDate = currentPeriodEnd;
     const subscription = await prisma.subscription.upsert({
       where: { uid },
       update: {
-        planId,
+        planId: planId as string,
         status: 'active',
         currentPeriodEnd,
-        billingCycle
+        endDate,
+        billingCycle: billingCycle as string
       },
       create: {
-        uid,
-        planId,
+        uid: uid as string,
+        planId: planId as string,
         status: 'active',
         currentPeriodEnd,
-        billingCycle
+        endDate,
+        billingCycle: billingCycle as string
       }
     });
 
@@ -304,22 +310,25 @@ router.post('/asaas/card', authenticateToken, async (req: AuthRequest, res) => {
     // For card, if it's CONFIRMED or RECEIVED, we can activate immediately
     if (payment.status === 'CONFIRMED' || payment.status === 'RECEIVED') {
       const currentPeriodEnd = new Date(Date.now() + (billingCycle === 'monthly' ? 30 : 365) * 24 * 60 * 60 * 1000);
+      const endDate = currentPeriodEnd;
       
       // Update Prisma
       await prisma.subscription.upsert({
         where: { uid },
         update: {
-          planId,
+          planId: planId as string,
           status: 'active',
           currentPeriodEnd,
-          billingCycle
+          endDate,
+          billingCycle: billingCycle as string
         },
         create: {
-          uid,
-          planId,
+          uid: uid as string,
+          planId: planId as string,
           status: 'active',
           currentPeriodEnd,
-          billingCycle
+          endDate,
+          billingCycle: billingCycle as string
         }
       });
 
@@ -345,9 +354,10 @@ router.post('/asaas/webhook', async (req, res) => {
     if (event === 'PAYMENT_RECEIVED' || event === 'PAYMENT_CONFIRMED') {
       const { externalReference } = payment;
       if (externalReference) {
-        const { uid, planId, billingCycle } = JSON.parse(externalReference);
+        const { uid, planId, billingCycle } = JSON.parse(externalReference) as { uid: string, planId: string, billingCycle: string };
         
         const currentPeriodEnd = new Date(Date.now() + (billingCycle === 'monthly' ? 30 : 365) * 24 * 60 * 60 * 1000);
+        const endDate = currentPeriodEnd;
         
         // Update Prisma
         await prisma.subscription.upsert({
@@ -356,6 +366,7 @@ router.post('/asaas/webhook', async (req, res) => {
             planId,
             status: 'active',
             currentPeriodEnd,
+            endDate,
             billingCycle
           },
           create: {
@@ -363,6 +374,7 @@ router.post('/asaas/webhook', async (req, res) => {
             planId,
             status: 'active',
             currentPeriodEnd,
+            endDate,
             billingCycle
           }
         });
@@ -550,7 +562,7 @@ router.get('/whatsapp-settings', authenticateToken, async (req: AuthRequest, res
 
 router.put('/whatsapp-settings', authenticateToken, async (req: AuthRequest, res) => {
   try {
-    const { enabled, templates, apiKey, instanceName, instanceStatus, batteryLevel } = req.body;
+    const { enabled, templates, apiKey, phoneNumberId, wabaId } = req.body;
     const uid = req.user?.id as string;
     const settings = await prisma.whatsappSettings.upsert({
       where: { uid },
@@ -558,9 +570,10 @@ router.put('/whatsapp-settings', authenticateToken, async (req: AuthRequest, res
         enabled,
         templates: templates ? JSON.stringify(templates) : undefined,
         apiKey,
-        instanceName,
-        instanceStatus,
-        batteryLevel
+        phoneNumberId,
+        wabaId,
+        wahaInstanceName: req.body.wahaInstanceName || `salon_${uid.split('-')[0]}`,
+        status: req.body.status || 'disconnected'
       },
       create: {
         uid,
@@ -571,14 +584,227 @@ router.put('/whatsapp-settings', authenticateToken, async (req: AuthRequest, res
           confirmation: "Confirmado! Seu agendamento na {shop_name} foi marcado para {data} às {hora}. Obrigado!"
         }),
         apiKey,
-        instanceName,
-        instanceStatus,
-        batteryLevel
+        phoneNumberId,
+        wabaId,
+        wahaInstanceName: req.body.wahaInstanceName || `salon_${uid.split('-')[0]}`,
+        status: 'disconnected'
       }
     });
 
     res.json(settings);
   } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// Test WhatsApp Message (Meta)
+router.post('/whatsapp/test', authenticateToken, async (req: AuthRequest, res) => {
+  try {
+    const { number, templateName, languageCode, components } = req.body;
+    const uid = req.user?.id as string;
+    
+    const settings = await prisma.whatsappSettings.findUnique({ where: { uid } });
+    if (!settings || !settings.apiKey || !settings.phoneNumberId) {
+      return res.status(400).json({ error: 'WhatsApp Meta configuration missing' });
+    }
+
+    const metaService = new WhatsAppMetaService(settings.apiKey, settings.phoneNumberId);
+    const result = await metaService.sendTemplateMessage(number, templateName, languageCode, components);
+    
+    res.json(result);
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// --- WAHA WhatsApp API Routes ---
+
+router.get('/whatsapp/waha/status', authenticateToken, async (req: AuthRequest, res) => {
+  try {
+    const uid = req.user?.id as string;
+    const settings = await prisma.whatsappSettings.findUnique({ where: { uid } });
+    if (!settings || !settings.wahaInstanceName) {
+      return res.json({ status: 'NOT_CONFIGURED' });
+    }
+    const waha = new WAHAService(WAHA_API_URL);
+    const status = await waha.getSessionStatus(settings.wahaInstanceName);
+    res.json(status);
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+router.get('/whatsapp/waha/qr', authenticateToken, async (req: AuthRequest, res) => {
+  try {
+    const uid = req.user?.id as string;
+    const settings = await prisma.whatsappSettings.findUnique({ where: { uid } });
+    if (!settings || !settings.wahaInstanceName) {
+      return res.status(400).json({ error: 'WAHA not configured' });
+    }
+    const waha = new WAHAService(WAHA_API_URL);
+    const qr = await waha.getQrCode(settings.wahaInstanceName);
+    res.json({ qr });
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+router.post('/whatsapp/waha/session/start', authenticateToken, async (req: AuthRequest, res) => {
+  try {
+    const uid = req.user?.id as string;
+    const settings = await prisma.whatsappSettings.findUnique({ where: { uid } });
+    if (!settings || !settings.wahaInstanceName) {
+      return res.status(400).json({ error: 'WAHA not configured' });
+    }
+    const waha = new WAHAService(WAHA_API_URL);
+    await waha.startSession(settings.wahaInstanceName);
+    res.json({ success: true });
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// WAHA Webhook - Public Endpoint
+router.post('/webhooks/waha', async (req, res) => {
+  try {
+    const { event, data } = req.body;
+    // WAHA event structure varies, usually 'message' or 'message.upsert'
+    if (event === 'message' || event === 'message.upsert') {
+      const message = data.message || data;
+      const text = message.body || message.conversation || message.extendedTextMessage?.text;
+      const from = message.from || message.key?.remoteJid;
+
+      if (text && from) {
+        // Find appointment ID in text: "Olá, ... ID: 123-abc"
+        const match = text.match(/ID:\s*([a-f0-9-]+)/i);
+        if (match) {
+          const appointmentId = match[1];
+          const appointment = await prisma.appointment.findUnique({
+            where: { id: appointmentId },
+            include: { owner: { include: { whatsappSettings: true, wallet: true } } }
+          });
+
+          if (appointment && appointment.owner.whatsappSettings?.enabled) {
+            const user = appointment.owner;
+            const settings = user.whatsappSettings!;
+            const wallet = user.wallet[0]; // Wallet is linked to user
+            
+            // Check Balance
+            if (!wallet || !wallet.isActive || wallet.balance < 0.10) {
+              console.log(`Wallet error: Insufficient balance for user ${user.id}`);
+              return res.sendStatus(200);
+            }
+
+            const waha = new WAHAService(WAHA_API_URL);
+            
+            // Send Confirmation Voucher
+            const templates = settings.templates ? JSON.parse(settings.templates as string) : {};
+            const baseText = templates.confirmation || "✅ Seu agendamento foi confirmado!";
+            const voucherText = WAHAService.applySpintax(baseText)
+              .replace('{nome_cliente}', appointment.clientName)
+              .replace('{shop_name}', user.shopName || user.name || 'Barbearia')
+              .replace('{data}', appointment.date.toLocaleDateString('pt-BR'))
+              .replace('{hora}', appointment.date.toLocaleDateString('pt-BR', { hour: '2-digit', minute: '2-digit' }).split(' ')[1] || '');
+            
+            await waha.sendTextMessage(settings.wahaInstanceName || 'default', from, voucherText);
+            
+            // DEBIT WALLET
+            await prisma.wallet.update({
+              where: { id: wallet.id },
+              data: { balance: { decrement: 0.10 } }
+            });
+            await prisma.walletTransaction.create({
+              data: {
+                walletId: wallet.id,
+                type: 'debit',
+                category: 'automation_usage',
+                amount: 0.10,
+                description: `WhatsApp WAHA - Voucher enviado: ${appointmentId}`
+              }
+            });
+          }
+        }
+      }
+    }
+    res.sendStatus(200);
+  } catch (err) {
+    console.error('WAHA Webhook Error:', err);
+    res.sendStatus(500);
+  }
+});
+
+router.post('/whatsapp/trigger', authenticateToken, async (req: AuthRequest, res) => {
+  try {
+    const { type, recipientNumber, recipientName, variables } = req.body;
+    const uid = req.user?.id as string;
+    
+    const settings = await prisma.whatsappSettings.findUnique({ where: { uid } });
+    if (!settings || !settings.enabled || !settings.apiKey || !settings.phoneNumberId) {
+      return res.status(400).json({ error: 'WhatsApp configuration missing or disabled' });
+    }
+
+    const metaService = new WhatsAppMetaService(settings.apiKey, settings.phoneNumberId);
+    
+    // Mapping internal types to Meta Template Names
+    // Default names - User should have these approved in Meta
+    let templateName = 'hello_world'; // fallback
+    if (type === 'welcome') templateName = 'welcome_message_v1';
+    if (type === 'reminder') templateName = 'appointment_reminder_v1';
+    if (type === 'confirmation') templateName = 'appointment_confirmation_v1';
+
+    // Meta templates use positional parameters {{1}}, {{2}}...
+    // We map our variables to components. This is a simplified version.
+    // Real implementation would depend on the template structure at Meta.
+    const components = [
+      {
+        type: 'body',
+        parameters: Object.entries(variables).map(([key, value]) => ({
+          type: 'text',
+          text: String(value)
+        }))
+      }
+    ];
+
+    const result = await metaService.sendTemplateMessage(recipientNumber, templateName, 'pt_BR', components);
+    
+    // Debit Wallet if enabled (Meta also costs)
+    try {
+      const wallet = await prisma.wallet.findUnique({ where: { ownerUid: uid } });
+      if (wallet && wallet.isActive && Number(wallet.balance) >= 0.10) {
+        await prisma.wallet.update({
+          where: { id: wallet.id },
+          data: { balance: { decrement: 0.10 } }
+        });
+        await prisma.walletTransaction.create({
+          data: {
+            walletId: wallet.id,
+            type: 'debit',
+            category: 'automation_usage',
+            amount: 0.10,
+            description: `WhatsApp (Meta): ${type}`
+          }
+        });
+      }
+    } catch (e) { console.error('Wallet debit failed:', e); }
+
+    const result_final = result;
+    
+    // Log message
+    await prisma.whatsappMessage.create({
+      data: {
+        ownerUid: uid,
+        recipientNumber,
+        recipientName,
+        content: `Template: ${templateName} (${type})`,
+        type,
+        status: 'Enviada',
+        externalId: result.messages?.[0]?.id
+      }
+    });
+
+    res.json({ success: true, result });
+  } catch (err: any) {
+    console.error('WhatsApp trigger error:', err.response?.data || err.message);
     res.status(500).json({ error: err.message });
   }
 });
@@ -607,6 +833,66 @@ router.post('/whatsapp-messages', authenticateToken, async (req: AuthRequest, re
       }
     });
     res.json({ id: message.id, success: true });
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// --- WALLET ROUTES ---
+router.get('/wallet/me', authenticateToken, async (req: AuthRequest, res) => {
+  try {
+    const ownerUid = req.user?.id as string;
+    let wallet = await prisma.wallet.findUnique({
+      where: { ownerUid },
+      include: {
+        transactions: {
+          take: 10,
+          orderBy: { createdAt: 'desc' }
+        }
+      }
+    });
+
+    if (!wallet) {
+      wallet = await prisma.wallet.create({
+        data: {
+          ownerUid,
+          balance: 0.00,
+          isActive: true
+        },
+        include: {
+          transactions: true
+        }
+      });
+    }
+
+    res.json(wallet);
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+router.post('/wallet/toggle', authenticateToken, async (req: AuthRequest, res) => {
+  try {
+    const ownerUid = req.user?.id as string;
+    const { isActive } = req.body;
+    
+    let wallet = await prisma.wallet.findUnique({ where: { ownerUid } });
+    if (!wallet) {
+       wallet = await prisma.wallet.create({
+        data: { ownerUid, balance: 0, isActive: false }
+       });
+    }
+
+    if (isActive && Number(wallet.balance) <= 0) {
+      return res.status(400).json({ error: 'Saldo insuficiente para ativar automação. Adicione créditos.' });
+    }
+
+    const updated = await prisma.wallet.update({
+      where: { ownerUid },
+      data: { isActive }
+    });
+
+    res.json(updated);
   } catch (err: any) {
     res.status(500).json({ error: err.message });
   }
@@ -718,7 +1004,41 @@ router.post('/appointments', authenticateToken, async (req: AuthRequest, res) =>
       clientId, clientName, phone, serviceId, serviceName, barberId, barberName, staffId, staffName, date: new Date(date), price, isFitIn
     }
   });
-  
+
+  // Wallet / Automation Logic
+  try {
+    const ownerUid = req.user?.id as string;
+    const wallet = await prisma.wallet.findUnique({ where: { ownerUid } });
+    
+    if (wallet && wallet.isActive && Number(wallet.balance) >= 0.10) {
+      // Simulate debit for WhatsApp automation
+      await prisma.wallet.update({
+        where: { id: wallet.id },
+        data: {
+          balance: { decrement: 0.10 }
+        }
+      });
+
+      await prisma.walletTransaction.create({
+        data: {
+          walletId: wallet.id,
+          type: 'debit',
+          category: 'automation_usage',
+          amount: 0.10,
+          description: `Débito automação WhatsApp (Agendamento #${appointment.id})`
+        }
+      });
+      
+      console.log(`[WALLET] Debited R$ 0,10 from ${ownerUid} for appointment ${appointment.id}`);
+      
+      // Integration with Meta API (Future)
+      // triggerMessage('confirmation', phone, clientName, { shop_name: user?.shopName, data: date, hora: time });
+    }
+  } catch (walletErr) {
+    console.error('Error processing wallet debit:', walletErr);
+    // Silent fail to not block appointment creation
+  }
+
   res.json({ id: appointment.id, clientId, clientName, serviceId, date: appointment.date, status: 'scheduled' });
 });
 
@@ -903,7 +1223,7 @@ const isSuperAdmin = (req: AuthRequest, res: any, next: any) => {
   next();
 };
 
-router.get('/admin/stats', authenticateToken, isSuperAdmin, async (req: AuthRequest, res) => {
+router.get('/superadmin/stats', authenticateToken, isSuperAdmin, async (req: AuthRequest, res) => {
   const totalUsers = await prisma.user.count();
   const activeSubscriptions = await prisma.subscription.count({ where: { status: "active" } });
   
@@ -915,7 +1235,7 @@ router.get('/admin/stats', authenticateToken, isSuperAdmin, async (req: AuthRequ
   });
 });
 
-router.get('/admin/plans', authenticateToken, isSuperAdmin, async (req: AuthRequest, res) => {
+router.get('/superadmin/plans', authenticateToken, isSuperAdmin, async (req: AuthRequest, res) => {
   const plansData = await prisma.plan.findMany();
   const plans = plansData.map((p: any) => ({
     ...p,
@@ -924,16 +1244,30 @@ router.get('/admin/plans', authenticateToken, isSuperAdmin, async (req: AuthRequ
   res.json(plans);
 });
 
-router.put('/admin/plans/:id', authenticateToken, isSuperAdmin, async (req: AuthRequest, res) => {
+router.put('/superadmin/plans/:id', authenticateToken, isSuperAdmin, async (req: AuthRequest, res) => {
   const { name, priceMonthly, priceYearly, features } = req.body;
-  await prisma.plan.update({
-    where: { id: req.params.id },
-    data: { name, priceMonthly, priceYearly, features: JSON.stringify(features) }
-  });
-  res.json({ success: true });
+  const { id } = req.params;
+  
+  console.log(`[SUPERADMIN] Plan Update: ${id}`, { name, priceMonthly, priceYearly, features });
+
+  try {
+    await prisma.plan.update({
+      where: { id },
+      data: { 
+        name, 
+        priceMonthly: isNaN(Number(priceMonthly)) ? 0 : Number(priceMonthly), 
+        priceYearly: isNaN(Number(priceYearly)) ? 0 : Number(priceYearly), 
+        features: typeof features === 'string' ? features : JSON.stringify(features) 
+      }
+    });
+    res.json({ success: true });
+  } catch (error: any) {
+    console.error(`[SUPERADMIN] Error updating plan ${id}:`, error);
+    res.status(500).json({ error: error.message || 'Failed to update plan' });
+  }
 });
 
-router.get('/admin/users', authenticateToken, isSuperAdmin, async (req: AuthRequest, res) => {
+router.get('/superadmin/tenants', authenticateToken, isSuperAdmin, async (req: AuthRequest, res) => {
   const users = await prisma.user.findMany({ 
     select: { 
       id: true, 
@@ -947,7 +1281,7 @@ router.get('/admin/users', authenticateToken, isSuperAdmin, async (req: AuthRequ
   res.json(users);
 });
 
-router.put('/admin/users/:id/plan', authenticateToken, isSuperAdmin, async (req: AuthRequest, res) => {
+router.put('/superadmin/tenants/:id', authenticateToken, isSuperAdmin, async (req: AuthRequest, res) => {
   const { planId } = req.body;
   const userId = req.params.id;
   console.log(`[ADMIN] Update request: User=${userId}, Plan=${planId}`);
@@ -1038,25 +1372,52 @@ router.put('/admin/users/:id/status', authenticateToken, isSuperAdmin, async (re
   res.json({ success: true });
 });
 
-// Webhook for Evolution API
-router.post('/whatsapp/webhook', async (req, res) => {
-  const { event, data } = req.body;
-  
-  if (event === 'messages.update' && data?.messageId && data?.status) {
-    try {
-      let newStatus = 'Enviada';
-      if (data.status === 'DELIVERED') newStatus = 'Entregue';
-      if (data.status === 'READ') newStatus = 'Lida';
-      if (data.status === 'ERROR') newStatus = 'Falha';
+// Webhook for Meta WhatsApp
+router.get('/whatsapp/webhook', (req, res) => {
+  // Meta webhook verification
+  const mode = req.query['hub.mode'];
+  const token = req.query['hub.verify_token'];
+  const challenge = req.query['hub.challenge'];
 
-      await prisma.whatsappMessage.updateMany({
-        where: { externalId: data.messageId },
-        data: { status: newStatus }
-      });
-        
-      console.log(`Webhook received: Message ${data.messageId} status updated to ${newStatus}`);
-    } catch (err) {
-      console.error('Error processing webhook:', err);
+  if (mode && token) {
+    if (mode === 'subscribe' && token === process.env.WHATSAPP_VERIFY_TOKEN) {
+      console.log('WEBHOOK_VERIFIED');
+      res.status(200).send(challenge);
+    } else {
+      res.sendStatus(403);
+    }
+  }
+});
+
+router.post('/whatsapp/webhook', async (req, res) => {
+  const { object, entry } = req.body;
+  
+  if (object === 'whatsapp_business_account') {
+    for (const item of entry) {
+      for (const change of item.changes) {
+        if (change.field === 'messages') {
+            const status = change.value.statuses?.[0];
+            if (status) {
+                const messageId = status.id;
+                const statusType = status.status; // delivered, read, sent, failed
+
+                let newStatus = 'Enviada';
+                if (statusType === 'delivered') newStatus = 'Entregue';
+                if (statusType === 'read') newStatus = 'Lida';
+                if (statusType === 'failed') newStatus = 'Falha';
+
+                try {
+                    await prisma.whatsappMessage.updateMany({
+                        where: { externalId: messageId },
+                        data: { status: newStatus }
+                    });
+                    console.log(`Meta Webhook: Message ${messageId} status updated to ${newStatus}`);
+                } catch (err) {
+                    console.error('Error updating message status from Meta webhook:', err);
+                }
+            }
+        }
+      }
     }
   }
   
@@ -1178,10 +1539,56 @@ router.get('/superadmin/tenant-usage/:userId', authenticateToken, async (req: an
     const { userId } = req.params;
     const appointments = await prisma.appointment.count({ where: { ownerUid: userId } });
     const staff = await prisma.staff.count({ where: { ownerUid: userId } });
-    res.json({ appointments, staff });
+    
+    // Get wallet info too
+    const wallet = await prisma.wallet.findUnique({
+      where: { ownerUid: userId },
+      include: { transactions: { take: 5, orderBy: { createdAt: 'desc' } } }
+    });
+
+    // Get WhatsApp status
+    const whatsapp = await prisma.whatsappSettings.findUnique({
+      where: { uid: userId }
+    });
+    
+    res.json({ appointments, staff, wallet, whatsapp });
   } catch (error) {
     res.status(500).json({ error: 'Failed to fetch usage' });
   }
+});
+
+router.post('/superadmin/tenants/:userId/wallet/recharge', authenticateToken, async (req: any, res) => {
+    if (req.user.role !== 'admin') return res.status(403).json({ error: 'Forbidden' });
+    try {
+        const { userId } = req.params;
+        const { amount, description } = req.body;
+
+        const wallet = await prisma.wallet.upsert({
+            where: { ownerUid: userId },
+            update: {
+                balance: { increment: Number(amount) }
+            },
+            create: {
+                ownerUid: userId,
+                balance: Number(amount),
+                isActive: true
+            }
+        });
+
+        await prisma.walletTransaction.create({
+            data: {
+                walletId: wallet.id,
+                amount: Number(amount),
+                type: 'credit',
+                category: 'recharge',
+                description: description || 'Recarga manual via Admin'
+            }
+        });
+
+        res.json(wallet);
+    } catch (error: any) {
+        res.status(500).json({ error: error.message });
+    }
 });
 
 router.put('/superadmin/tenants/:userId', authenticateToken, async (req: any, res) => {
@@ -1206,12 +1613,48 @@ router.put('/superadmin/plans/:planId', authenticateToken, async (req: any, res)
     const data = req.body;
     const updated = await prisma.plan.update({
       where: { id: planId },
-      data
+      data: {
+          ...data,
+          features: typeof data.features === 'object' ? JSON.stringify(data.features) : data.features
+      }
     });
     res.json(updated);
   } catch (error) {
     res.status(500).json({ error: 'Failed to update plan' });
   }
+});
+
+router.post('/superadmin/plans', authenticateToken, async (req: any, res) => {
+    if (req.user.role !== 'admin') return res.status(403).json({ error: 'Forbidden' });
+    try {
+        const { id, name, slug, priceMonthly, priceYearly, features } = req.body;
+        const plan = await prisma.plan.create({
+            data: {
+                id: id || `plan_${slug || Math.random().toString(36).substring(2, 9)}`,
+                name,
+                slug: slug || name.toLowerCase().replace(/\s+/g, '-'),
+                priceMonthly: Number(priceMonthly),
+                priceYearly: Number(priceYearly),
+                features: typeof features === 'string' ? features : JSON.stringify(features)
+            }
+        });
+        res.json(plan);
+    } catch (error: any) {
+        res.status(500).json({ error: error.message });
+    }
+});
+
+router.delete('/superadmin/plans/:planId', authenticateToken, async (req: any, res) => {
+    if (req.user.role !== 'admin') return res.status(403).json({ error: 'Forbidden' });
+    try {
+        const { planId } = req.params;
+        await prisma.plan.delete({
+            where: { id: planId }
+        });
+        res.json({ success: true });
+    } catch (error: any) {
+        res.status(500).json({ error: error.message });
+    }
 });
 
 // Subscription Routes
@@ -1246,6 +1689,48 @@ router.post('/subscriptions', authenticateToken, async (req: any, res) => {
   } catch (error) {
     console.error('Error creating subscription:', error);
     res.status(500).json({ error: 'Failed to create subscription' });
+  }
+});
+
+// --- ANAMNESIS ROUTES ---
+router.get('/clients/:id/anamnesis', authenticateToken, async (req: AuthRequest, res) => {
+  try {
+    const list = await prisma.anamnesis.findMany({
+      where: { clientId: req.params.id, ownerUid: req.user?.id },
+      orderBy: { createdAt: 'desc' }
+    });
+    res.json(list.map(a => ({ ...a, content: JSON.parse(a.content) })));
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+router.post('/clients/:id/anamnesis', authenticateToken, async (req: AuthRequest, res) => {
+  try {
+    const { procedure, content, signatureUrl } = req.body;
+    const record = await prisma.anamnesis.create({
+      data: {
+        clientId: req.params.id,
+        ownerUid: req.user?.id as string,
+        procedure: procedure || "Geral",
+        content: JSON.stringify(content),
+        signatureUrl
+      }
+    });
+    res.json(record);
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+router.delete('/anamnesis/:id', authenticateToken, async (req: AuthRequest, res) => {
+  try {
+    await prisma.anamnesis.deleteMany({
+      where: { id: req.params.id, ownerUid: req.user?.id }
+    });
+    res.json({ success: true });
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
   }
 });
 
