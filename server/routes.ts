@@ -8,6 +8,7 @@ import { WAHA_API_URL } from './config.js';
 import { JWT_SECRET } from './config.js';
 import { authenticateToken, AuthRequest } from './middleware.js';
 import { asaas } from './asaas.js';
+import { GoogleGenAI } from "@google/genai";
 
 const router = express.Router();
 
@@ -1527,7 +1528,11 @@ router.get('/superadmin/plans', authenticateToken, async (req: any, res) => {
   if (req.user.role !== 'admin') return res.status(403).json({ error: 'Forbidden' });
   try {
     const plans = await prisma.plan.findMany();
-    res.json(plans);
+    const parsedPlans = plans.map((p: any) => ({
+      ...p,
+      features: typeof p.features === 'string' ? JSON.parse(p.features) : p.features
+    }));
+    res.json(parsedPlans);
   } catch (error) {
     res.status(500).json({ error: 'Failed to fetch plans' });
   }
@@ -1732,6 +1737,42 @@ router.delete('/anamnesis/:id', authenticateToken, async (req: AuthRequest, res)
   } catch (err: any) {
     res.status(500).json({ error: err.message });
   }
+});
+
+// AI & Assets
+router.post('/ai/generate-assets', async (req, res) => {
+    try {
+        const { prompt, aspectRatio } = req.body;
+        const apiKey = process.env.GEMINI_API_KEY;
+
+        if (!apiKey) {
+            return res.status(500).json({ error: 'AI API Key not configured' });
+        }
+
+        const genAI = new GoogleGenAI({ apiKey });
+        
+        const result = await (genAI as any).models.generateContent({
+            model: 'gemini-1.5-flash',
+            contents: { parts: [{ text: prompt }] },
+            config: { imageConfig: { aspectRatio: aspectRatio || "16:9" } }
+        });
+
+        const response = result;
+        // In the original frontend code, it expected inlineData (base64)
+        // Since we are moving the logic, we'll return the same structure
+        const imagePart = response.candidates?.[0]?.content?.parts?.find((p: any) => p.inlineData);
+        
+        if (imagePart) {
+            res.json({ data: imagePart.inlineData.data });
+        } else {
+            // If it's just text (because gemini-2.0-flash is text/multimodal but not always image gen)
+            // We'll return the text for now or handle the error
+            res.json({ text: response.text() });
+        }
+    } catch (error: any) {
+        console.error('AI Error:', error);
+        res.status(500).json({ error: error.message });
+    }
 });
 
 export default router;

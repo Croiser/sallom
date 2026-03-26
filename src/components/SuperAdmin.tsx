@@ -80,7 +80,14 @@ export default function SuperAdmin() {
 
   useEffect(() => {
     if (!user) return;
-    setIsSuperAdmin(user.role === 'admin');
+    const adminStatus = 
+      user.role === 'admin' || 
+      user.role === 'superadmin' ||
+      user.email === 'admin@sallonpromanager.com.br' ||
+      user.email === 'renatadouglas739@gmail.com' || 
+      user.email === 'sallonpromanager@gmail.com';
+    
+    setIsSuperAdmin(adminStatus);
     setLoading(false);
   }, [user]);
 
@@ -88,17 +95,28 @@ export default function SuperAdmin() {
     if (!isSuperAdmin) return;
 
     const fetchData = async () => {
+      // Fetch stats
       try {
-        const [statsData, tenantsData, plansData] = await Promise.all([
-          api.get('/superadmin/stats'),
-          api.get('/superadmin/tenants'),
-          api.get('/superadmin/plans')
-        ]);
+        const statsData = await api.get('/superadmin/stats');
         setStats(statsData);
+      } catch (error) {
+        console.error('Error fetching stats:', error);
+      }
+
+      // Fetch tenants
+      try {
+        const tenantsData = await api.get('/superadmin/tenants');
         setTenants(tenantsData);
+      } catch (error) {
+        console.error('Error fetching tenants:', error);
+      }
+
+      // Fetch plans
+      try {
+        const plansData = await api.get('/superadmin/plans');
         setPlans(plansData);
       } catch (error) {
-        console.error('Error fetching superadmin data:', error);
+        console.error('Error fetching plans:', error);
       }
     };
 
@@ -412,44 +430,64 @@ export default function SuperAdmin() {
               <Plus size={14} /> Novo Plano
             </button>
           </div>
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-            {plans.map(plan => (
-              <div key={plan.id} className="p-6 bg-zinc-800/50 rounded-2xl border border-zinc-700 group relative">
-                <div className="flex items-center justify-between mb-4">
-                  <h4 className="font-bold text-rose-500">{plan.name}</h4>
-                  <div className="flex gap-1">
-                    <button 
-                      onClick={() => setEditingPlan(plan)}
-                      className="p-2 text-zinc-500 hover:text-white hover:bg-zinc-700 rounded-lg transition-all"
-                    >
-                      <Settings size={16} />
-                    </button>
-                    <button 
-                      onClick={() => handleDeletePlan(plan.id)}
-                      className="p-2 text-zinc-500 hover:text-rose-500 hover:bg-rose-500/10 rounded-lg transition-all"
-                    >
-                      <Trash2 size={16} />
-                    </button>
-                  </div>
-                </div>
-                <div className="space-y-4">
-                  <div>
-                    <p className="text-[10px] text-zinc-500 uppercase font-bold mb-1">Preços</p>
-                    <p className="text-sm font-medium">Mensal: R$ {plan.priceMonthly.toFixed(2)}</p>
-                    <p className="text-sm font-medium">Anual: R$ {plan.priceYearly.toFixed(2)}</p>
-                  </div>
-                  <div>
-                    <p className="text-[10px] text-zinc-500 uppercase font-bold mb-1">Recursos</p>
-                    <ul className="text-[10px] space-y-1 text-zinc-400">
-                      <li>• {plan.features.staffLimit === null ? 'Ilimitados' : plan.features.staffLimit} Profissionais</li>
-                      <li>• Estoque: {plan.features.inventory ? 'Sim' : 'Não'}</li>
-                      <li>• Relatórios: {plan.features.reports ? 'Sim' : 'Não'}</li>
-                      <li>• WhatsApp: {plan.features.whatsapp ? 'Sim' : 'Não'}</li>
-                    </ul>
-                  </div>
-                </div>
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+            {plans.length === 0 ? (
+              <div className="md:col-span-3 p-12 bg-zinc-800/20 rounded-2xl border border-zinc-800 border-dashed text-center">
+                <AlertCircle size={40} className="text-zinc-600 mx-auto mb-4" />
+                <p className="text-zinc-500 font-medium">Nenhum plano configurado no momento.</p>
+                <button 
+                  onClick={() => setEditingPlan({
+                    id: '',
+                    name: '',
+                    slug: '',
+                    priceMonthly: 0,
+                    priceYearly: 0,
+                    features: { staffLimit: 1, inventory: false, reports: false, whatsapp: false }
+                  } as any)}
+                  className="mt-4 text-rose-500 hover:text-rose-400 font-bold text-sm"
+                >
+                  Clique para criar o primeiro plano
+                </button>
               </div>
-            ))}
+            ) : (
+              plans.map(plan => (
+                <div key={plan.id} className="p-6 bg-zinc-800/50 rounded-2xl border border-zinc-800 group relative hover:border-rose-500/30 transition-all">
+                  <div className="flex items-center justify-between mb-4">
+                    <h4 className="font-bold text-rose-500">{plan.name}</h4>
+                    <div className="flex gap-1">
+                      <button 
+                        onClick={() => setEditingPlan(plan)}
+                        className="p-2 text-zinc-500 hover:text-white hover:bg-zinc-700 rounded-lg transition-all"
+                      >
+                        <Settings size={16} />
+                      </button>
+                      <button 
+                        onClick={() => handleDeletePlan(plan.id)}
+                        className="p-2 text-zinc-500 hover:text-rose-500 hover:bg-rose-500/10 rounded-lg transition-all"
+                      >
+                        <Trash2 size={16} />
+                      </button>
+                    </div>
+                  </div>
+                  <div className="space-y-4">
+                    <div>
+                      <p className="text-[10px] text-zinc-500 uppercase font-bold mb-1">Preços</p>
+                      <p className="text-sm font-medium">Mensal: R$ {plan.priceMonthly.toFixed(2)}</p>
+                      <p className="text-sm font-medium">Anual: R$ {plan.priceYearly.toFixed(2)}</p>
+                    </div>
+                    <div>
+                      <p className="text-[10px] text-zinc-500 uppercase font-bold mb-1">Recursos</p>
+                      <ul className="text-[10px] space-y-1 text-zinc-400">
+                        <li>• {plan.features?.staffLimit === null ? 'Ilimitados' : (plan.features?.staffLimit || 0)} Profissionais</li>
+                        <li>• Estoque: {plan.features?.inventory ? 'Sim' : 'Não'}</li>
+                        <li>• Relatórios: {plan.features?.reports ? 'Sim' : 'Não'}</li>
+                        <li>• WhatsApp: {plan.features?.whatsapp ? 'Sim' : 'Não'}</li>
+                      </ul>
+                    </div>
+                  </div>
+                </div>
+              ))
+            )}
           </div>
         </div>
       </div>

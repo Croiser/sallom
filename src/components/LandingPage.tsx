@@ -26,7 +26,7 @@ import {
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import Pricing from './Pricing';
-import { GoogleGenAI } from "@google/genai";
+import { api } from '../services/api';
 
 export default function LandingPage({ onAuthClick }: { onAuthClick: (view?: 'login' | 'register') => void }) {
   const [heroImage, setHeroImage] = useState<string | null>(null);
@@ -47,38 +47,28 @@ export default function LandingPage({ onAuthClick }: { onAuthClick: (view?: 'log
       setLoadingImage(true);
       setLoadingLogo(true);
       try {
-        const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
-        
         // Generate Hero Image
         const heroPrompt = `A high-quality, professional photography of a modern beauty salon. In the foreground, a middle-aged female salon owner sits at a cluttered reception desk, looking exhausted and overwhelmed with her hands on her head. The desk is covered in messy paper planners, notebooks, a ringing telephone, and a tablet displaying numerous notifications. In the background, the salon is bustling with activity, showing hairdressers working and clients in styling chairs. The lighting is dramatic and natural, highlighting the owner's stressed expression. In the center of the composition, there is a clean, empty space for text, featuring a prominent, elegant hot pink button that clearly says 'CADASTRE-SE AGORA' in bold white letters. The overall mood captures the contrast between professional success and administrative chaos.`;
 
-        const heroResponse = await ai.models.generateContent({
-          model: 'gemini-2.5-flash-image',
-          contents: { parts: [{ text: heroPrompt }] },
-          config: { imageConfig: { aspectRatio: "16:9" } },
+        const heroResponse = await api.post('/ai/generate-assets', { 
+          prompt: heroPrompt,
+          aspectRatio: "16:9"
         });
 
-        for (const part of heroResponse.candidates[0].content.parts) {
-          if (part.inlineData) {
-            setHeroImage(`data:image/png;base64,${part.inlineData.data}`);
-            break;
-          }
+        if (heroResponse.data) {
+          setHeroImage(`data:image/png;base64,${heroResponse.data}`);
         }
 
         // Generate Logo
         const logoPrompt = `A modern and elegant logo for a women's beauty salon management app named 'SallonProManager'. The logo should feature minimalist and sophisticated elements representing hair styling or aesthetics (like a stylized hair strand or a subtle silhouette). Use a luxury color palette: rose gold, deep charcoal, and soft white. The design must be clean, professional, and suitable for a high-end mobile app icon. Vector style, isolated on a white background.`;
 
-        const logoResponse = await ai.models.generateContent({
-          model: 'gemini-2.5-flash-image',
-          contents: { parts: [{ text: logoPrompt }] },
-          config: { imageConfig: { aspectRatio: "1:1" } },
+        const logoResponse = await api.post('/ai/generate-assets', {
+          prompt: logoPrompt,
+          aspectRatio: "1:1"
         });
 
-        for (const part of logoResponse.candidates[0].content.parts) {
-          if (part.inlineData) {
-            setLogoImage(`data:image/png;base64,${part.inlineData.data}`);
-            break;
-          }
+        if (logoResponse.data) {
+          setLogoImage(`data:image/png;base64,${logoResponse.data}`);
         }
       } catch (error) {
         console.error('Error generating assets:', error);

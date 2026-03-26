@@ -81,7 +81,12 @@ export default function Layout({ children, activeTab, setActiveTab }: LayoutProp
     { id: 'help', label: 'Ajuda', icon: HelpCircle },
   ];
 
-  const isSuperAdmin = userProfile?.role === 'admin' || userProfile?.email === 'renatadouglas739@gmail.com' || userProfile?.email === 'sallonpromanager@gmail.com';
+  const isSuperAdmin = 
+    userProfile?.role === 'admin' || 
+    userProfile?.role === 'superadmin' ||
+    userProfile?.email === 'admin@sallonpromanager.com.br' ||
+    userProfile?.email === 'renatadouglas739@gmail.com' || 
+    userProfile?.email === 'sallonpromanager@gmail.com';
 
   const filteredMenuItems = menuItems.filter(item => item.id !== 'whatsapp');
 
@@ -95,7 +100,7 @@ export default function Layout({ children, activeTab, setActiveTab }: LayoutProp
   };
 
   return (
-    <div className="min-h-screen bg-zinc-50 flex">
+    <div className="min-h-screen bg-surface-50 flex font-sans">
       {/* Mobile Sidebar Overlay */}
       <AnimatePresence>
         {isSidebarOpen && (
@@ -104,32 +109,35 @@ export default function Layout({ children, activeTab, setActiveTab }: LayoutProp
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
             onClick={() => setIsSidebarOpen(false)}
-            className="fixed inset-0 bg-black/50 z-40 lg:hidden"
+            className="fixed inset-0 bg-surface-900/40 backdrop-blur-sm z-40 lg:hidden"
           />
         )}
       </AnimatePresence>
 
       {/* Sidebar */}
       <aside className={`
-        fixed inset-y-0 left-0 z-50 w-64 bg-zinc-900 text-white transform transition-transform duration-300 ease-in-out
+        fixed inset-y-0 left-0 z-50 w-72 bg-surface-900 text-white transform transition-all duration-500 ease-in-out border-r border-white/5
         lg:relative lg:translate-x-0 ${isSidebarOpen ? 'translate-x-0' : '-translate-x-full'}
       `}>
-        <div className="p-6 flex flex-col h-full">
-          <div className="flex items-center gap-3 mb-10">
-            <div className="w-10 h-10 bg-rose-500 rounded-xl flex items-center justify-center shadow-lg shadow-rose-500/20 overflow-hidden">
+        <div className="p-8 flex flex-col h-full">
+          <div className="flex items-center gap-3 mb-12 group cursor-pointer">
+            <div className="w-12 h-12 bg-gradient-to-br from-brand-500 to-brand-700 rounded-2xl flex items-center justify-center shadow-premium overflow-hidden transition-transform group-hover:scale-105 duration-300">
               {loadingLogo ? (
                 <Flower2 className="text-white animate-spin" size={24} />
               ) : logoImage ? (
                 <img src={logoImage} alt="SallonProManager Logo" className="w-full h-full object-cover" referrerPolicy="no-referrer" />
               ) : (
-                <Flower2 className="text-white" size={24} />
+                <Flower2 className="text-white" size={28} />
               )}
             </div>
-            <h1 className="text-2xl font-black tracking-tighter text-white italic leading-tight">SALLONPROMANAGER</h1>
+            <div className="flex flex-col">
+              <h1 className="text-xl font-display font-black tracking-tighter text-white italic leading-none group-hover:text-brand-500 transition-colors">SALLONPRO</h1>
+              <span className="text-[10px] font-bold tracking-[0.2em] text-zinc-500 uppercase mt-1">Manager</span>
+            </div>
           </div>
 
-          <nav className="flex-1 space-y-1">
-            {fullMenuItems.filter(item => item.id !== 'superadmin').map((item) => (
+          <nav className="flex-1 space-y-1.5 overflow-y-auto pr-2 custom-scrollbar">
+            {fullMenuItems.map((item) => (
               <button
                 key={item.id}
                 onClick={() => {
@@ -137,54 +145,43 @@ export default function Layout({ children, activeTab, setActiveTab }: LayoutProp
                   setIsSidebarOpen(false);
                 }}
                 className={`
-                  w-full flex items-center gap-3 px-4 py-3 rounded-xl transition-colors
+                  w-full flex items-center gap-3 px-4 py-3.5 rounded-2xl transition-all duration-300 group
                   ${activeTab === item.id 
-                    ? 'bg-rose-500 text-white font-medium shadow-lg shadow-rose-500/20' 
-                    : 'text-zinc-400 hover:bg-zinc-800 hover:text-white'}
+                    ? 'bg-rose-500 text-white font-bold shadow-lg shadow-rose-500/20' 
+                    : 'text-zinc-400 hover:bg-white/5 hover:text-white'}
                 `}
               >
-                <item.icon size={20} />
-                {item.label}
+                <div className={`p-2 rounded-xl transition-all duration-300 ${
+                  activeTab === item.id ? 'bg-white/20' : 'bg-zinc-800 group-hover:bg-zinc-700'
+                }`}>
+                  <item.icon size={18} className={activeTab === item.id ? 'text-white' : 'text-rose-500'} />
+                </div>
+                <span className="text-sm">{item.label}</span>
+                {activeTab === item.id && (
+                  <div className="ml-auto w-1.5 h-1.5 rounded-full bg-white shadow-[0_0_8px_rgba(255,255,255,0.8)]" />
+                )}
               </button>
             ))}
           </nav>
 
-          {isSuperAdmin && (
-            <div className="mt-4 pt-4 border-t border-zinc-800">
-              <button
-                onClick={() => {
-                  setActiveTab('superadmin');
-                  setIsSidebarOpen(false);
-                }}
-                className={`
-                  w-full flex items-center gap-3 px-4 py-3 rounded-xl transition-all
-                  ${activeTab === 'superadmin' 
-                    ? 'bg-zinc-100 text-zinc-900 font-bold shadow-xl' 
-                    : 'text-rose-500 hover:bg-zinc-800'}
-                `}
-              >
-                <ShieldAlert size={20} />
-                SaaS Admin
-              </button>
-            </div>
-          )}
+          {/* Bottom logout area is clean now */}
 
-          <div className="pt-6 border-t border-zinc-800">
-            <div className="flex items-center gap-3 mb-6 px-4">
-              <div className="w-10 h-10 bg-zinc-800 rounded-full flex items-center justify-center">
-                <UserIcon size={20} className="text-zinc-400" />
+          <div className="mt-auto pt-6 border-t border-white/5">
+            <div className="flex items-center gap-3 mb-6 px-4 bg-white/5 p-4 rounded-2xl border border-white/5">
+              <div className="w-10 h-10 bg-brand-500/10 rounded-xl flex items-center justify-center border border-brand-500/20">
+                <UserIcon size={20} className="text-brand-500" />
               </div>
               <div className="overflow-hidden">
-                <p className="text-sm font-medium truncate">{userProfile?.name || 'Carregando...'}</p>
-                <p className="text-xs text-zinc-500 truncate">{userProfile?.shopName || 'Salão de Beleza'}</p>
+                <p className="text-sm font-bold truncate text-white">{userProfile?.name || 'Carregando...'}</p>
+                <p className="text-[10px] text-zinc-500 truncate font-bold uppercase tracking-wider">{userProfile?.shopName || 'Salão de Beleza'}</p>
               </div>
             </div>
             <button
               onClick={handleLogout}
-              className="w-full flex items-center gap-3 px-4 py-3 text-zinc-400 hover:text-red-400 hover:bg-red-400/10 rounded-xl transition-colors"
+              className="w-full flex items-center gap-3 px-4 py-3 text-zinc-500 hover:text-rose-400 hover:bg-rose-400/5 rounded-2xl transition-all font-medium text-sm"
             >
-              <LogOut size={20} />
-              Sair
+              <LogOut size={18} />
+              Sair da Conta
             </button>
           </div>
         </div>
@@ -193,41 +190,49 @@ export default function Layout({ children, activeTab, setActiveTab }: LayoutProp
       {/* Main Content */}
       <main className="flex-1 flex flex-col min-w-0 overflow-hidden">
         {/* Header */}
-        <header className="h-16 bg-white border-b border-zinc-200 flex items-center justify-between px-6 lg:px-10">
+        <header className="h-20 bg-white/70 backdrop-blur-xl border-b border-surface-200 flex items-center justify-between px-8 lg:px-12 sticky top-0 z-30">
           <button
             onClick={() => setIsSidebarOpen(true)}
-            className="lg:hidden p-2 text-zinc-600 hover:bg-zinc-100 rounded-lg"
+            className="lg:hidden p-2 text-surface-900 bg-surface-100 rounded-xl hover:bg-surface-200 transition-colors"
           >
             <Menu size={24} />
           </button>
           
-          <div className="flex-1 lg:flex-none">
-            <h2 className="text-lg font-semibold text-zinc-900 capitalize">
+          <div className="flex items-baseline gap-4">
+            <h2 className="text-2xl font-display font-black text-surface-900 tracking-tight">
               {[...menuItems, { id: 'superadmin', label: 'SaaS Admin' }].find(i => i.id === activeTab)?.label}
             </h2>
+            <div className="hidden lg:flex items-center gap-1.5 px-3 py-1 bg-surface-100 border border-surface-200 rounded-full">
+              <div className="w-1.5 h-1.5 bg-emerald-500 rounded-full animate-pulse" />
+              <span className="text-[10px] font-bold text-surface-900 uppercase tracking-widest">Ativo</span>
+            </div>
           </div>
 
-          <div className="flex items-center gap-4">
+          <div className="flex items-center gap-6">
             <button 
               onClick={() => setActiveTab('help')}
-              className="p-2 text-zinc-400 hover:text-rose-500 hover:bg-rose-50 rounded-xl transition-all flex items-center gap-2 text-sm font-medium"
+              className="p-2 text-surface-900 hover:bg-surface-100 rounded-2xl transition-all flex items-center gap-2.5 text-sm font-bold group"
             >
-              <HelpCircle size={20} />
-              <span className="hidden sm:inline">Ajuda</span>
+              <div className="p-2 bg-surface-100 rounded-xl group-hover:bg-brand-500 group-hover:text-white transition-colors">
+                <HelpCircle size={18} />
+              </div>
+              <span className="hidden sm:inline">Suporte</span>
             </button>
-            <div className="hidden sm:block text-right">
-              <p className="text-xs text-zinc-500">{new Date().toLocaleDateString('pt-BR', { weekday: 'long', day: 'numeric', month: 'long' })}</p>
+            <div className="hidden md:flex flex-col items-end">
+              <p className="text-[10px] font-black text-brand-500 uppercase tracking-[0.2em]">{new Date().toLocaleDateString('pt-BR', { weekday: 'long' })}</p>
+              <p className="text-sm font-bold text-surface-900">{new Date().toLocaleDateString('pt-BR', { day: 'numeric', month: 'long' })}</p>
             </div>
           </div>
         </header>
 
         {/* Content Area */}
-        <div className="flex-1 overflow-y-auto p-6 lg:p-10">
+        <div className="flex-1 overflow-y-auto p-8 lg:p-12 bg-surface-50 custom-scrollbar">
           <motion.div
             key={activeTab}
-            initial={{ opacity: 0, y: 10 }}
+            initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.2 }}
+            transition={{ duration: 0.4, ease: [0.23, 1, 0.32, 1] }}
+            className="max-w-7xl mx-auto"
           >
             {children}
           </motion.div>
