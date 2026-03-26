@@ -12,6 +12,8 @@ services:
       - postgres_data:/var/lib/postgresql/data
     ports:
       - "5432:5432"
+    networks:
+      - web-network
 
   app:
     build: .
@@ -26,6 +28,8 @@ services:
     depends_on:
       - db
       - waha
+    networks:
+      - web-network
 
   waha:
     image: devlikeapro/waha
@@ -35,6 +39,12 @@ services:
     environment:
       WHATSAPP_DEFAULT_SESSION: default
       WAHA_PRINT_QR: "true"
+    networks:
+      - web-network
 
 volumes:
   postgres_data:
+
+networks:
+  web-network:
+    external: true
