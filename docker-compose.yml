@@ -3,11 +3,12 @@ version: '3.8'
 services:
   db:
     image: postgres:15-alpine
+    container_name: salon-db
     restart: always
     environment:
-      POSTGRES_USER: sallonpromanager_user
-      POSTGRES_PASSWORD: sallonpromanager_password
-      POSTGRES_DB: sallonpromanager_db
+      POSTGRES_USER: salonuser
+      POSTGRES_PASSWORD: salonpassword
+      POSTGRES_DB: salondb
     volumes:
       - postgres_data:/var/lib/postgresql/data
     ports:
@@ -17,11 +18,12 @@ services:
 
   app:
     build: .
+    container_name: salon-app
     restart: always
     ports:
       - "3005:3000"
     environment:
-      DATABASE_URL: "postgresql://sallonpromanager_user:sallonpromanager_password@db:5432/sallonpromanager_db?schema=public"
+      DATABASE_URL: "postgresql://salonuser:salonpassword@db:5432/salondb?schema=public"
       JWT_SECRET: "sua_chave_secreta_aqui"
       WAHA_API_URL: "http://waha:3000"
       NODE_ENV: production
@@ -33,6 +35,7 @@ services:
 
   waha:
     image: devlikeapro/waha
+    container_name: salon-waha
     restart: always
     ports:
       - "3006:3000"
@@ -47,4 +50,5 @@ volumes:
 
 networks:
   web-network:
+    name: dodile_web-network
     external: true
