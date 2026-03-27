@@ -13,9 +13,18 @@ services:
       - "5432:5432"
     networks:
       - web-network
+    deploy:
+      resources:
+        limits:
+          memory: 512M
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
 
   app:
-    build: .
+    image: ghcr.io/croiser/sallom:latest
     container_name: salon-app
     restart: always
     ports:
@@ -30,6 +39,16 @@ services:
       - waha
     networks:
       - web-network
+    deploy:
+      resources:
+        limits:
+          memory: 1G
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+
 
   waha:
     image: devlikeapro/waha
@@ -42,6 +61,15 @@ services:
       WAHA_PRINT_QR: "true"
     networks:
       - web-network
+    deploy:
+      resources:
+        limits:
+          memory: 512M
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
 
 volumes:
   postgres_data:
@@ -49,3 +77,4 @@ volumes:
 networks:
   web-network:
     driver: bridge
+
