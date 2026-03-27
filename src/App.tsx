@@ -60,7 +60,7 @@ export default function App() {
       }
     } else if (parts.length >= 3) {
       // Standard domain logic (e.g., salon.myapp.com)
-      if (parts[0] !== 'www' && parts[0] !== 'app') {
+      if (parts[0] !== 'www' && parts[0] !== 'app' && parts[0] !== 'sallon') {
         subdomainSlug = parts[0];
       }
     }
