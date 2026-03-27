@@ -1,7 +1,7 @@
 module.exports = {
   apps: [
     {
-      name: 'sallonpromanager',
+      name: 'salonmanagerpro',
       script: './dist-server/server.js',
       instances: 'max',
       exec_mode: 'cluster',

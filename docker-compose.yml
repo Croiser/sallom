@@ -50,5 +50,4 @@ volumes:
 
 networks:
   web-network:
-    name: dodile_web-network
-    external: true
+    driver: bridge
