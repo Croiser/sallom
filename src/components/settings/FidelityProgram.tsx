@@ -1,4 +1,4 @@
-import { Gift, Save, Sparkles, Percent, Target, Coins } from 'lucide-react';
+import { Gift as GiftIcon, Save as SaveIcon, Sparkles as SparklesIcon, Percent as PercentIcon, Target as TargetIcon, Coins as CoinsIcon } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { ShopSettings } from '../../types';
 
@@ -37,7 +37,7 @@ export default function FidelityProgram({ settings, setSettings, onSave }: Fidel
       <div className="p-8 border-b border-surface-100 bg-surface-50/50">
         <h3 className="text-xl font-display font-black flex items-center gap-3 text-surface-900">
           <div className="p-2 bg-brand-50 text-brand-500 rounded-xl">
-            <Gift size={24} />
+            <GiftIcon size={24} />
           </div>
           Programa de Fidelidade
         </h3>
@@ -71,7 +71,7 @@ export default function FidelityProgram({ settings, setSettings, onSave }: Fidel
               <div className="space-y-3">
                 <label className="text-[10px] font-black text-zinc-400 uppercase tracking-[0.2em] ml-1">Pontos por Visita</label>
                 <div className="relative group">
-                  <Sparkles size={18} className="absolute left-4 top-1/2 -translate-y-1/2 text-zinc-400 group-focus-within:text-brand-500 transition-colors" />
+                  <SparklesIcon size={18} className="absolute left-4 top-1/2 -translate-y-1/2 text-zinc-400 group-focus-within:text-brand-500 transition-colors" />
                   <input
                     type="number"
                     value={settings.fidelityConfig.pointsPerVisit}
@@ -85,7 +85,7 @@ export default function FidelityProgram({ settings, setSettings, onSave }: Fidel
               <div className="space-y-3">
                 <label className="text-[10px] font-black text-zinc-400 uppercase tracking-[0.2em] ml-1">Pontos por Valor Gasto (R$)</label>
                 <div className="relative group">
-                  <Percent size={18} className="absolute left-4 top-1/2 -translate-y-1/2 text-zinc-400 group-focus-within:text-brand-500 transition-colors" />
+                  <PercentIcon size={18} className="absolute left-4 top-1/2 -translate-y-1/2 text-zinc-400 group-focus-within:text-brand-500 transition-colors" />
                   <input
                     type="number"
                     value={settings.fidelityConfig.pointsPerCurrency}
@@ -99,7 +99,7 @@ export default function FidelityProgram({ settings, setSettings, onSave }: Fidel
               <div className="space-y-3">
                 <label className="text-[10px] font-black text-zinc-400 uppercase tracking-[0.2em] ml-1">Alvo para Resgate</label>
                 <div className="relative group">
-                  <Target size={18} className="absolute left-4 top-1/2 -translate-y-1/2 text-zinc-400 group-focus-within:text-brand-500 transition-colors" />
+                  <TargetIcon size={18} className="absolute left-4 top-1/2 -translate-y-1/2 text-zinc-400 group-focus-within:text-brand-500 transition-colors" />
                   <input
                     type="number"
                     value={settings.fidelityConfig.minPointsToRedeem}
@@ -113,7 +113,7 @@ export default function FidelityProgram({ settings, setSettings, onSave }: Fidel
               <div className="space-y-3">
                 <label className="text-[10px] font-black text-zinc-400 uppercase tracking-[0.2em] ml-1">Valor do Voucher (R$)</label>
                 <div className="relative group">
-                  <Coins size={18} className="absolute left-4 top-1/2 -translate-y-1/2 text-zinc-400 group-focus-within:text-brand-500 transition-colors" />
+                  <CoinsIcon size={18} className="absolute left-4 top-1/2 -translate-y-1/2 text-zinc-400 group-focus-within:text-brand-500 transition-colors" />
                   <input
                     type="number"
                     value={settings.fidelityConfig.redeemValue}
@@ -133,7 +133,7 @@ export default function FidelityProgram({ settings, setSettings, onSave }: Fidel
             onClick={onSave}
             className="btn-primary group"
           >
-            <Save size={20} className="group-hover:rotate-12 transition-transform" />
+            <SaveIcon size={20} className="group-hover:rotate-12 transition-transform" />
             Salvar Programação de Fidelidade
           </button>
         </div>

@@ -1,5 +1,18 @@
 import React, { useState, useEffect } from 'react';
-import { Plus, Search, Phone, Mail, Trash2, User, X, Users, Gift, Star, ArrowRight, Check } from 'lucide-react';
+import { 
+  Plus as PlusIcon, 
+  Search as SearchIcon, 
+  Phone as PhoneIcon, 
+  Mail as MailIcon, 
+  Trash2 as TrashIcon, 
+  User as UserIcon, 
+  X as XIcon, 
+  Users as UsersIcon, 
+  Gift as GiftIcon, 
+  Star as StarIcon, 
+  ArrowRight as ArrowIcon, 
+  Check as CheckIcon 
+} from 'lucide-react';
 import { Client, ShopSettings } from '../types';
 import { whatsappService } from '../services/whatsappService';
 import { useAuth } from '../contexts/AuthContext';
@@ -125,7 +138,7 @@ export default function Clients() {
     <div className="space-y-6">
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div className="relative flex-1 max-w-md">
-          <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-zinc-400" size={18} />
+          <SearchIcon className="absolute left-4 top-1/2 -translate-y-1/2 text-zinc-400" size={18} />
           <input
             type="text"
             placeholder="Buscar clientes..."
@@ -138,7 +151,7 @@ export default function Clients() {
           onClick={() => setIsModalOpen(true)}
           className="bg-amber-500 hover:bg-amber-400 text-zinc-900 font-bold px-6 py-3 rounded-2xl flex items-center justify-center gap-2 transition-all shadow-lg shadow-amber-500/20"
         >
-          <Plus size={20} />
+          <PlusIcon size={20} />
           Novo Cliente
         </button>
       </div>
@@ -150,7 +163,7 @@ export default function Clients() {
               onClick={() => handleDelete(client.id)}
               className="absolute top-4 right-4 p-2 text-zinc-400 hover:text-rose-600 opacity-0 group-hover:opacity-100 transition-opacity"
             >
-              <Trash2 size={18} />
+              <TrashIcon size={18} />
             </button>
             
             <div className="flex items-center gap-4 mb-6">
@@ -165,11 +178,11 @@ export default function Clients() {
 
             <div className="space-y-3">
               <div className="flex items-center gap-3 text-zinc-600">
-                <Phone size={18} className="text-zinc-400" />
+                <PhoneIcon size={18} className="text-zinc-400" />
                 <span className="text-sm">{client.phone || 'Sem telefone'}</span>
               </div>
               <div className="flex items-center gap-3 text-zinc-600">
-                <Mail size={18} className="text-zinc-400" />
+                <MailIcon size={18} className="text-zinc-400" />
                 <span className="text-sm truncate">{client.email || 'Sem e-mail'}</span>
               </div>
             </div>
@@ -178,7 +191,7 @@ export default function Clients() {
               <div className="bg-rose-50 p-3 rounded-2xl border border-rose-100 relative overflow-hidden">
                 <p className="text-[10px] text-rose-600 uppercase font-bold">Pontos</p>
                 <p className="text-lg font-bold text-rose-900">{client.loyaltyPoints || 0}</p>
-                <Gift className="absolute -right-2 -bottom-2 text-rose-200/50" size={40} />
+                <GiftIcon className="absolute -right-2 -bottom-2 text-rose-200/50" size={40} />
               </div>
                 <div className="bg-zinc-50 p-3 rounded-2xl border border-zinc-100">
                   <p className="text-[10px] text-zinc-500 uppercase font-bold">Visitas</p>
@@ -202,7 +215,7 @@ export default function Clients() {
                 }}
                 className="mt-4 w-full bg-emerald-500 hover:bg-emerald-400 text-white font-bold py-2 rounded-xl transition-all flex items-center justify-center gap-2 shadow-lg shadow-emerald-500/20"
               >
-                <Star size={16} fill="currentColor" />
+                <StarIcon size={16} fill="currentColor" />
                 Resgatar Prêmio
               </button>
             )}
@@ -217,7 +230,7 @@ export default function Clients() {
         )) : (
           <div className="col-span-full py-20 text-center bg-white rounded-[2.5rem] border border-zinc-200 border-dashed space-y-4">
             <div className="w-16 h-16 bg-blue-50 text-blue-500 rounded-2xl flex items-center justify-center mx-auto">
-              <Users size={32} />
+                <UsersIcon size={32} />
             </div>
             <div>
               <h3 className="text-xl font-bold text-zinc-900">Sua lista está vazia</h3>
@@ -241,11 +254,11 @@ export default function Clients() {
           <div className="bg-white w-full max-w-md rounded-3xl shadow-2xl overflow-hidden">
             <div className="p-6 border-b border-zinc-100 flex items-center justify-between bg-emerald-50">
               <h3 className="text-xl font-bold text-emerald-900 flex items-center gap-2">
-                <Gift size={24} />
+                <GiftIcon size={24} />
                 Resgatar Prêmio
               </h3>
               <button onClick={() => setIsRedeemModalOpen(false)} className="text-emerald-400 hover:text-emerald-600">
-                <X size={24} />
+                <XIcon size={24} />
               </button>
             </div>
             <div className="p-6 space-y-6">
@@ -272,7 +285,7 @@ export default function Clients() {
                   className="w-full bg-emerald-500 hover:bg-emerald-400 text-white font-bold py-4 rounded-xl transition-all shadow-lg shadow-emerald-500/20 flex items-center justify-center gap-2"
                 >
                   Confirmar Resgate
-                  <ArrowRight size={18} />
+                  <ArrowIcon size={18} />
                 </button>
                 <button
                   onClick={() => setIsRedeemModalOpen(false)}
@@ -301,11 +314,11 @@ export default function Clients() {
           >
             {toast.type === 'success' ? (
               <div className="w-6 h-6 bg-emerald-500 rounded-full flex items-center justify-center">
-                <Check size={14} className="text-emerald-900" />
+                <CheckIcon size={14} className="text-emerald-900" />
               </div>
             ) : (
               <div className="w-6 h-6 bg-rose-500 rounded-full flex items-center justify-center">
-                <X size={14} className="text-rose-900" />
+                <XIcon size={14} className="text-rose-900" />
               </div>
             )}
             <span className="font-bold text-sm tracking-tight">{toast.message}</span>
@@ -332,7 +345,7 @@ export default function Clients() {
                     onClick={() => setSelectedClientForAnamnesis(null)} 
                     className="p-3 hover:bg-zinc-100 rounded-2xl transition-all text-zinc-400 hover:text-zinc-600"
                 >
-                  <X size={24} />
+                  <XIcon size={24} />
                 </button>
               </div>
               <div className="p-8 overflow-y-auto flex-1 custom-scrollbar">
@@ -350,7 +363,7 @@ export default function Clients() {
             <div className="p-6 border-b border-zinc-100 flex items-center justify-between">
               <h3 className="text-xl font-bold text-zinc-900">Novo Cliente</h3>
               <button onClick={() => setIsModalOpen(false)} className="text-zinc-400 hover:text-zinc-600">
-                <X size={24} />
+                <XIcon size={24} />
               </button>
             </div>
             <form onSubmit={handleCreate} className="p-6 space-y-4">

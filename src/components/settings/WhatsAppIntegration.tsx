@@ -1,5 +1,16 @@
 import React from 'react';
-import { MessageSquare, Smartphone, ShieldCheck, Battery, QrCode, Loader2, Lock, Zap, Save, CheckCircle2 } from 'lucide-react';
+import { 
+  MessageSquare as MessageIcon, 
+  Smartphone as SmartphoneIcon, 
+  ShieldCheck as ShieldIcon, 
+  Battery as BatteryIcon, 
+  QrCode as QrIcon, 
+  Loader2 as LoaderIcon, 
+  Lock as LockIcon, 
+  Zap as ZapIcon, 
+  Save as SaveIcon, 
+  CheckCircle2 as CheckIcon 
+} from 'lucide-react';
 import { motion } from 'motion/react';
 import { ShopSettings, Plan } from '../../types';
 
@@ -43,7 +54,7 @@ export default function WhatsAppIntegration({
             animate={{ scale: 1, opacity: 1 }}
             className="w-20 h-20 bg-brand-50 rounded-3xl flex items-center justify-center mb-6 shadow-lg shadow-brand-500/10"
           >
-            <Lock size={32} className="text-brand-500" />
+            <LockIcon size={32} className="text-brand-500" />
           </motion.div>
           <h4 className="text-2xl font-display font-black text-surface-900 mb-3 uppercase tracking-tight">WhatsApp Inteligente</h4>
           <p className="text-zinc-500 text-sm max-w-xs mb-8 font-bold leading-relaxed">
@@ -53,7 +64,7 @@ export default function WhatsAppIntegration({
             onClick={() => onNavigate?.('subscription', { planId: 'gold' })}
             className="btn-primary"
           >
-            <Zap size={20} className="text-brand-300" />
+            <ZapIcon size={20} className="text-brand-300" />
             Upgrade para Gold
           </button>
         </div>
@@ -61,7 +72,7 @@ export default function WhatsAppIntegration({
       <div className="p-8 border-b border-surface-100 bg-surface-50/50">
         <h3 className="text-xl font-display font-black flex items-center gap-3 text-surface-900">
           <div className="p-2 bg-amber-50 text-amber-500 rounded-xl">
-            <MessageSquare size={24} />
+            <MessageIcon size={24} />
           </div>
           Integração WhatsApp
         </h3>
@@ -74,7 +85,7 @@ export default function WhatsAppIntegration({
           <div className="flex flex-col md:flex-row md:items-center justify-between gap-8 relative z-10">
             <div className="flex items-start gap-5">
               <div className={`p-4 rounded-2xl shadow-sm ${isWhatsAppConnected ? 'bg-white text-emerald-500' : 'bg-white text-zinc-300'}`}>
-                <Smartphone size={28} />
+                <SmartphoneIcon size={28} />
               </div>
               <div className="space-y-1.5">
                 <div className="flex items-center gap-3">
@@ -87,7 +98,7 @@ export default function WhatsAppIntegration({
                       animate={{ scale: 1 }}
                       className="flex items-center gap-1.5 px-3 py-1 bg-emerald-500 text-white text-[10px] font-black uppercase tracking-widest rounded-full shadow-lg shadow-emerald-500/20"
                     >
-                      <CheckCircle2 size={12} />
+                      <CheckIcon size={12} />
                       Ativo
                     </motion.span>
                   )}
@@ -100,7 +111,7 @@ export default function WhatsAppIntegration({
                 
                 {isWhatsAppConnected && batteryLevel !== null && (
                   <div className="flex items-center gap-2 mt-3 text-xs font-black text-emerald-600 uppercase tracking-widest">
-                    <Battery size={16} className={batteryLevel < 20 ? 'text-brand-500 animate-pulse' : ''} />
+                    <BatteryIcon size={16} className={batteryLevel < 20 ? 'text-brand-500 animate-pulse' : ''} />
                     Bateria: {batteryLevel}%
                   </div>
                 )}
@@ -116,12 +127,12 @@ export default function WhatsAppIntegration({
                 >
                   {isGeneratingQR ? (
                     <>
-                      <Loader2 size={18} className="animate-spin" />
+                      <LoaderIcon size={18} className="animate-spin" />
                       Sincronizando...
                     </>
                   ) : (
                     <>
-                      <QrCode size={18} />
+                      <QrIcon size={18} />
                       vincular novo aparelho
                     </>
                   )}
@@ -216,7 +227,7 @@ export default function WhatsAppIntegration({
             onClick={onSave}
             className="btn-primary"
           >
-            <Save size={20} />
+            <SaveIcon size={20} />
             Efetivar Configurações
           </button>
         </div>

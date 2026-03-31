@@ -1,4 +1,4 @@
-import { UserPlus, Plus, Trash2, Crown, ShieldCheck, CheckCircle2, DollarSign, Users } from 'lucide-react';
+import { UserPlus, Plus, Trash2, Crown, ShieldCheck, CheckCircle2, DollarSign, Users as UsersIcon } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { Staff, Plan } from '../../types';
 
@@ -126,7 +126,7 @@ export default function StaffManagement({
           {staff.length === 0 && (
             <div className="p-16 text-center border-2 border-dashed border-surface-200 rounded-[2.5rem] bg-surface-50/50">
               <div className="w-16 h-16 bg-white rounded-2xl flex items-center justify-center mx-auto mb-6 shadow-sm border border-surface-100">
-                <Users size={32} className="text-zinc-200" />
+                <UsersIcon size={32} className="text-zinc-200" />
               </div>
               <p className="text-zinc-400 font-display font-black uppercase tracking-widest text-sm">Monte sua equipe de estrelas</p>
               <p className="text-xs text-zinc-400 px-12 mt-2">Adicione seu primeiro profissional acima para começar a gerenciar agendamentos e comissões.</p>

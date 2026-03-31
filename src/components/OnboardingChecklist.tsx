@@ -1,14 +1,14 @@
 import React, { useState, useEffect } from 'react';
 import { 
-  CheckCircle2, 
-  Circle, 
-  ChevronRight, 
-  Sparkles, 
-  Users, 
-  Calendar, 
-  DollarSign,
-  ArrowRight,
-  PartyPopper
+  CheckCircle2 as CheckIcon, 
+  Circle as CircleIcon, 
+  ChevronRight as ChevronIcon, 
+  Sparkles as SparklesIcon, 
+  Users as UsersIcon, 
+  Calendar as CalendarIcon, 
+  DollarSign as DollarIcon,
+  ArrowRight as ArrowIcon,
+  PartyPopper as PartyIcon
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { useAuth } from '../contexts/AuthContext';
@@ -68,7 +68,7 @@ export default function OnboardingChecklist({ onNavigate }: OnboardingChecklistP
       id: 'services',
       title: 'Configure seus Serviços',
       description: 'Cadastre o que você oferece',
-      icon: <Sparkles size={18} />,
+      icon: <SparklesIcon size={18} />,
       completed: stats.hasServices,
       tab: 'services'
     },
@@ -76,7 +76,7 @@ export default function OnboardingChecklist({ onNavigate }: OnboardingChecklistP
       id: 'staff',
       title: 'Cadastre sua Equipe',
       description: 'Adicione seus profissionais',
-      icon: <Users size={18} />,
+      icon: <UsersIcon size={18} />,
       completed: stats.hasStaff,
       tab: 'settings'
     },
@@ -84,7 +84,7 @@ export default function OnboardingChecklist({ onNavigate }: OnboardingChecklistP
       id: 'clients',
       title: 'Organize seus Clientes',
       description: 'Importe sua base de contatos',
-      icon: <Users size={18} />,
+      icon: <UsersIcon size={18} />,
       completed: stats.hasClients,
       tab: 'clients'
     },
@@ -92,7 +92,7 @@ export default function OnboardingChecklist({ onNavigate }: OnboardingChecklistP
       id: 'appointments',
       title: 'Primeiro Agendamento',
       description: 'Teste o fluxo de reserva',
-      icon: <Calendar size={18} />,
+      icon: <CalendarIcon size={18} />,
       completed: stats.hasAppointments,
       tab: 'appointments'
     }
@@ -116,7 +116,7 @@ export default function OnboardingChecklist({ onNavigate }: OnboardingChecklistP
             <div>
               <h2 className="text-2xl font-bold text-zinc-900 flex items-center gap-2">
                 {isFullyCompleted ? 'Tudo pronto! 🚀' : 'Vamos começar?'}
-                {isFullyCompleted && <PartyPopper className="text-rose-500" />}
+                {isFullyCompleted && <PartyIcon className="text-rose-500" />}
               </h2>
               <p className="text-zinc-500 text-sm">
                 {isFullyCompleted 
@@ -158,9 +158,9 @@ export default function OnboardingChecklist({ onNavigate }: OnboardingChecklistP
                     {step.icon}
                   </div>
                   {step.completed ? (
-                    <CheckCircle2 size={16} className="text-emerald-500" />
+                    <CheckIcon size={16} className="text-emerald-500" />
                   ) : (
-                    <Circle size={16} className="text-zinc-200 group-hover:text-rose-200" />
+                    <CircleIcon size={16} className="text-zinc-200 group-hover:text-rose-200" />
                   )}
                 </div>
                 <h3 className={`text-sm font-bold ${step.completed ? 'text-emerald-900' : 'text-zinc-900'}`}>
@@ -177,7 +177,7 @@ export default function OnboardingChecklist({ onNavigate }: OnboardingChecklistP
         {!isFullyCompleted && (
           <div className="md:w-64 w-full bg-zinc-50 p-6 rounded-3xl flex flex-col items-center text-center space-y-4 border border-zinc-100">
             <div className="w-12 h-12 bg-rose-500 text-white rounded-2xl flex items-center justify-center shadow-lg shadow-rose-500/20">
-              <Sparkles size={24} />
+              <SparklesIcon size={24} />
             </div>
             <div>
               <h4 className="font-bold text-zinc-900 text-sm">Treinamento Rápido</h4>
@@ -190,7 +190,7 @@ export default function OnboardingChecklist({ onNavigate }: OnboardingChecklistP
               className="w-full bg-white text-zinc-900 border border-zinc-200 py-2 rounded-xl text-xs font-bold hover:bg-zinc-100 transition-all flex items-center justify-center gap-2"
             >
               Ver Guia Completo
-              <ArrowRight size={14} />
+              <ArrowIcon size={14} />
             </button>
             <button 
               onClick={() => {

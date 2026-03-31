@@ -1,28 +1,28 @@
 import React, { useState, useEffect } from 'react';
 import { 
-  Sparkles, 
-  CheckCircle2, 
-  Zap, 
-  Star, 
-  Crown, 
-  ArrowRight, 
-  MessageSquare, 
-  BarChart3, 
-  Package, 
-  Calendar,
-  Users,
-  Smartphone,
-  ShieldCheck,
-  Clock,
-  TrendingUp,
-  Heart,
-  Flower2,
-  Loader2,
-  Scissors,
-  DollarSign,
+  Sparkles as SparklesIcon, 
+  CheckCircle2 as CheckIcon, 
+  Zap as ZapIcon, 
+  Star as StarIcon, 
+  Crown as CrownIcon, 
+  ArrowRight as ArrowIcon, 
+  MessageSquare as MessageIcon, 
+  BarChart3 as BarChartIcon, 
+  Package as PackageIcon, 
+  Calendar as CalendarIcon,
+  Users as UsersIcon,
+  Smartphone as SmartphoneIcon,
+  ShieldCheck as ShieldIcon,
+  Clock as ClockIcon,
+  TrendingUp as TrendingIcon,
+  Heart as HeartIcon,
+  Flower2 as FlowerIcon,
+  Loader2 as LoaderIcon,
+  Scissors as ScissorsIcon,
+  DollarSign as DollarIcon,
   Smartphone as MobileIcon,
   CheckCircle,
-  Plus
+  Plus as PlusIcon
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import Pricing from './Pricing';
@@ -89,11 +89,11 @@ export default function LandingPage({ onAuthClick }: { onAuthClick: (view?: 'log
           <div className="flex items-center gap-2">
             <div className="w-10 h-10 bg-rose-500 rounded-xl flex items-center justify-center shadow-lg shadow-rose-500/20 overflow-hidden">
               {loadingLogo ? (
-                <Loader2 className="text-white animate-spin" size={20} />
+                <LoaderIcon className="text-white animate-spin" size={20} />
               ) : logoImage ? (
                 <img src={logoImage} alt="SallonProManager Logo" className="w-full h-full object-cover" referrerPolicy="no-referrer" />
               ) : (
-                <Scissors className="text-white" size={24} />
+                <ScissorsIcon className="text-white" size={24} />
               )}
             </div>
             <span className="text-xl font-bold text-zinc-900 tracking-tight bg-gradient-to-r from-zinc-900 to-rose-600 bg-clip-text text-transparent italic uppercase">SallonProManager</span>
@@ -132,7 +132,7 @@ export default function LandingPage({ onAuthClick }: { onAuthClick: (view?: 'log
                 animate={{ opacity: 1, y: 0 }}
                 className="inline-flex items-center gap-2 px-4 py-2 bg-rose-100 text-rose-700 rounded-full text-xs font-bold uppercase tracking-wider mb-6"
               >
-                <Zap size={14} />
+                <ZapIcon size={14} />
                 A plataforma #1 para Salões de Beleza
               </motion.div>
               <motion.h1 
@@ -197,7 +197,7 @@ export default function LandingPage({ onAuthClick }: { onAuthClick: (view?: 'log
                     className="w-full bg-rose-500 text-white py-4 rounded-xl font-bold text-lg hover:bg-rose-600 transition-all shadow-lg shadow-rose-200 flex items-center justify-center gap-2"
                   >
                     Criar minha agenda digital agora
-                    <ArrowRight size={20} />
+                    <ArrowIcon size={20} />
                   </button>
                   <p className="text-[10px] text-zinc-400 text-center">Teste grátis por 7 dias. Sem cartão de crédito.</p>
                 </form>
@@ -213,13 +213,13 @@ export default function LandingPage({ onAuthClick }: { onAuthClick: (view?: 'log
               <div className="relative z-10 bg-white rounded-[2.5rem] p-4 shadow-2xl border border-zinc-100 min-h-[500px] flex items-center justify-center overflow-hidden">
                 {loadingImage ? (
                   <div className="flex flex-col items-center gap-4">
-                    <Loader2 className="w-12 h-12 text-rose-500 animate-spin" />
+                    <LoaderIcon className="w-12 h-12 text-rose-500 animate-spin" />
                     <p className="text-zinc-500 font-medium italic">Gerando imagem conceito...</p>
                   </div>
                 ) : heroImage ? (
                   <img 
                     src={heroImage} 
-                    alt="Salão Pro Manager Hero Concept" 
+                    alt="Conceito visual do sistema SallonProManager em um salão de beleza moderno" 
                     className="rounded-[2rem] w-full h-[500px] object-cover"
                     referrerPolicy="no-referrer"
                   />
@@ -232,7 +232,7 @@ export default function LandingPage({ onAuthClick }: { onAuthClick: (view?: 'log
                 <div className="absolute -bottom-10 -left-10 bg-white p-6 rounded-3xl shadow-xl border border-zinc-100 hidden md:block">
                   <div className="flex items-center gap-4 mb-4">
                     <div className="w-12 h-12 bg-emerald-100 rounded-2xl flex items-center justify-center text-emerald-600">
-                      <TrendingUp size={24} />
+                      <TrendingIcon size={24} />
                     </div>
                     <div>
                       <p className="text-xs font-bold text-zinc-400 uppercase">Faturamento Mensal</p>
@@ -240,7 +240,7 @@ export default function LandingPage({ onAuthClick }: { onAuthClick: (view?: 'log
                     </div>
                   </div>
                   <div className="flex items-center gap-2 text-emerald-600 text-sm font-bold">
-                    <CheckCircle2 size={16} />
+                    <CheckIcon size={16} />
                     +18% que o mês anterior
                   </div>
                 </div>
@@ -257,19 +257,19 @@ export default function LandingPage({ onAuthClick }: { onAuthClick: (view?: 'log
         <div className="max-w-7xl mx-auto px-4">
           <div className="flex flex-wrap items-center justify-center gap-12 opacity-50 grayscale hover:grayscale-0 transition-all">
             <div className="flex items-center gap-2 font-bold text-xl text-zinc-400">
-              <Users size={24} />
+              <UsersIcon size={24} />
               <span>+2.500 SALÕES</span>
             </div>
             <div className="flex items-center gap-2 font-bold text-xl text-zinc-400">
-              <Calendar size={24} />
+              <CalendarIcon size={24} />
               <span>150k AGENDAMENTOS</span>
             </div>
             <div className="flex items-center gap-2 font-bold text-xl text-zinc-400">
-              <Smartphone size={24} />
+              <SmartphoneIcon size={24} />
               <span>APP NOTA 4.9</span>
             </div>
             <div className="flex items-center gap-2 font-bold text-xl text-zinc-400">
-              <ShieldCheck size={24} />
+              <ShieldIcon size={24} />
               <span>100% SEGURO</span>
             </div>
           </div>
@@ -318,7 +318,7 @@ export default function LandingPage({ onAuthClick }: { onAuthClick: (view?: 'log
               <div className="space-y-6">
                 <div className="flex items-start gap-4">
                   <div className="w-12 h-12 bg-rose-500/20 rounded-2xl flex items-center justify-center text-rose-500 flex-shrink-0">
-                    <Clock size={24} />
+                    <ClockIcon size={24} />
                   </div>
                   <div>
                     <h4 className="font-bold text-xl mb-1">Recupere suas noites</h4>
@@ -327,7 +327,7 @@ export default function LandingPage({ onAuthClick }: { onAuthClick: (view?: 'log
                 </div>
                 <div className="flex items-start gap-4">
                   <div className="w-12 h-12 bg-rose-500/20 rounded-2xl flex items-center justify-center text-rose-500 flex-shrink-0">
-                    <TrendingUp size={24} />
+                    <TrendingIcon size={24} />
                   </div>
                   <div>
                     <h4 className="font-bold text-xl mb-1">Aumente sua produtividade</h4>
@@ -350,25 +350,25 @@ export default function LandingPage({ onAuthClick }: { onAuthClick: (view?: 'log
           <div className="grid grid-cols-2 md:grid-cols-4 gap-6">
             <div className="bg-white p-6 rounded-3xl border border-zinc-100 text-center hover:shadow-xl transition-all">
               <div className="w-12 h-12 bg-rose-50 text-rose-500 rounded-2xl flex items-center justify-center mx-auto mb-4">
-                <Scissors size={24} />
+                <ScissorsIcon size={24} />
               </div>
               <h4 className="font-bold text-zinc-900">Salões de Cabelo</h4>
             </div>
             <div className="bg-white p-6 rounded-3xl border border-zinc-100 text-center hover:shadow-xl transition-all">
               <div className="w-12 h-12 bg-blue-50 text-blue-500 rounded-2xl flex items-center justify-center mx-auto mb-4">
-                <Users size={24} />
+                <UsersIcon size={24} />
               </div>
               <h4 className="font-bold text-zinc-900">Barbearias</h4>
             </div>
             <div className="bg-white p-6 rounded-3xl border border-zinc-100 text-center hover:shadow-xl transition-all">
               <div className="w-12 h-12 bg-emerald-50 text-emerald-500 rounded-2xl flex items-center justify-center mx-auto mb-4">
-                <Sparkles size={24} />
+                <SparklesIcon size={24} />
               </div>
               <h4 className="font-bold text-zinc-900">Estética & SPA</h4>
             </div>
             <div className="bg-white p-6 rounded-3xl border border-zinc-100 text-center hover:shadow-xl transition-all">
               <div className="w-12 h-12 bg-amber-50 text-amber-500 rounded-2xl flex items-center justify-center mx-auto mb-4">
-                <Heart size={24} />
+                <HeartIcon size={24} />
               </div>
               <h4 className="font-bold text-zinc-900">Nail Designers</h4>
             </div>
@@ -388,7 +388,7 @@ export default function LandingPage({ onAuthClick }: { onAuthClick: (view?: 'log
 
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8">
             <FeatureCard 
-              icon={<MessageSquare className="text-zinc-400" />}
+              icon={<MessageIcon className="text-zinc-400" />}
               title="Lembretes WhatsApp"
               description="Notificações de agendamento simplificadas. (Recurso automático disponível em breve)."
             />
@@ -398,7 +398,7 @@ export default function LandingPage({ onAuthClick }: { onAuthClick: (view?: 'log
               description="Sua cliente agenda sozinha pelo celular. Você só recebe a notificação e foca no serviço."
             />
             <FeatureCard 
-              icon={<DollarSign className="text-rose-500" />}
+              icon={<DollarIcon className="text-rose-500" />}
               title="Controle Financeiro"
               description="Saiba exatamente quanto entrou no dia, as comissões dos profissionais e seu lucro real."
             />
@@ -445,21 +445,21 @@ export default function LandingPage({ onAuthClick }: { onAuthClick: (view?: 'log
           <div className="grid grid-cols-1 md:grid-cols-3 gap-12">
             <div className="flex flex-col items-center text-center space-y-4">
               <div className="w-16 h-16 bg-white/5 rounded-2xl flex items-center justify-center text-rose-500 border border-white/10">
-                <ShieldCheck size={32} />
+                <ShieldIcon size={32} />
               </div>
               <h3 className="text-xl font-bold">Dados 100% Seguros</h3>
               <p className="text-zinc-400">Seus dados e de suas clientes são protegidos com criptografia de ponta a ponta.</p>
             </div>
             <div className="flex flex-col items-center text-center space-y-4">
               <div className="w-16 h-16 bg-white/5 rounded-2xl flex items-center justify-center text-rose-500 border border-white/10">
-                <Zap size={32} />
+                <ZapIcon size={32} />
               </div>
               <h3 className="text-xl font-bold">99.9% de Disponibilidade</h3>
               <p className="text-zinc-400">Sua agenda nunca sai do ar. Suas clientes agendam a qualquer hora, em qualquer lugar.</p>
             </div>
             <div className="flex flex-col items-center text-center space-y-4">
               <div className="w-16 h-16 bg-white/5 rounded-2xl flex items-center justify-center text-rose-500 border border-white/10">
-                <TrendingUp size={32} />
+                <TrendingIcon size={32} />
               </div>
               <h3 className="text-xl font-bold">Backup Diário</h3>
               <p className="text-zinc-400">Nunca perca uma informação. Fazemos cópias de segurança automáticas todos os dias.</p>
@@ -493,8 +493,8 @@ export default function LandingPage({ onAuthClick }: { onAuthClick: (view?: 'log
               </div>
             </div>
             <div className="flex-1 grid grid-cols-2 gap-4">
-              <img src="https://images.unsplash.com/photo-1522335789203-aabd1fc54bc9?auto=format&fit=crop&q=80&w=400" className="rounded-3xl w-full h-64 object-cover rotate-3" />
-              <img src="https://images.unsplash.com/photo-1527799822367-3188572f483f?auto=format&fit=crop&q=80&w=400" className="rounded-3xl w-full h-64 object-cover -rotate-3 mt-12" />
+              <img src="https://images.unsplash.com/photo-1522335789203-aabd1fc54bc9?auto=format&fit=crop&q=80&w=400" alt="Ambiente de salão de beleza moderno" className="rounded-3xl w-full h-64 object-cover rotate-3" />
+              <img src="https://images.unsplash.com/photo-1527799822367-3188572f483f?auto=format&fit=crop&q=80&w=400" alt="Detalhe de produtos de beleza profissionais" className="rounded-3xl w-full h-64 object-cover -rotate-3 mt-12" />
             </div>
           </div>
         </div>
@@ -545,7 +545,7 @@ export default function LandingPage({ onAuthClick }: { onAuthClick: (view?: 'log
                 Cadastre-se agora
               </button>
             </div>
-            <Flower2 className="absolute -bottom-10 -right-10 text-white/10" size={300} />
+            <FlowerIcon className="absolute -bottom-10 -right-10 text-white/10" size={300} />
           </div>
         </div>
       </section>
@@ -557,7 +557,7 @@ export default function LandingPage({ onAuthClick }: { onAuthClick: (view?: 'log
         rel="noopener noreferrer"
         className="fixed bottom-8 right-8 z-50 bg-emerald-500 text-white p-4 rounded-full shadow-2xl hover:bg-emerald-600 hover:scale-110 transition-all group"
       >
-        <MessageSquare size={28} />
+        <MessageIcon size={28} />
         <span className="absolute right-full mr-4 top-1/2 -translate-y-1/2 bg-white text-zinc-900 px-4 py-2 rounded-xl text-sm font-bold shadow-xl opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap pointer-events-none">
           Falar com Suporte
         </span>
@@ -568,7 +568,7 @@ export default function LandingPage({ onAuthClick }: { onAuthClick: (view?: 'log
         <div className="max-w-7xl mx-auto px-4 flex flex-col md:flex-row justify-between items-center gap-8">
           <div className="flex items-center gap-2">
             <div className="w-8 h-8 bg-rose-500 rounded-lg flex items-center justify-center">
-              <Sparkles className="text-white" size={18} />
+              <SparklesIcon className="text-white" size={18} />
             </div>
             <span className="font-bold text-zinc-900 italic">Salão Pro Manager</span>
           </div>
@@ -602,7 +602,7 @@ function FAQItem({ question, answer }: { question: string, answer: string }) {
         className="w-full px-6 py-4 flex items-center justify-between text-left hover:bg-zinc-50 transition-colors"
       >
         <span className="font-bold text-zinc-900">{question}</span>
-        <Plus className={`text-rose-500 transition-transform ${isOpen ? 'rotate-45' : ''}`} size={20} />
+        <PlusIcon className={`text-rose-500 transition-transform ${isOpen ? 'rotate-45' : ''}`} size={20} />
       </button>
       <AnimatePresence>
         {isOpen && (
@@ -677,7 +677,7 @@ function Testimonial({ quote, author, role }: { quote: string, author: string, r
     <div className="bg-zinc-800/50 p-8 rounded-3xl border border-zinc-700">
       <p className="text-lg italic text-zinc-300 mb-6">"{quote}"</p>
       <div className="flex items-center gap-4">
-        <img src={`https://i.pravatar.cc/100?u=salon-user${author}`} className="w-12 h-12 rounded-full" />
+        <img src={`https://i.pravatar.cc/100?u=salon-user${author}`} alt={`Foto de ${author}`} className="w-12 h-12 rounded-full" />
         <div>
           <p className="font-bold text-white">{author}</p>
           <p className="text-sm text-zinc-500">{role}</p>

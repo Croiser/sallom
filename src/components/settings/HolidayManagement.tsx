@@ -1,4 +1,4 @@
-import { Calendar as CalendarIcon, Plus, Trash2, Sparkles, AlertCircle } from 'lucide-react';
+import { Calendar as CalendarIcon, Plus as PlusIcon, Trash2 as TrashIcon, Sparkles as SparklesIcon } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { Holiday } from '../../types';
 
@@ -56,7 +56,7 @@ export default function HolidayManagement({
                 onClick={onAdd}
                 className="btn-primary shrink-0 group"
               >
-                <Plus size={20} className="group-hover:rotate-90 transition-transform" />
+                <PlusIcon size={20} className="group-hover:rotate-90 transition-transform" />
               </button>
             </div>
           </div>
@@ -91,14 +91,14 @@ export default function HolidayManagement({
                   onClick={() => onDelete(holiday.id)}
                   className="w-10 h-10 flex items-center justify-center text-zinc-400 hover:text-brand-500 hover:bg-brand-50 rounded-xl transition-all"
                 >
-                  <Trash2 size={20} />
+                  <TrashIcon size={20} />
                 </button>
               </motion.div>
             ))}
           </AnimatePresence>
           {holidays.length === 0 && (
             <div className="p-12 text-center border-2 border-dashed border-surface-200 rounded-[2rem] bg-surface-50/50">
-              <Sparkles size={32} className="mx-auto text-zinc-200 mb-4" />
+              <SparklesIcon size={32} className="mx-auto text-zinc-200 mb-4" />
               <p className="text-zinc-400 font-display font-black uppercase tracking-widest text-xs">Nenhuma data especial cadastrada</p>
             </div>
           )}

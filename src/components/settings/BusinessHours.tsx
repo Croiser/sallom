@@ -1,5 +1,5 @@
 import React from 'react';
-import { Clock, Save, AlertCircle } from 'lucide-react';
+import { Clock as ClockIcon, Save as SaveIcon, AlertCircle as AlertIcon } from 'lucide-react';
 import { motion } from 'motion/react';
 import { ShopSettings } from '../../types';
 
@@ -30,7 +30,7 @@ export default function BusinessHours({ settings, setSettings, onSave, timeError
       <div className="p-8 border-b border-surface-100 bg-surface-50/50">
         <h3 className="text-xl font-display font-black flex items-center gap-3 text-surface-900">
           <div className="p-2 bg-brand-50 text-brand-500 rounded-xl">
-            <Clock size={24} />
+            <ClockIcon size={24} />
           </div>
           Horário de Funcionamento
         </h3>
@@ -93,7 +93,7 @@ export default function BusinessHours({ settings, setSettings, onSave, timeError
             onClick={onSave}
             className="btn-primary group"
           >
-            <Save size={20} className="group-hover:rotate-12 transition-transform" />
+            <SaveIcon size={20} className="group-hover:rotate-12 transition-transform" />
             Salvar Cronograma
           </button>
         </div>
@@ -105,7 +105,7 @@ export default function BusinessHours({ settings, setSettings, onSave, timeError
             className="p-5 bg-brand-50 border border-brand-100 rounded-[1.5rem] flex items-center gap-4 text-brand-600"
           >
             <div className="w-10 h-10 bg-brand-500 rounded-full flex items-center justify-center text-white shrink-0 shadow-lg shadow-brand-500/20">
-              <AlertCircle size={20} />
+              <AlertIcon size={20} />
             </div>
             <div>
               <p className="text-[10px] font-black uppercase tracking-widest">Erro de Validação</p>

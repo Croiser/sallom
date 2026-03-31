@@ -1,31 +1,31 @@
 import React, { useState, useEffect } from 'react';
 import { 
-  Building2, 
-  MapPin, 
-  Globe, 
-  Clock, 
-  MessageSquare, 
-  Plus, 
-  Trash2, 
-  Save,
-  UserPlus,
+  Building2 as BuildingIcon, 
+  MapPin as MapIcon, 
+  Globe as GlobeIcon, 
+  Clock as ClockIcon, 
+  MessageSquare as MessageIcon, 
+  Plus as PlusIcon, 
+  Trash2 as TrashIcon, 
+  Save as SaveIcon,
+  UserPlus as UserPlusIcon,
   Calendar as CalendarIcon,
-  Copy,
-  ExternalLink,
-  Check,
-  Crown,
-  Lock,
+  Copy as CopyIcon,
+  ExternalLink as LinkIcon,
+  Check as CheckIcon,
+  Crown as CrownIcon,
+  Lock as LockIcon,
   Settings as SettingsIcon,
-  Zap,
-  Star,
-  Battery,
-  Loader2,
-  QrCode,
-  ShieldCheck,
-  Smartphone,
-  Facebook,
-  Music2,
-  Gift
+  Zap as ZapIcon,
+  Star as StarIcon,
+  Battery as BatteryIcon,
+  Loader2 as LoaderIcon,
+  QrCode as QrIcon,
+  ShieldCheck as ShieldIcon,
+  Smartphone as SmartphoneIcon,
+  Facebook as FacebookIcon,
+  Music2 as MusicIcon,
+  Gift as GiftIcon
 } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import { useSubscription } from '../hooks/useSubscription';
@@ -104,7 +104,7 @@ export default function Settings({ onNavigate }: SettingsProps) {
   };
 
   useEffect(() => {
-    if (user) {
+    if (user?.email) {
       if (user.email === 'renatadouglas739@gmail.com' || user.email === 'sallonpromanager@gmail.com') {
         setIsSuperAdmin(true);
       }
@@ -255,7 +255,7 @@ export default function Settings({ onNavigate }: SettingsProps) {
       <section className="bg-white rounded-2xl border border-zinc-200 overflow-hidden shadow-sm">
         <div className="p-6 border-b border-zinc-100 bg-zinc-50/50">
           <h3 className="text-lg font-semibold flex items-center gap-2">
-            <ExternalLink size={20} className="text-rose-500" />
+            <LinkIcon size={20} className="text-rose-500" />
             Link de Agendamento Online
           </h3>
         </div>
@@ -278,14 +278,14 @@ export default function Settings({ onNavigate }: SettingsProps) {
                   }}
                   className="p-2 hover:bg-zinc-700 rounded-lg transition-colors text-zinc-400 hover:text-white"
                 >
-                  {copied ? <Check size={18} className="text-emerald-500" /> : <Copy size={18} />}
+                  {copied ? <CheckIcon size={18} className="text-emerald-500" /> : <CopyIcon size={18} />}
                 </button>
               </div>
               <p className="mt-4 text-xs text-zinc-500">
                 Compartilhe este link em sua bio do Instagram ou envie diretamente para seus clientes.
               </p>
             </div>
-            <Globe className="absolute -bottom-4 -right-4 text-zinc-800/50" size={100} />
+            <GlobeIcon className="absolute -bottom-4 -right-4 text-zinc-800/50" size={100} />
           </div>
         </div>
       </section>

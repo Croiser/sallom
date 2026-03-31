@@ -2,12 +2,10 @@ import React, { useState, useEffect } from 'react';
 import { 
   TrendingUp, 
   TrendingDown, 
-  Users, 
+  Users as UsersIcon, 
   Calendar, 
   Clock,
   CheckCircle2,
-  AlertCircle,
-  Sparkles,
   AlertCircle,
   Sparkles,
   Zap,
@@ -183,7 +181,7 @@ export default function Dashboard({ onNavigate }: DashboardProps) {
         >
           <div className="flex items-center justify-between mb-6">
             <div className="p-4 bg-blue-50 text-blue-600 rounded-2xl group-hover:bg-blue-500 group-hover:text-white transition-all duration-300">
-              <Users size={28} />
+              <UsersIcon size={28} />
             </div>
           </div>
           <p className="text-xs font-bold text-zinc-400 uppercase tracking-widest mb-2">Clientes Ativos</p>

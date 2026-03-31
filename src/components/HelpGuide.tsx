@@ -1,8 +1,8 @@
 import React from 'react';
 import { 
   BookOpen, 
-  Calendar, 
-  Users, 
+  Calendar as CalendarIcon, 
+  Users as UsersIcon, 
   Sparkles, 
   DollarSign, 
   Package, 
@@ -28,19 +28,19 @@ export default function HelpGuide({ onNavigate }: HelpGuideProps) {
     {
       title: '2. Cadastre sua Equipe',
       description: 'Adicione os profissionais que trabalham com você para gerenciar as agendas individuais.',
-      icon: <Users className="text-blue-500" size={24} />,
+      icon: <UsersIcon className="text-blue-500" size={24} />,
       tab: 'settings'
     },
     {
       title: '3. Organize seus Clientes',
       description: 'Mantenha uma base de dados dos seus clientes para facilitar o agendamento e o contato via WhatsApp.',
-      icon: <Users className="text-emerald-500" size={24} />,
+      icon: <UsersIcon className="text-emerald-500" size={24} />,
       tab: 'clients'
     },
     {
       title: '4. Realize Agendamentos',
       description: 'Use o calendário para marcar horários. Você pode visualizar por dia, semana ou mês.',
-      icon: <Calendar className="text-purple-500" size={24} />,
+      icon: <CalendarIcon className="text-rose-500" size={24} />,
       tab: 'appointments'
     },
     {

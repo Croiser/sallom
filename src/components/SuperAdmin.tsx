@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { 
-  Users, 
+  Users as UsersIcon, 
   CreditCard, 
   TrendingUp, 
   Activity, 
@@ -17,7 +17,7 @@ import {
   CheckCircle2,
   Globe,
   Database,
-  Zap,
+  Zap as ZapIcon,
   Save,
   Trash2,
   LifeBuoy,
@@ -292,7 +292,7 @@ export default function SuperAdmin() {
         <StatCard 
           title="Total de Salões" 
           value={stats.totalUsers.toString()} 
-          icon={<Users className="text-blue-400" />} 
+          icon={<UsersIcon className="text-blue-400" />} 
           trend="+12%" 
           trendUp={true} 
         />
@@ -313,7 +313,7 @@ export default function SuperAdmin() {
         <StatCard 
           title="Saúde da API" 
           value="99.9%" 
-          icon={<Zap className="text-purple-400" />} 
+          icon={<ZapIcon className="text-amber-400" />} 
           trend="Estável" 
           trendUp={true} 
         />
@@ -405,7 +405,7 @@ export default function SuperAdmin() {
             <StatusItem label="Database PostgreSQL" status={apiStatus.database} icon={<Database size={18} />} />
             <StatusItem label="Asaas Payment API" status={apiStatus.asaas} icon={<CreditCard size={18} />} />
             <StatusItem label="Evolution WhatsApp API" status={apiStatus.evolution} icon={<Globe size={18} />} />
-            <StatusItem label="Webhooks System" status={apiStatus.webhooks} icon={<Zap size={18} />} />
+            <StatusItem label="Webhooks System" status={apiStatus.webhooks} icon={<ZapIcon size={18} />} />
           </div>
         </div>
 
@@ -794,7 +794,7 @@ export default function SuperAdmin() {
                       {/* Manual Recharge Section */}
                       <div className="p-6 bg-zinc-950 rounded-2xl border border-zinc-800 border-dashed border-zinc-700">
                           <h4 className="text-sm font-bold mb-4 flex items-center gap-2">
-                              <Zap size={16} className="text-amber-500" />
+                              <ZapIcon size={16} className="text-amber-500" />
                               Gestão Manual de Créditos
                           </h4>
                           <div className="flex gap-3">

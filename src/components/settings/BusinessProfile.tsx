@@ -1,5 +1,14 @@
 import React from 'react';
-import { Building2, MapPin, Globe, ShieldCheck, Smartphone, Star, Facebook, Music2 } from 'lucide-react';
+import { 
+  Building2 as BuildingIcon, 
+  MapPin as MapIcon, 
+  Globe as GlobeIcon, 
+  ShieldCheck as ShieldIcon, 
+  Smartphone as SmartphoneIcon, 
+  Star as StarIcon, 
+  Facebook as FacebookIcon, 
+  Music2 as MusicIcon 
+} from 'lucide-react';
 import { ShopSettings } from '../../types';
 
 interface BusinessProfileProps {
@@ -13,7 +22,7 @@ export default function BusinessProfile({ settings, setSettings }: BusinessProfi
       <div className="p-8 border-b border-surface-100 bg-surface-50/50">
         <h3 className="text-xl font-display font-black flex items-center gap-3 text-surface-900">
           <div className="p-2 bg-brand-50 text-brand-500 rounded-xl">
-            <Building2 size={24} />
+            <BuildingIcon size={24} />
           </div>
           Perfil do Negócio
         </h3>
@@ -23,7 +32,7 @@ export default function BusinessProfile({ settings, setSettings }: BusinessProfi
           <div className="space-y-3">
             <label className="text-xs font-black text-zinc-400 uppercase tracking-widest ml-1">Nome do Estabelecimento</label>
             <div className="relative group">
-              <Building2 className="absolute left-4 top-1/2 -translate-y-1/2 text-zinc-400 group-focus-within:text-brand-500 transition-colors" size={20} />
+              <BuildingIcon className="absolute left-4 top-1/2 -translate-y-1/2 text-zinc-400 group-focus-within:text-brand-500 transition-colors" size={20} />
               <input
                 type="text"
                 value={settings?.name || ''}
@@ -36,7 +45,7 @@ export default function BusinessProfile({ settings, setSettings }: BusinessProfi
           <div className="space-y-3">
             <label className="text-xs font-black text-zinc-400 uppercase tracking-widest ml-1">Link Exclusivo (Slug)</label>
             <div className="relative group">
-              <Globe className="absolute left-4 top-1/2 -translate-y-1/2 text-zinc-400 group-focus-within:text-brand-500 transition-colors" size={20} />
+              <GlobeIcon className="absolute left-4 top-1/2 -translate-y-1/2 text-zinc-400 group-focus-within:text-brand-500 transition-colors" size={20} />
               <input
                 type="text"
                 value={settings?.slug || ''}
@@ -50,7 +59,7 @@ export default function BusinessProfile({ settings, setSettings }: BusinessProfi
           <div className="space-y-3">
             <label className="text-xs font-black text-zinc-400 uppercase tracking-widest ml-1">CNPJ (Opcional)</label>
             <div className="relative group">
-              <ShieldCheck className="absolute left-4 top-1/2 -translate-y-1/2 text-zinc-400 group-focus-within:text-brand-500 transition-colors" size={20} />
+              <ShieldIcon className="absolute left-4 top-1/2 -translate-y-1/2 text-zinc-400 group-focus-within:text-brand-500 transition-colors" size={20} />
               <input
                 type="text"
                 value={settings?.cnpj || ''}
@@ -63,7 +72,7 @@ export default function BusinessProfile({ settings, setSettings }: BusinessProfi
           <div className="space-y-3">
             <label className="text-xs font-black text-zinc-400 uppercase tracking-widest ml-1">Telefone de Contato</label>
             <div className="relative group">
-              <Smartphone className="absolute left-4 top-1/2 -translate-y-1/2 text-zinc-400 group-focus-within:text-brand-500 transition-colors" size={20} />
+              <SmartphoneIcon className="absolute left-4 top-1/2 -translate-y-1/2 text-zinc-400 group-focus-within:text-brand-500 transition-colors" size={20} />
               <input
                 type="text"
                 value={settings?.phone || ''}
@@ -76,7 +85,7 @@ export default function BusinessProfile({ settings, setSettings }: BusinessProfi
           <div className="space-y-3 md:col-span-2">
             <label className="text-xs font-black text-zinc-400 uppercase tracking-widest ml-1">Endereço Completo</label>
             <div className="relative group">
-              <MapPin className="absolute left-4 top-1/2 -translate-y-1/2 text-zinc-400 group-focus-within:text-brand-500 transition-colors" size={20} />
+              <MapIcon className="absolute left-4 top-1/2 -translate-y-1/2 text-zinc-400 group-focus-within:text-brand-500 transition-colors" size={20} />
               <input
                 type="text"
                 value={settings?.address || ''}
@@ -90,7 +99,7 @@ export default function BusinessProfile({ settings, setSettings }: BusinessProfi
           <div className="space-y-3">
             <label className="text-xs font-black text-zinc-400 uppercase tracking-widest ml-1">Instagram Business</label>
             <div className="relative group">
-              <Star className="absolute left-4 top-1/2 -translate-y-1/2 text-zinc-400 group-focus-within:text-brand-500 transition-colors" size={20} />
+              <StarIcon className="absolute left-4 top-1/2 -translate-y-1/2 text-zinc-400 group-focus-within:text-brand-500 transition-colors" size={20} />
               <input
                 type="text"
                 value={settings?.instagram || ''}
@@ -103,7 +112,7 @@ export default function BusinessProfile({ settings, setSettings }: BusinessProfi
           <div className="space-y-3">
             <label className="text-xs font-black text-zinc-400 uppercase tracking-widest ml-1">Facebook Fanpage</label>
             <div className="relative group">
-              <Facebook className="absolute left-4 top-1/2 -translate-y-1/2 text-zinc-400 group-focus-within:text-brand-500 transition-colors" size={20} />
+              <FacebookIcon className="absolute left-4 top-1/2 -translate-y-1/2 text-zinc-400 group-focus-within:text-brand-500 transition-colors" size={20} />
               <input
                 type="text"
                 value={settings?.facebook || ''}

@@ -16,7 +16,8 @@ import {
   RefreshCw,
   Zap,
   Lock,
-  Crown
+  Crown,
+  LifeBuoy
 } from 'lucide-react';
 import { whatsappService, WhatsAppSettings } from '../services/whatsappService';
 import { useSubscription } from '../hooks/useSubscription';
