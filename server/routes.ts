@@ -660,8 +660,10 @@ router.get('/whatsapp/waha/qr', authenticateToken, async (req: AuthRequest, res)
   try {
     const waha = new WAHAService(WAHA_API_URL);
     const qr = await waha.getQrCode('default');
+    console.log('QR Code result:', qr ? 'received' : 'null');
     res.json({ qr });
   } catch (err: any) {
+    console.error('QR endpoint error:', err.message);
     res.status(500).json({ error: err.message });
   }
 });
