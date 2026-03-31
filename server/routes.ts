@@ -648,13 +648,8 @@ router.post('/whatsapp/test', authenticateToken, async (req: AuthRequest, res) =
 
 router.get('/whatsapp/waha/status', authenticateToken, async (req: AuthRequest, res) => {
   try {
-    const uid = req.user?.id as string;
-    const settings = await prisma.whatsappSettings.findUnique({ where: { uid } });
-    if (!settings || !settings.wahaInstanceName) {
-      return res.json({ status: 'NOT_CONFIGURED' });
-    }
     const waha = new WAHAService(WAHA_API_URL);
-    const status = await waha.getSessionStatus(settings.wahaInstanceName);
+    const status = await waha.getSessionStatus('default');
     res.json(status);
   } catch (err: any) {
     res.status(500).json({ error: err.message });
@@ -663,13 +658,8 @@ router.get('/whatsapp/waha/status', authenticateToken, async (req: AuthRequest, 
 
 router.get('/whatsapp/waha/qr', authenticateToken, async (req: AuthRequest, res) => {
   try {
-    const uid = req.user?.id as string;
-    const settings = await prisma.whatsappSettings.findUnique({ where: { uid } });
-    if (!settings || !settings.wahaInstanceName) {
-      return res.status(400).json({ error: 'WAHA not configured' });
-    }
     const waha = new WAHAService(WAHA_API_URL);
-    const qr = await waha.getQrCode(settings.wahaInstanceName);
+    const qr = await waha.getQrCode('default');
     res.json({ qr });
   } catch (err: any) {
     res.status(500).json({ error: err.message });
@@ -678,13 +668,8 @@ router.get('/whatsapp/waha/qr', authenticateToken, async (req: AuthRequest, res)
 
 router.post('/whatsapp/waha/session/start', authenticateToken, async (req: AuthRequest, res) => {
   try {
-    const uid = req.user?.id as string;
-    const settings = await prisma.whatsappSettings.findUnique({ where: { uid } });
-    if (!settings || !settings.wahaInstanceName) {
-      return res.status(400).json({ error: 'WAHA not configured' });
-    }
     const waha = new WAHAService(WAHA_API_URL);
-    await waha.startSession(settings.wahaInstanceName);
+    await waha.startSession('default');
     res.json({ success: true });
   } catch (err: any) {
     res.status(500).json({ error: err.message });
