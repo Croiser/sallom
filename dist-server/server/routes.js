@@ -613,6 +613,21 @@ router.post('/whatsapp/waha/session/start', authenticateToken, async (req, res) 
         res.status(500).json({ error: err.message });
     }
 });
+router.post('/whatsapp/waha/send', authenticateToken, async (req, res) => {
+    try {
+        const { chatId, text, session } = req.body;
+        if (!chatId || !text) {
+            return res.status(400).json({ error: 'chatId and text are required' });
+        }
+        const waha = new WAHAService(WAHA_API_URL);
+        const result = await waha.sendTextMessage(session || 'default', chatId, text);
+        res.json({ success: true, data: result });
+    }
+    catch (err) {
+        console.error('Error sending message:', err.message);
+        res.status(500).json({ error: err.message });
+    }
+});
 // WAHA Webhook - Public Endpoint
 router.post('/webhooks/waha', async (req, res) => {
     try {

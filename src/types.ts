@@ -118,6 +118,24 @@ export interface Holiday {
   ownerUid?: string;
 }
 
+export interface WhatsAppChatMessage {
+  id: string;
+  fromMe: boolean;
+  content: string;
+  timestamp: Date;
+  status?: 'sent' | 'delivered' | 'read' | 'failed';
+  chatId: string;
+  contactName?: string;
+}
+
+export interface WhatsAppChat {
+  chatId: string;
+  contactName: string;
+  lastMessage?: string;
+  lastMessageTime?: Date;
+  unreadCount: number;
+}
+
 export interface Product {
   id: string;
   name: string;
