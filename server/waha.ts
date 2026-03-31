@@ -51,16 +51,13 @@ export class WAHAService {
 
   async getQrCode(sessionName: string = 'default') {
     try {
-      const response = await axios.get(`${this.apiUrl}/api/screenshot?session=${sessionName}`, {
+      const response = await axios.get(`${this.apiUrl}/api/${sessionName}/auth/qr`, {
         headers: { 
-          'X-Api-Key': this.apiKey,
-          'Accept': 'application/json'
-        }
+          'X-Api-Key': this.apiKey
+        },
+        responseType: 'arraybuffer'
       });
-      if (response.data && response.data.data) {
-        return response.data.data;
-      }
-      return null;
+      return Buffer.from(response.data, 'binary').toString('base64');
     } catch (error: any) {
       console.error('Error fetching WAHA QR Code:', error.response?.data || error.message);
       return null;
