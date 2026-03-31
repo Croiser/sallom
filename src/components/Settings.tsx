@@ -42,9 +42,20 @@ interface SettingsProps {
   onNavigate?: (tab: string, data?: { planId?: string, cycle?: 'monthly' | 'yearly' }) => void;
 }
 
+type SettingsTab = 'perfil' | 'agenda' | 'equipe' | 'financeiro' | 'comunicacao';
+
+const tabs: { id: SettingsTab; label: string; icon: React.ReactNode }[] = [
+  { id: 'perfil', label: 'Perfil', icon: <BuildingIcon size={18} /> },
+  { id: 'agenda', label: 'Agenda', icon: <ClockIcon size={18} /> },
+  { id: 'equipe', label: 'Equipe', icon: <UserPlusIcon size={18} /> },
+  { id: 'financeiro', label: 'Financeiro', icon: <CrownIcon size={18} /> },
+  { id: 'comunicacao', label: 'Comunicação', icon: <MessageIcon size={18} /> },
+];
+
 export default function Settings({ onNavigate }: SettingsProps) {
   const { user } = useAuth();
   const { plan, loading: subLoading } = useSubscription();
+  const [activeTab, setActiveTab] = useState<SettingsTab>('perfil');
   const [settings, setSettings] = useState<ShopSettings | null>(null);
   const [staff, setStaff] = useState<Staff[]>([]);
   const [holidays, setHolidays] = useState<Holiday[]>([]);
@@ -291,102 +302,145 @@ export default function Settings({ onNavigate }: SettingsProps) {
 
   if (loading || subLoading) return <div className="flex justify-center p-10"><div className="animate-spin rounded-full h-8 w-8 border-b-2 border-rose-500"></div></div>;
 
-  return (
-    <div className="space-y-10 pb-20">
-      {/* Booking Link */}
-      <section className="bg-white rounded-2xl border border-zinc-200 overflow-hidden shadow-sm">
-        <div className="p-6 border-b border-zinc-100 bg-zinc-50/50">
-          <h3 className="text-lg font-semibold flex items-center gap-2">
-            <LinkIcon size={20} className="text-rose-500" />
-            Link de Agendamento Online
-          </h3>
-        </div>
-        <div className="p-6 space-y-6">
-          <div className="p-6 bg-zinc-900 rounded-2xl text-white relative overflow-hidden">
-            <div className="relative z-10">
-              <p className="text-zinc-400 text-sm mb-2">Seu link exclusivo para clientes:</p>
-              <div className="flex items-center gap-3 bg-zinc-800 p-3 rounded-xl border border-zinc-700">
-                <code className="text-rose-400 font-mono text-sm flex-1 truncate">
-                  {settings?.slug ? `${settings.slug}.dodile.com.br` : `${window.location.protocol}//${window.location.host}/agendar/seu-salao`}
-                </code>
-                <button
-                  onClick={() => {
-                    const url = settings?.slug 
-                      ? `https://${settings.slug}.dodile.com.br` 
-                      : `${window.location.protocol}//${window.location.host}/agendar/seu-salao`;
-                    navigator.clipboard.writeText(url);
-                    setCopied(true);
-                    setTimeout(() => setCopied(false), 2000);
-                  }}
-                  className="p-2 hover:bg-zinc-700 rounded-lg transition-colors text-zinc-400 hover:text-white"
-                >
-                  {copied ? <CheckIcon size={18} className="text-emerald-500" /> : <CopyIcon size={18} />}
-                </button>
+  const renderTabContent = () => {
+    switch (activeTab) {
+      case 'perfil':
+        return (
+          <div className="space-y-10">
+            <section className="bg-white rounded-2xl border border-zinc-200 overflow-hidden shadow-sm">
+              <div className="p-6 border-b border-zinc-100 bg-zinc-50/50">
+                <h3 className="text-lg font-semibold flex items-center gap-2">
+                  <LinkIcon size={20} className="text-rose-500" />
+                  Link de Agendamento Online
+                </h3>
               </div>
-              <p className="mt-4 text-xs text-zinc-500">
-                Compartilhe este link em sua bio do Instagram ou envie diretamente para seus clientes.
-              </p>
-            </div>
-            <GlobeIcon className="absolute -bottom-4 -right-4 text-zinc-800/50" size={100} />
+              <div className="p-6 space-y-6">
+                <div className="p-6 bg-zinc-900 rounded-2xl text-white relative overflow-hidden">
+                  <div className="relative z-10">
+                    <p className="text-zinc-400 text-sm mb-2">Seu link exclusivo para clientes:</p>
+                    <div className="flex items-center gap-3 bg-zinc-800 p-3 rounded-xl border border-zinc-700">
+                      <code className="text-rose-400 font-mono text-sm flex-1 truncate">
+                        {settings?.slug ? `${settings.slug}.dodile.com.br` : `${window.location.protocol}//${window.location.host}/agendar/seu-salao`}
+                      </code>
+                      <button
+                        onClick={() => {
+                          const url = settings?.slug 
+                            ? `https://${settings.slug}.dodile.com.br` 
+                            : `${window.location.protocol}//${window.location.host}/agendar/seu-salao`;
+                          navigator.clipboard.writeText(url);
+                          setCopied(true);
+                          setTimeout(() => setCopied(false), 2000);
+                        }}
+                        className="p-2 hover:bg-zinc-700 rounded-lg transition-colors text-zinc-400 hover:text-white"
+                      >
+                        {copied ? <CheckIcon size={18} className="text-emerald-500" /> : <CopyIcon size={18} />}
+                      </button>
+                    </div>
+                    <p className="mt-4 text-xs text-zinc-500">
+                      Compartilhe este link em sua bio do Instagram ou envie diretamente para seus clientes.
+                    </p>
+                  </div>
+                  <GlobeIcon className="absolute -bottom-4 -right-4 text-zinc-800/50" size={100} />
+                </div>
+              </div>
+            </section>
+            <BusinessProfile settings={settings} setSettings={setSettings} />
           </div>
+        );
+
+      case 'agenda':
+        return (
+          <div className="space-y-10">
+            <BusinessHours 
+              settings={settings} 
+              setSettings={setSettings} 
+              onSave={handleSaveSettings} 
+              timeError={timeError}
+            />
+            <HolidayManagement 
+              holidays={holidays} 
+              newHolidayName={newHolidayName} 
+              setNewHolidayName={setNewHolidayName} 
+              newHolidayDate={newHolidayDate} 
+              setNewHolidayDate={setNewHolidayDate} 
+              onAdd={handleAddHoliday} 
+              onDelete={(id) => handleDelete('holidays', id)}
+            />
+          </div>
+        );
+
+      case 'equipe':
+        return (
+          <div className="space-y-10">
+            <StaffManagement 
+              staff={staff} 
+              newStaffName={newStaffName} 
+              setNewStaffName={setNewStaffName} 
+              plan={plan} 
+              onAdd={handleAddStaff} 
+              onDelete={(id) => handleDelete('staff', id)} 
+              onUpdate={handleUpdateStaff}
+            />
+          </div>
+        );
+
+      case 'financeiro':
+        return (
+          <div className="space-y-10">
+            <FidelityProgram 
+              settings={settings} 
+              setSettings={setSettings} 
+              onSave={handleSaveSettings} 
+            />
+          </div>
+        );
+
+      case 'comunicacao':
+        return (
+          <div className="space-y-10">
+            <WhatsAppIntegration 
+              settings={settings} 
+              setSettings={setSettings} 
+              plan={plan} 
+              isWhatsAppConnected={isWhatsAppConnected} 
+              setIsWhatsAppConnected={setIsWhatsAppConnected} 
+              isGeneratingQR={isGeneratingQR} 
+              qrCode={qrCode} 
+              batteryLevel={batteryLevel} 
+              onGenerateQR={handleGenerateQR} 
+              onSimulateConnection={handleSimulateConnection} 
+              onSave={handleSaveSettings} 
+              onNavigate={onNavigate}
+            />
+          </div>
+        );
+
+      default:
+        return null;
+    }
+  };
+
+  return (
+    <div className="pb-20">
+      <div className="bg-white rounded-2xl border border-zinc-200 overflow-hidden shadow-sm mb-8">
+        <div className="flex overflow-x-auto scrollbar-hide">
+          {tabs.map((tab) => (
+            <button
+              key={tab.id}
+              onClick={() => setActiveTab(tab.id)}
+              className={`flex items-center gap-2 px-6 py-4 text-sm font-medium whitespace-nowrap transition-all border-b-2 ${
+                activeTab === tab.id
+                  ? 'border-rose-500 text-rose-600 bg-rose-50/50'
+                  : 'border-transparent text-zinc-500 hover:text-zinc-700 hover:bg-zinc-50'
+              }`}
+            >
+              {tab.icon}
+              {tab.label}
+            </button>
+          ))}
         </div>
-      </section>
-
-      {/* Business Profile */}
-      <BusinessProfile settings={settings} setSettings={setSettings} />
-
-      {/* Business Hours */}
-      <BusinessHours 
-        settings={settings} 
-        setSettings={setSettings} 
-        onSave={handleSaveSettings} 
-        timeError={timeError}
-      />
-
-      {/* Staff Management */}
-      <StaffManagement 
-        staff={staff} 
-        newStaffName={newStaffName} 
-        setNewStaffName={setNewStaffName} 
-        plan={plan} 
-        onAdd={handleAddStaff} 
-        onDelete={(id) => handleDelete('staff', id)} 
-        onUpdate={handleUpdateStaff}
-      />
-
-      {/* Holiday Management */}
-      <HolidayManagement 
-        holidays={holidays} 
-        newHolidayName={newHolidayName} 
-        setNewHolidayName={setNewHolidayName} 
-        newHolidayDate={newHolidayDate} 
-        setNewHolidayDate={setNewHolidayDate} 
-        onAdd={handleAddHoliday} 
-        onDelete={(id) => handleDelete('holidays', id)}
-      />
-
-      {/* Fidelity Program */}
-      <FidelityProgram 
-        settings={settings} 
-        setSettings={setSettings} 
-        onSave={handleSaveSettings} 
-      />
-
-      {/* WhatsApp Integration */}
-      <WhatsAppIntegration 
-        settings={settings} 
-        setSettings={setSettings} 
-        plan={plan} 
-        isWhatsAppConnected={isWhatsAppConnected} 
-        setIsWhatsAppConnected={setIsWhatsAppConnected} 
-        isGeneratingQR={isGeneratingQR} 
-        qrCode={qrCode} 
-        batteryLevel={batteryLevel} 
-        onGenerateQR={handleGenerateQR} 
-        onSimulateConnection={handleSimulateConnection} 
-        onSave={handleSaveSettings} 
-        onNavigate={onNavigate}
-      />
+      </div>
+      {renderTabContent()}
     </div>
   );
 }
