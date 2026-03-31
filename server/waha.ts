@@ -31,7 +31,7 @@ export class WAHAService {
 
   async getSessionStatus(sessionName: string) {
     try {
-      const response = await axios.get(`${this.apiUrl}/sessions/${sessionName}`);
+      const response = await axios.get(`${this.apiUrl}/api/sessions/${sessionName}`);
       return response.data;
     } catch (error) {
       return { status: 'STOPPED' };
@@ -40,34 +40,36 @@ export class WAHAService {
 
   async getQrCode(sessionName: string) {
     try {
-      // WAHA returns QR code in PNG/Base64 or via specific endpoint
-      const response = await axios.get(`${this.apiUrl}/sessions/${sessionName}/qr`, {
-        responseType: 'arraybuffer'
+      const response = await axios.post(`${this.apiUrl}/api/${sessionName}/auth/qr`, {}, {
+        headers: { 'Accept': 'application/json' }
       });
-      return Buffer.from(response.data, 'binary').toString('base64');
-    } catch (error) {
-      console.error('Error fetching WAHA QR Code:', error);
+      if (response.data && response.data.qr) {
+        return response.data.qr;
+      }
+      return null;
+    } catch (error: any) {
+      console.error('Error fetching WAHA QR Code:', error.response?.data || error.message);
       return null;
     }
   }
 
   async startSession(sessionName: string) {
     try {
-      await axios.post(`${this.apiUrl}/sessions/start`, { name: sessionName });
+      await axios.post(`${this.apiUrl}/api/sessions/${sessionName}/start`);
       return true;
-    } catch (error) {
-      console.error('Error starting WAHA session:', error);
+    } catch (error: any) {
+      console.error('Error starting WAHA session:', error.response?.data || error.message);
       return false;
     }
   }
 
   async sendTextMessage(sessionName: string, chatid: string, text: string) {
     try {
-      // Chat ID usually is 551199999999@c.us
       const formattedChatId = chatid.includes('@') ? chatid : `${chatid}@c.us`;
       const processedText = WAHAService.applySpintax(text);
 
-      const response = await axios.post(`${this.apiUrl}/sessions/${sessionName}/messages/text`, {
+      const response = await axios.post(`${this.apiUrl}/api/sendText`, {
+        session: sessionName,
         chatId: formattedChatId,
         text: processedText
       });

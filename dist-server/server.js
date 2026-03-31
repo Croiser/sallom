@@ -8,7 +8,7 @@ import prisma from './server/db.js';
 import apiRoutes from './server/routes.js';
 async function startServer() {
     const app = express();
-    const PORT = 3000;
+    const PORT = Number(process.env.PORT) || 3000;
     Sentry.init({
         dsn: process.env.SENTRY_DSN,
         environment: process.env.NODE_ENV || 'development',

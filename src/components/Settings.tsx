@@ -112,22 +112,64 @@ export default function Settings({ onNavigate }: SettingsProps) {
     }
   }, [user]);
 
+  const checkWahaStatus = async () => {
+    if (!plan?.features?.whatsapp) return;
+    try {
+      // Ensure backend has created the WhatsApp settings row for this user
+      await api.getWhatsAppSettings().catch(() => {});
+      
+      const res = await api.getWahaStatus();
+      if (res && (res.status === 'CONNECTED' || res.status === 'WORKING')) {
+        setIsWhatsAppConnected(true);
+        setBatteryLevel(100);
+        setQrCode(null);
+      } else {
+        setIsWhatsAppConnected(false);
+      }
+    } catch (err) {
+      console.error('Failed to get WAHA status:', err);
+    }
+  };
+
+  useEffect(() => {
+    if (plan?.features?.whatsapp) {
+      checkWahaStatus();
+      const interval = setInterval(checkWahaStatus, 15000); // Check every 15s
+      return () => clearInterval(interval);
+    }
+  }, [plan]);
+
   const handleGenerateQR = async () => {
     setIsGeneratingQR(true);
     setQrCode(null);
     
-    // Simulate API call delay
-    setTimeout(() => {
-      // Placeholder base64 QR code (a simple black square for demo)
-      setQrCode('iVBORw0KGgoAAAANSUhEUgAAAQAAAAEAAQMAAABmvDolAAAAA1BMVEUAAACnej3aAAAAAXRSTlMAQObYZgAAADBJREFUGBntwTEBAAAAwiD7p14HB2AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAI8B8LAAAR77938AAAAASUVORK5CYII=');
+    try {
+      // Create settings record if it doesn't exist
+      await api.getWhatsAppSettings().catch(() => {});
+      
+      // Request backend to start session
+      await api.startWahaSession().catch(() => {});
+      
+      // Wait a few seconds for WAHA to spawn the browser and make QR ready
+      await new Promise(resolve => setTimeout(resolve, 3000));
+      
+      const res = await api.getWahaQr();
+      if (res && res.qr) {
+        setQrCode(res.qr);
+      } else {
+        alert('O QR Code ainda está sendo gerado ou o serviço está iniciando. Tente clicar novamente em alguns segundos.');
+      }
+    } catch (err) {
+      console.error('Failed to fetch real WAHA QR:', err);
+      alert('Houve um erro de conexão com o servidor do WhatsApp. Tente novamente mais tarde.');
+    } finally {
       setIsGeneratingQR(false);
-    }, 2000);
+    }
   };
 
-  const handleSimulateConnection = () => {
-    setIsWhatsAppConnected(true);
-    setQrCode(null);
-    setBatteryLevel(85); // Simulate 85% battery
+  const handleSimulateConnection = async () => {
+    // Used to refresh connection status manually, instead of just simulating
+    await checkWahaStatus();
   };
 
   const handleSaveSettings = async (e?: React.FormEvent) => {

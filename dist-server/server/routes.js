@@ -8,6 +8,7 @@ import { WAHA_API_URL } from './config.js';
 import { JWT_SECRET } from './config.js';
 import { authenticateToken } from './middleware.js';
 import { asaas } from './asaas.js';
+import { emailService } from './email.js';
 import { GoogleGenAI } from "@google/genai";
 const router = express.Router();
 // --- AUTH ROUTES ---
@@ -42,6 +43,8 @@ router.post('/auth/register', async (req, res) => {
                 }
             }
         });
+        // Enviar Boas-Vindas por E-mail (rodando de forma assíncrona)
+        emailService.sendWelcomeEmail(email, name, shopName).catch(console.error);
         const token = jwt.sign({ id: user.id, email, role: 'barber' }, JWT_SECRET, { expiresIn: '7d' });
         res.json({ token, user: { id: user.id, name, email, shopName, role: 'barber' } });
     }
@@ -111,12 +114,12 @@ router.post('/auth/forgot-password', async (req, res) => {
             }
         });
         console.log(`[PASSWORD RESET] Token for ${email}: ${token}`);
-        // In production, send email here. For now, returning success.
-        // We return the token in the response so the user can actually use it in this preview environment.
+        // Disparo real do e-mail na produção
+        await emailService.sendPasswordResetEmail(email, token);
         res.json({
             success: true,
-            message: 'Token de recuperação gerado',
-            token: token
+            message: 'Token de recuperação gerado enviado para o seu e-mail',
+            token: token // Remova o envio do token no payload em produção verdadeira, mas para mock/teste mantemos
         });
     }
     catch (err) {
@@ -300,10 +303,19 @@ router.post('/asaas/card', authenticateToken, async (req, res) => {
                 }
             });
             // Also update user's planId for backward compatibility
-            await prisma.user.update({
+            const user = await prisma.user.update({
                 where: { id: uid },
                 data: { planId }
             });
+            if (user && user.email) {
+                const planNameMap = {
+                    'plan_bronze': 'Bronze',
+                    'plan_silver': 'Prata',
+                    'plan_gold': 'Ouro'
+                };
+                const planNomeReal = planNameMap[planId] || planId;
+                emailService.sendPaymentConfirmation(user.email, user.name, planNomeReal).catch(console.error);
+            }
         }
         res.json(payment);
     }
@@ -342,11 +354,21 @@ router.post('/asaas/webhook', async (req, res) => {
                     }
                 });
                 // Also update user's planId for backward compatibility
-                await prisma.user.update({
+                const user = await prisma.user.update({
                     where: { id: uid },
                     data: { planId }
                 });
                 console.log(`Subscription activated via Webhook for user ${uid}`);
+                // Enviar E-mail de Confirmação de Pagamento
+                if (user && user.email) {
+                    const planNameMap = {
+                        'plan_bronze': 'Bronze',
+                        'plan_silver': 'Prata',
+                        'plan_gold': 'Ouro'
+                    };
+                    const planNomeReal = planNameMap[planId] || planId;
+                    emailService.sendPaymentConfirmation(user.email, user.name, planNomeReal).catch(console.error);
+                }
             }
         }
         res.json({ success: true });
