@@ -599,7 +599,7 @@ router.put('/whatsapp-settings', authenticateToken, async (req: AuthRequest, res
         apiKey,
         phoneNumberId,
         wabaId,
-        wahaInstanceName: req.body.wahaInstanceName || `salon_${uid.split('-')[0]}`,
+        wahaInstanceName: 'default',
         status: req.body.status || 'disconnected'
       },
       create: {
@@ -613,7 +613,7 @@ router.put('/whatsapp-settings', authenticateToken, async (req: AuthRequest, res
         apiKey,
         phoneNumberId,
         wabaId,
-        wahaInstanceName: req.body.wahaInstanceName || `salon_${uid.split('-')[0]}`,
+        wahaInstanceName: 'default',
         status: 'disconnected'
       }
     });

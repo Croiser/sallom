@@ -38,7 +38,7 @@ export class WAHAService {
     });
   }
 
-  async getSessionStatus(sessionName: string) {
+  async getSessionStatus(sessionName: string = 'default') {
     try {
       const response = await axios.get(`${this.apiUrl}/api/sessions/${sessionName}`, {
         headers: this.getHeaders()
@@ -49,13 +49,16 @@ export class WAHAService {
     }
   }
 
-  async getQrCode(sessionName: string) {
+  async getQrCode(sessionName: string = 'default') {
     try {
-      const response = await axios.post(`${this.apiUrl}/api/${sessionName}/auth/qr`, {}, {
-        headers: this.getHeaders()
+      const response = await axios.get(`${this.apiUrl}/api/screenshot?session=${sessionName}`, {
+        headers: { 
+          'X-Api-Key': this.apiKey,
+          'Accept': 'application/json'
+        }
       });
-      if (response.data && response.data.qr) {
-        return response.data.qr;
+      if (response.data && response.data.data) {
+        return response.data.data;
       }
       return null;
     } catch (error: any) {
@@ -64,7 +67,7 @@ export class WAHAService {
     }
   }
 
-  async startSession(sessionName: string) {
+  async startSession(sessionName: string = 'default') {
     try {
       await axios.post(`${this.apiUrl}/api/sessions/${sessionName}/start`, {}, {
         headers: this.getHeaders()
@@ -76,7 +79,7 @@ export class WAHAService {
     }
   }
 
-  async sendTextMessage(sessionName: string, chatid: string, text: string) {
+  async sendTextMessage(sessionName: string = 'default', chatid: string, text: string) {
     try {
       const formattedChatId = chatid.includes('@') ? chatid : `${chatid}@c.us`;
       const processedText = WAHAService.applySpintax(text);
