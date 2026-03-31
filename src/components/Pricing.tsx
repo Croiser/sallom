@@ -24,11 +24,10 @@ export default function Pricing({ onSelectPlan }: PricingProps) {
           user ? api.get('/subscriptions/me').catch(() => null) : Promise.resolve(null)
         ]);
         const filteredPlans = plansData
-          .filter((p: Plan) => p.slug === 'bronze' || p.slug === 'silver')
           .map((p: Plan) => {
             if (p.slug === 'silver') return { ...p, name: 'Prata' };
-            // Ensure whatsapp is false in the UI for both
-            return { ...p, features: { ...p.features, whatsapp: false } };
+            if (p.slug === 'gold') return { ...p, name: 'Ouro' };
+            return p;
           })
           .sort((a: Plan, b: Plan) => a.priceMonthly - b.priceMonthly);
           

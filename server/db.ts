@@ -22,21 +22,21 @@ export function initDb() {
         id: 'plan_bronze',
         name: 'Bronze',
         slug: 'bronze',
-        priceMonthly: 49.90,
-        priceYearly: 499.00,
+        priceMonthly: 27.90,
+        priceYearly: 279.00,
         features: { staffLimit: 1, inventory: false, reports: false, whatsapp: false }
       },
       {
         id: 'plan_silver',
-        name: 'Silver',
+        name: 'Prata',
         slug: 'silver',
         priceMonthly: 89.90,
         priceYearly: 899.00,
-        features: { staffLimit: 3, inventory: true, reports: true, whatsapp: false }
+        features: { staffLimit: null, inventory: true, reports: true, whatsapp: false }
       },
       {
         id: 'plan_gold',
-        name: 'Gold',
+        name: 'Ouro',
         slug: 'gold',
         priceMonthly: 149.90,
         priceYearly: 1499.00,

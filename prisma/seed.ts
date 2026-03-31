@@ -21,6 +21,14 @@ async function main() {
         priceMonthly: 89.90,
         priceYearly: 899.00,
         features: JSON.stringify({ staffLimit: null, inventory: true, reports: true, whatsapp: false })
+      },
+      {
+        id: 'plan_gold',
+        name: 'Ouro',
+        slug: 'gold',
+        priceMonthly: 149.90,
+        priceYearly: 1499.00,
+        features: JSON.stringify({ staffLimit: null, inventory: true, reports: true, whatsapp: true })
       }
     ]
   });
