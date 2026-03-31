@@ -23,6 +23,7 @@ import {
 import { UserProfile } from '../types';
 import { motion, AnimatePresence } from 'motion/react';
 import { useAuth } from '../contexts/AuthContext';
+import { useSubscription } from '../hooks/useSubscription';
 import { GoogleGenAI } from "@google/genai";
 
 interface LayoutProps {
@@ -33,6 +34,7 @@ interface LayoutProps {
 
 export default function Layout({ children, activeTab, setActiveTab }: LayoutProps) {
   const { user: userProfile, logout } = useAuth();
+  const { plan } = useSubscription();
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const [logoImage, setLogoImage] = useState<string | null>(null);
   const [loadingLogo, setLoadingLogo] = useState(false);
@@ -88,7 +90,12 @@ export default function Layout({ children, activeTab, setActiveTab }: LayoutProp
     userProfile?.email === 'renatadouglas739@gmail.com' || 
     userProfile?.email === 'sallonpromanager@gmail.com';
 
-  const filteredMenuItems = menuItems.filter(item => item.id !== 'whatsapp');
+  const filteredMenuItems = menuItems.filter(item => {
+    if (item.id === 'whatsapp' || item.id === 'whatsapp-connection') {
+      return plan?.features?.whatsapp === true;
+    }
+    return item.id !== 'whatsapp';
+  });
 
   const fullMenuItems = isSuperAdmin 
     ? [...filteredMenuItems, { id: 'superadmin', label: 'SaaS Admin', icon: ShieldAlert }]
