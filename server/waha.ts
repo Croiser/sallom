@@ -6,9 +6,18 @@ import axios from 'axios';
  */
 export class WAHAService {
   private apiUrl: string;
+  private apiKey: string;
 
   constructor(apiUrl: string = process.env.WAHA_API_URL || 'http://waha:3000') {
     this.apiUrl = apiUrl;
+    this.apiKey = process.env.WAHA_API_KEY || 'waha_secret_key_2024';
+  }
+
+  private getHeaders() {
+    return {
+      'X-Api-Key': this.apiKey,
+      'Accept': 'application/json'
+    };
   }
 
   /**
@@ -31,7 +40,9 @@ export class WAHAService {
 
   async getSessionStatus(sessionName: string) {
     try {
-      const response = await axios.get(`${this.apiUrl}/api/sessions/${sessionName}`);
+      const response = await axios.get(`${this.apiUrl}/api/sessions/${sessionName}`, {
+        headers: this.getHeaders()
+      });
       return response.data;
     } catch (error) {
       return { status: 'STOPPED' };
@@ -41,7 +52,7 @@ export class WAHAService {
   async getQrCode(sessionName: string) {
     try {
       const response = await axios.post(`${this.apiUrl}/api/${sessionName}/auth/qr`, {}, {
-        headers: { 'Accept': 'application/json' }
+        headers: this.getHeaders()
       });
       if (response.data && response.data.qr) {
         return response.data.qr;
@@ -55,7 +66,9 @@ export class WAHAService {
 
   async startSession(sessionName: string) {
     try {
-      await axios.post(`${this.apiUrl}/api/sessions/${sessionName}/start`);
+      await axios.post(`${this.apiUrl}/api/sessions/${sessionName}/start`, {}, {
+        headers: this.getHeaders()
+      });
       return true;
     } catch (error: any) {
       console.error('Error starting WAHA session:', error.response?.data || error.message);
@@ -72,6 +85,8 @@ export class WAHAService {
         session: sessionName,
         chatId: formattedChatId,
         text: processedText
+      }, {
+        headers: this.getHeaders()
       });
       return response.data;
     } catch (error: any) {

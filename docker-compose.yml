@@ -33,6 +33,7 @@ services:
       DATABASE_URL: "postgresql://salonuser:salonpassword@db:5432/salondb?schema=public"
       JWT_SECRET: "sua_chave_secreta_aqui"
       WAHA_API_URL: "http://waha:3000"
+      WAHA_API_KEY: "waha_secret_key_2024"
       NODE_ENV: production
       ASAAS_API_KEY: ${ASAAS_API_KEY}
       ASAAS_API_URL: ${ASAAS_API_URL}
@@ -66,6 +67,7 @@ services:
     environment:
       WHATSAPP_DEFAULT_SESSION: default
       WAHA_PRINT_QR: "true"
+      WAHA_API_KEY: waha_secret_key_2024
     networks:
       - web-network
     deploy:
