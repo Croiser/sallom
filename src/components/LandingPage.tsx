@@ -141,7 +141,7 @@ export default function LandingPage({ onAuthClick }: { onAuthClick: (view?: 'log
                 transition={{ delay: 0.1 }}
                 className="text-5xl lg:text-7xl font-bold text-zinc-900 leading-[1.1] mb-6"
               >
-                Chega de <span className="text-rose-500">Caos</span> na Agenda e Prejuízo no Fim do Mês.
+                SallonProManager: Chega de <span className="text-rose-500">Caos</span> na Agenda e Prejuízo no Fim do Mês.
               </motion.h1>
               <motion.p 
                 initial={{ opacity: 0, y: 20 }}
