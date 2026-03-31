@@ -24,7 +24,7 @@ services:
         max-file: "3"
 
   app:
-    image: ghcr.io/croiser/sallom:latest
+    build: .
     container_name: salon-app
     restart: always
     ports:

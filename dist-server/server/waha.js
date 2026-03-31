@@ -6,6 +6,13 @@ import axios from 'axios';
 export class WAHAService {
     constructor(apiUrl = process.env.WAHA_API_URL || 'http://waha:3000') {
         this.apiUrl = apiUrl;
+        this.apiKey = process.env.WAHA_API_KEY || 'waha_secret_key_2024';
+    }
+    getHeaders() {
+        return {
+            'X-Api-Key': this.apiKey,
+            'Accept': 'application/json'
+        };
     }
     /**
      * Generates a random delay between 15 and 45 seconds to avoid bans.
@@ -23,33 +30,37 @@ export class WAHAService {
             return list[Math.floor(Math.random() * list.length)];
         });
     }
-    async getSessionStatus(sessionName) {
+    async getSessionStatus(sessionName = 'default') {
         try {
-            const response = await axios.get(`${this.apiUrl}/api/sessions/${sessionName}`);
+            const response = await axios.get(`${this.apiUrl}/api/sessions/${sessionName}`, {
+                headers: this.getHeaders()
+            });
             return response.data;
         }
         catch (error) {
             return { status: 'STOPPED' };
         }
     }
-    async getQrCode(sessionName) {
+    async getQrCode(sessionName = 'default') {
         try {
-            const response = await axios.post(`${this.apiUrl}/api/${sessionName}/auth/qr`, {}, {
-                headers: { 'Accept': 'application/json' }
+            const response = await axios.get(`${this.apiUrl}/api/${sessionName}/auth/qr`, {
+                headers: {
+                    'X-Api-Key': this.apiKey
+                },
+                responseType: 'arraybuffer'
             });
-            if (response.data && response.data.qr) {
-                return response.data.qr;
-            }
-            return null;
+            return Buffer.from(response.data, 'binary').toString('base64');
         }
         catch (error) {
             console.error('Error fetching WAHA QR Code:', error.response?.data || error.message);
             return null;
         }
     }
-    async startSession(sessionName) {
+    async startSession(sessionName = 'default') {
         try {
-            await axios.post(`${this.apiUrl}/api/sessions/${sessionName}/start`);
+            await axios.post(`${this.apiUrl}/api/sessions/${sessionName}/start`, {}, {
+                headers: this.getHeaders()
+            });
             return true;
         }
         catch (error) {
@@ -57,7 +68,7 @@ export class WAHAService {
             return false;
         }
     }
-    async sendTextMessage(sessionName, chatid, text) {
+    async sendTextMessage(sessionName = 'default', chatid, text) {
         try {
             const formattedChatId = chatid.includes('@') ? chatid : `${chatid}@c.us`;
             const processedText = WAHAService.applySpintax(text);
@@ -65,6 +76,8 @@ export class WAHAService {
                 session: sessionName,
                 chatId: formattedChatId,
                 text: processedText
+            }, {
+                headers: this.getHeaders()
             });
             return response.data;
         }

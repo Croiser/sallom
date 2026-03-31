@@ -539,7 +539,7 @@ router.put('/whatsapp-settings', authenticateToken, async (req, res) => {
                 apiKey,
                 phoneNumberId,
                 wabaId,
-                wahaInstanceName: req.body.wahaInstanceName || `salon_${uid.split('-')[0]}`,
+                wahaInstanceName: 'default',
                 status: req.body.status || 'disconnected'
             },
             create: {
@@ -553,7 +553,7 @@ router.put('/whatsapp-settings', authenticateToken, async (req, res) => {
                 apiKey,
                 phoneNumberId,
                 wabaId,
-                wahaInstanceName: req.body.wahaInstanceName || `salon_${uid.split('-')[0]}`,
+                wahaInstanceName: 'default',
                 status: 'disconnected'
             }
         });
@@ -583,13 +583,8 @@ router.post('/whatsapp/test', authenticateToken, async (req, res) => {
 // --- WAHA WhatsApp API Routes ---
 router.get('/whatsapp/waha/status', authenticateToken, async (req, res) => {
     try {
-        const uid = req.user?.id;
-        const settings = await prisma.whatsappSettings.findUnique({ where: { uid } });
-        if (!settings || !settings.wahaInstanceName) {
-            return res.json({ status: 'NOT_CONFIGURED' });
-        }
         const waha = new WAHAService(WAHA_API_URL);
-        const status = await waha.getSessionStatus(settings.wahaInstanceName);
+        const status = await waha.getSessionStatus('default');
         res.json(status);
     }
     catch (err) {
@@ -598,13 +593,8 @@ router.get('/whatsapp/waha/status', authenticateToken, async (req, res) => {
 });
 router.get('/whatsapp/waha/qr', authenticateToken, async (req, res) => {
     try {
-        const uid = req.user?.id;
-        const settings = await prisma.whatsappSettings.findUnique({ where: { uid } });
-        if (!settings || !settings.wahaInstanceName) {
-            return res.status(400).json({ error: 'WAHA not configured' });
-        }
         const waha = new WAHAService(WAHA_API_URL);
-        const qr = await waha.getQrCode(settings.wahaInstanceName);
+        const qr = await waha.getQrCode('default');
         res.json({ qr });
     }
     catch (err) {
@@ -613,13 +603,8 @@ router.get('/whatsapp/waha/qr', authenticateToken, async (req, res) => {
 });
 router.post('/whatsapp/waha/session/start', authenticateToken, async (req, res) => {
     try {
-        const uid = req.user?.id;
-        const settings = await prisma.whatsappSettings.findUnique({ where: { uid } });
-        if (!settings || !settings.wahaInstanceName) {
-            return res.status(400).json({ error: 'WAHA not configured' });
-        }
         const waha = new WAHAService(WAHA_API_URL);
-        await waha.startSession(settings.wahaInstanceName);
+        await waha.startSession('default');
         res.json({ success: true });
     }
     catch (err) {
