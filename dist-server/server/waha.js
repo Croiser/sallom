@@ -86,4 +86,30 @@ export class WAHAService {
             throw error;
         }
     }
+    async getChats(sessionName = 'default') {
+        try {
+            const response = await axios.get(`${this.apiUrl}/api/chats`, {
+                params: { session: sessionName },
+                headers: this.getHeaders()
+            });
+            return response.data.chats || [];
+        }
+        catch (error) {
+            console.error('Error fetching WAHA chats:', error.response?.data || error.message);
+            return [];
+        }
+    }
+    async getChatMessages(sessionName = 'default', chatId) {
+        try {
+            const response = await axios.get(`${this.apiUrl}/api/messages/${chatId}`, {
+                params: { session: sessionName },
+                headers: this.getHeaders()
+            });
+            return response.data.messages || [];
+        }
+        catch (error) {
+            console.error('Error fetching WAHA messages:', error.response?.data || error.message);
+            return [];
+        }
+    }
 }

@@ -693,6 +693,29 @@ router.post('/whatsapp/waha/send', authenticateToken, async (req: AuthRequest, r
   }
 });
 
+router.get('/whatsapp/chats', authenticateToken, async (req: AuthRequest, res) => {
+  try {
+    const waha = new WAHAService(WAHA_API_URL);
+    const chats = await waha.getChats();
+    res.json(chats);
+  } catch (err: any) {
+    console.error('Error fetching chats:', err.message);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+router.get('/whatsapp/messages/:chatId', authenticateToken, async (req: AuthRequest, res) => {
+  try {
+    const { chatId } = req.params;
+    const waha = new WAHAService(WAHA_API_URL);
+    const messages = await waha.getChatMessages('default', chatId);
+    res.json(messages);
+  } catch (err: any) {
+    console.error('Error fetching messages:', err.message);
+    res.status(500).json({ error: err.message });
+  }
+});
+
 // WAHA Webhook - Public Endpoint
 router.post('/webhooks/waha', async (req, res) => {
   try {

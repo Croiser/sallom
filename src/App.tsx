@@ -23,6 +23,7 @@ import HelpGuide from './components/HelpGuide';
 import BookingPage from './components/BookingPage';
 import AutomationSettings from './components/AutomationSettings';
 import WhatsAppConnection from './components/WhatsAppConnection';
+import WhatsAppChatList from './components/whatsapp/WhatsAppChatList';
 import { Plan } from './types';
 import { ShieldAlert } from 'lucide-react';
 import { api } from './services/api';
@@ -251,6 +252,8 @@ export default function App() {
         return <SuperAdmin />;
       case 'whatsapp':
         return <WhatsApp onNavigate={handleNavigate} />;
+      case 'whatsapp-chats':
+        return <WhatsAppChatList onBack={() => setActiveTab('whatsapp')} />;
       case 'automation':
         return <AutomationSettings />;
       case 'whatsapp-connection':

@@ -15,6 +15,7 @@ import {
   BarChart3,
   ShieldAlert,
   MessageSquare as MessageIcon,
+  MessageSquare,
   HelpCircle,
   Flower2,
   Settings2,
@@ -76,6 +77,7 @@ export default function Layout({ children, activeTab, setActiveTab }: LayoutProp
     { id: 'finance', label: 'Financeiro', icon: DollarSign },
     { id: 'reports', label: 'Relatórios', icon: BarChart3 },
     { id: 'whatsapp', label: 'WhatsApp', icon: MessageIcon },
+    { id: 'whatsapp-chats', label: 'Mensagens', icon: MessageSquare },
     { id: 'settings', label: 'Configurações', icon: SettingsIcon },
     { id: 'subscription', label: 'Minha Assinatura', icon: CreditCard },
     { id: 'automation', label: 'Automação', icon: Settings2 },
@@ -91,7 +93,7 @@ export default function Layout({ children, activeTab, setActiveTab }: LayoutProp
     userProfile?.email === 'sallonpromanager@gmail.com';
 
   const filteredMenuItems = menuItems.filter(item => {
-    if (item.id === 'whatsapp' || item.id === 'whatsapp-connection') {
+    if (item.id === 'whatsapp' || item.id === 'whatsapp-connection' || item.id === 'whatsapp-chats') {
       return plan?.features?.whatsapp === true;
     }
     return item.id !== 'whatsapp';
