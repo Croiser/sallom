@@ -159,8 +159,8 @@ export default function App() {
     }
   }
 
-  // Public Booking Route (Legacy /book/:slug)
-  if (path.startsWith('/book/')) {
+  // Public Booking Route (Legacy /book/:slug, /agendar/:slug, /cliente/:slug)
+  if (path.startsWith('/book/') || path.startsWith('/agendar/') || path.startsWith('/cliente/')) {
     const slug = path.split('/')[2];
     if (slug) {
       return (
