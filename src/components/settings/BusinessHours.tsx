@@ -1,5 +1,6 @@
 import React from 'react';
-import { Clock, Save } from 'lucide-react';
+import { Clock, Save, AlertCircle } from 'lucide-react';
+import { motion } from 'motion/react';
 import { ShopSettings } from '../../types';
 
 interface BusinessHoursProps {

@@ -32,7 +32,7 @@ export default function WhatsAppIntegration({
   onSave,
   onNavigate
 }: WhatsAppIntegrationProps) {
-  const hasWhatsApp = plan?.features.whatsapp;
+  const hasWhatsApp = plan?.features?.whatsapp;
 
   return (
     <section className="bg-white rounded-[2rem] border border-surface-200 overflow-hidden shadow-premium relative min-h-[400px]">

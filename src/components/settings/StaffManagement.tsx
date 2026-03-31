@@ -1,4 +1,4 @@
-import { UserPlus, Plus, Trash2, Crown, ShieldCheck, CheckCircle2 } from 'lucide-react';
+import { UserPlus, Plus, Trash2, Crown, ShieldCheck, CheckCircle2, DollarSign, Users } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { Staff, Plan } from '../../types';
 
