@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { ShopSettings, Service, Staff, BusinessHours, Appointment } from '../types';
-import { Sparkles, Calendar, Clock, User, CheckCircle2, ChevronRight, ChevronLeft, MapPin, Phone } from 'lucide-react';
+import { Sparkles, Calendar, Clock, User, CheckCircle2, ChevronRight, ChevronLeft, MapPin, Phone, Copy } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { format, addDays, startOfToday, isSameDay, parse, isAfter, isBefore } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
@@ -202,6 +202,21 @@ export default function BookingPage({ slug }: BookingPageProps) {
             >
               Voltar ao início
             </button>
+          </div>
+
+          <div className="mt-6 p-4 bg-zinc-800/50 rounded-xl">
+            <p className="text-xs text-zinc-400 mb-2">Indique este link para suas amigas:</p>
+            <div className="flex items-center gap-2">
+              <code className="text-rose-400 text-xs flex-1 truncate">sallon.dodile.com.br/agenda/{slug}</code>
+              <button
+                onClick={() => {
+                  navigator.clipboard.writeText(`https://sallon.dodile.com.br/agenda/${slug}`);
+                }}
+                className="p-2 hover:bg-zinc-700 rounded-lg transition-colors"
+              >
+                <Copy size={14} />
+              </button>
+            </div>
           </div>
         </motion.div>
       </div>

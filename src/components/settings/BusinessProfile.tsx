@@ -53,7 +53,7 @@ export default function BusinessProfile({ settings, setSettings }: BusinessProfi
                 className="input-premium pl-12 pr-28 font-bold text-brand-500"
                 placeholder="ex: studio-glow"
               />
-              <span className="absolute right-5 top-1/2 -translate-y-1/2 text-zinc-300 text-[10px] font-black uppercase tracking-tighter">.sallonpro</span>
+              <span className="absolute right-5 top-1/2 -translate-y-1/2 text-zinc-300 text-[10px] font-black uppercase tracking-tighter">.dodile.com.br</span>
             </div>
           </div>
           <div className="space-y-3">

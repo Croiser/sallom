@@ -320,13 +320,11 @@ export default function Settings({ onNavigate }: SettingsProps) {
                     <p className="text-zinc-400 text-sm mb-2">Seu link exclusivo para clientes:</p>
                     <div className="flex items-center gap-3 bg-zinc-800 p-3 rounded-xl border border-zinc-700">
                       <code className="text-rose-400 font-mono text-sm flex-1 truncate">
-                        {settings?.slug ? `${settings.slug}.dodile.com.br` : `${window.location.protocol}//${window.location.host}/agendar/seu-salao`}
+                        sallon.dodile.com.br/agenda/{settings?.slug || 'seu-salao'}
                       </code>
                       <button
                         onClick={() => {
-                          const url = settings?.slug 
-                            ? `https://${settings.slug}.dodile.com.br` 
-                            : `${window.location.protocol}//${window.location.host}/agendar/seu-salao`;
+                          const url = `https://sallon.dodile.com.br/agenda/${settings?.slug || 'seu-salao'}`;
                           navigator.clipboard.writeText(url);
                           setCopied(true);
                           setTimeout(() => setCopied(false), 2000);

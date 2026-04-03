@@ -59,8 +59,15 @@ export default function App() {
       if (parts.length > 4) {
         subdomainSlug = parts[0];
       }
-    } else if (parts.length >= 3) {
-      // Standard domain logic (e.g., salon.myapp.com)
+    } else if (parts.length >= 4) {
+      // Standard domain logic for .com.br (e.g., salon.dodile.com.br)
+      // root: dodile.com.br (3 parts)
+      // sub: salon.dodile.com.br (4 parts)
+      if (parts[0] !== 'www' && parts[0] !== 'app' && parts[0] !== 'sallon') {
+        subdomainSlug = parts[0];
+      }
+    } else if (parts.length === 3 && !hostname.endsWith('.com.br')) {
+      // Fallback for .com or other 2-part registries (e.g. salon.domain.com)
       if (parts[0] !== 'www' && parts[0] !== 'app' && parts[0] !== 'sallon') {
         subdomainSlug = parts[0];
       }
@@ -160,8 +167,20 @@ export default function App() {
     }
   }
 
-  // Public Booking Route (Legacy /book/:slug, /agendar/:slug, /cliente/:slug)
-  if (path.startsWith('/book/') || path.startsWith('/agendar/') || path.startsWith('/cliente/')) {
+  // Public Booking Route (/book/:slug, /agendar/:slug, /agenda/:slug, /empresa/:slug, /cliente/:slug)
+  if (path.startsWith('/book/') || path.startsWith('/agendar/') || path.startsWith('/agenda/') || path.startsWith('/empresa/') || path.startsWith('/cliente/')) {
+    const slug = path.split('/')[2];
+    if (slug) {
+      return (
+        <ErrorBoundary>
+          <BookingPage slug={slug} />
+        </ErrorBoundary>
+      );
+    }
+  }
+
+  // Special case for sallon.dodile.com.br/agenda/:slug
+  if (hostname === 'sallon.dodile.com.br' && path.startsWith('/agenda/')) {
     const slug = path.split('/')[2];
     if (slug) {
       return (

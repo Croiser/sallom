@@ -12,7 +12,7 @@ echo "🚀 Starting Deployment to $VPS_IP..."
 
 # 1. Archive local project (excluding node_modules and other junk)
 echo "📦 Archiving project..."
-tar --exclude='node_modules' --exclude='.git' --exclude='dist' --exclude='dist-server' \
+tar --exclude='node_modules' --exclude='.git' \
     -czf $ARCHIVE_NAME .
 
 # 2. Transfer archive to VPS
