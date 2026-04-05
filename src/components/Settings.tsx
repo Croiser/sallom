@@ -54,14 +54,13 @@ const tabs: { id: SettingsTab; label: string; icon: React.ReactNode }[] = [
 
 export default function Settings({ onNavigate }: SettingsProps) {
   const { user } = useAuth();
+  const isProfessional = user?.role === 'professional';
   const { plan, loading: subLoading } = useSubscription();
   const [activeTab, setActiveTab] = useState<SettingsTab>('perfil');
   const [settings, setSettings] = useState<ShopSettings | null>(null);
   const [staff, setStaff] = useState<Staff[]>([]);
   const [holidays, setHolidays] = useState<Holiday[]>([]);
   const [loading, setLoading] = useState(true);
-
-  const [isSuperAdmin, setIsSuperAdmin] = useState(false);
 
   const [newStaffName, setNewStaffName] = useState('');
   const [newHolidayName, setNewHolidayName] = useState('');
@@ -116,15 +115,13 @@ export default function Settings({ onNavigate }: SettingsProps) {
 
   useEffect(() => {
     if (user?.email) {
-      if (user.email === 'renatadouglas739@gmail.com' || user.email === 'sallonpromanager@gmail.com') {
-        setIsSuperAdmin(true);
-      }
       fetchData();
     }
   }, [user]);
 
   const checkWahaStatus = async () => {
-    if (!plan?.features?.whatsapp) return;
+    const isAdmin = user?.email === 'renatadouglas739@gmail.com' || user?.email === 'sallonpromanager@gmail.com' || user?.email === 'admin@sallonpromanager.com.br';
+    if (!isAdmin && !plan?.features?.whatsapp) return;
     try {
       // Ensure backend has created the WhatsApp settings row for this user
       await api.getWhatsAppSettings().catch(() => {});
@@ -143,9 +140,10 @@ export default function Settings({ onNavigate }: SettingsProps) {
   };
 
   useEffect(() => {
-    if (plan?.features?.whatsapp) {
+    const isAdmin = user?.email === 'renatadouglas739@gmail.com' || user?.email === 'sallonpromanager@gmail.com' || user?.email === 'admin@sallonpromanager.com.br';
+    if (isAdmin || plan?.features?.whatsapp) {
       checkWahaStatus();
-      const interval = setInterval(checkWahaStatus, 15000); // Check every 15s
+      const interval = setInterval(checkWahaStatus, 15000);
       return () => clearInterval(interval);
     }
   }, [plan]);
@@ -214,9 +212,9 @@ export default function Settings({ onNavigate }: SettingsProps) {
   const handleAddStaff = async () => {
     if (!newStaffName || !user?.uid) return;
     
-    // Check barber limit
+    const isAdmin = user?.email === 'renatadouglas739@gmail.com' || user?.email === 'sallonpromanager@gmail.com' || user?.email === 'admin@sallonpromanager.com.br';
     const staffLimit = plan?.features?.staffLimit;
-    if (staffLimit !== undefined && staffLimit !== null && staff.length >= staffLimit) {
+    if (!isAdmin && staffLimit !== undefined && staffLimit !== null && staff.length >= staffLimit) {
       alert(`Seu plano atual permite apenas ${staffLimit} profissional(is). Faça o upgrade para adicionar mais.`);
       return;
     }
@@ -422,7 +420,9 @@ export default function Settings({ onNavigate }: SettingsProps) {
     <div className="pb-20">
       <div className="bg-white rounded-2xl border border-zinc-200 overflow-hidden shadow-sm mb-8">
         <div className="flex overflow-x-auto scrollbar-hide">
-          {tabs.map((tab) => (
+          {tabs
+            .filter(tab => !isProfessional || tab.id === 'perfil')
+            .map((tab) => (
             <button
               key={tab.id}
               onClick={() => setActiveTab(tab.id)}

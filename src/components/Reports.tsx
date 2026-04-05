@@ -37,12 +37,19 @@ export default function Reports({ onNavigate }: ReportsProps) {
   const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [appointments, setAppointments] = useState<Appointment[]>([]);
   const [loading, setLoading] = useState(true);
-  const [dateRange, setDateRange] = useState('month'); // 'week', 'month', 'year'
+  const [dateRange, setDateRange] = useState('month');
+
+  const isSuperAdmin = 
+    user?.role === 'admin' || 
+    user?.role === 'superadmin' ||
+    user?.email === 'admin@sallonpromanager.com.br' ||
+    user?.email === 'renatadouglas739@gmail.com' || 
+    user?.email === 'sallonpromanager@gmail.com';
 
   useEffect(() => {
     if (subLoading || !user) return;
 
-    if (!plan?.features.reports) {
+    if (!isSuperAdmin && !plan?.features.reports) {
       setLoading(false);
       return;
     }
@@ -129,7 +136,7 @@ export default function Reports({ onNavigate }: ReportsProps) {
 
   if (subLoading) return <div className="flex justify-center p-10"><div className="animate-spin rounded-full h-8 w-8 border-b-2 border-rose-500"></div></div>;
 
-  if (!plan?.features.reports) {
+  if (!isSuperAdmin && !plan?.features.reports) {
     return (
       <div className="flex flex-col items-center justify-center py-20 text-center">
         <div className="w-20 h-20 bg-rose-100 rounded-full flex items-center justify-center mb-6">

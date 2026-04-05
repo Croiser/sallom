@@ -10,7 +10,7 @@ import {
   BarChart3 as BarChartIcon, 
   Package as PackageIcon, 
   Calendar as CalendarIcon,
-  Users as UsersIcon,
+  Group as UsersIcon,
   Smartphone as SmartphoneIcon,
   ShieldCheck as ShieldIcon,
   Clock as ClockIcon,

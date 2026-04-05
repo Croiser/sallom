@@ -1,0 +1,2 @@
+INSERT INTO subscriptions (uid, "planId", status, "billingCycle", "startDate", "endDate", "currentPeriodEnd", "updatedAt") 
+VALUES ('0ac57777-413e-43e3-a285-2785024f98c0', 'plan_gold', 'active', 'monthly', NOW(), NOW() + INTERVAL '30 days', NOW() + INTERVAL '30 days', NOW());

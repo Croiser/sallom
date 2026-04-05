@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { 
-  Users as UsersIcon, 
+  Group as UsersIcon, 
   CreditCard, 
   TrendingUp, 
   Activity, 

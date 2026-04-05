@@ -1,11 +1,17 @@
 import { PrismaClient } from '@prisma/client';
 import bcrypt from 'bcryptjs';
 
-const prisma = new PrismaClient();
+const prisma = new PrismaClient({
+  datasources: {
+    db: {
+      url: "postgresql://sallonpromanager_user:sallonpromanager_password@localhost:5439/sallonpromanager_db?schema=public"
+    }
+  }
+});
 
 async function main() {
   const email = 'renatadouglas739@gmail.com';
-  const password = 'admin123'; // Temporary password
+  const password = 'admin1'; // Temporary password
   const hashedPassword = await bcrypt.hash(password, 10);
 
   const user = await prisma.user.upsert({

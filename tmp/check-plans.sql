@@ -1,0 +1,1 @@
+SELECT name, "priceMonthly", "priceYearly" FROM plans;

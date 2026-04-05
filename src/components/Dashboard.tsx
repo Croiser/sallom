@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { 
   TrendingUp, 
   TrendingDown, 
-  Users as UsersIcon, 
+  Group as UsersIcon, 
   Calendar, 
   Clock,
   CheckCircle2,

@@ -7,7 +7,7 @@ import {
   Trash2 as TrashIcon, 
   User as UserIcon, 
   X as XIcon, 
-  Users as UsersIcon, 
+  Group as UsersIcon, 
   Gift as GiftIcon, 
   Star as StarIcon, 
   ArrowRight as ArrowIcon, 

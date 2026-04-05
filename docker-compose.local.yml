@@ -1,0 +1,47 @@
+version: '3.8'
+
+services:
+  db-local:
+    image: postgres:15-alpine
+    container_name: salaopromanager-db-local
+    restart: always
+    environment:
+      POSTGRES_USER: sallonpromanager_user
+      POSTGRES_PASSWORD: sallonpromanager_password
+      POSTGRES_DB: sallonpromanager_db
+    volumes:
+      - postgres_local_data:/var/lib/postgresql/data
+    ports:
+      - "5439:5432"
+
+  app-local:
+    build: .
+    container_name: salaopromanager-app-local
+    restart: always
+    ports:
+      - "3000:3000"
+    environment:
+      DATABASE_URL: "postgresql://sallonpromanager_user:sallonpromanager_password@db-local:5432/sallonpromanager_db?schema=public"
+      JWT_SECRET: "sua_chave_secreta_aqui"
+      WAHA_API_URL: "http://waha-local:3000"
+      WAHA_API_KEY: "waha_secret_key_2024"
+      NODE_ENV: production
+      ASAAS_API_KEY: ${ASAAS_API_KEY:-'$aact_prod_000MzkwODA2MWY2OGM3MWRlMDU2NWM3MzJlNzZmNGZhZGY6OjQ3NDA3ZTg3LTMyMjQtNDdhZS1iM2Q1LTA3NjkyZDBiMDk1NDo6JGFhY2hfYmU1ZTYwOGItYTJiZi00MTg3LWEyOGYtYmE2NGQ4MzE4YTg3'}
+      ASAAS_API_URL: "https://api.asaas.com/v3"
+      GEMINI_API_KEY: ${GEMINI_API_KEY:-""}
+      SMTP_HOST: smtp.gmail.com
+      SMTP_PORT: "465"
+      SMTP_USER: sallonpromanager.dodile@gmail.com
+      SMTP_PASS: daakqurlcvtlwzin
+      SMTP_FROM_EMAIL: Sallon Pro <sallonpromanager.dodile@gmail.com>
+    depends_on:
+      - db-local
+    networks:
+      - local-network
+
+volumes:
+  postgres_local_data:
+
+networks:
+  local-network:
+    driver: bridge

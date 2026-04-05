@@ -39,10 +39,17 @@ export default function Inventory({ onNavigate }: InventoryProps) {
     category: ''
   });
 
+  const isSuperAdmin = 
+    user?.role === 'admin' || 
+    user?.role === 'superadmin' ||
+    user?.email === 'admin@sallonpromanager.com.br' ||
+    user?.email === 'renatadouglas739@gmail.com' || 
+    user?.email === 'sallonpromanager@gmail.com';
+
   const fetchData = async () => {
     if (subLoading || !user) return;
 
-    if (!plan?.features.inventory) {
+    if (!isSuperAdmin && !plan?.features.inventory) {
       setLoading(false);
       return;
     }
@@ -111,7 +118,7 @@ export default function Inventory({ onNavigate }: InventoryProps) {
     );
   }
 
-  if (!plan?.features.inventory) {
+  if (!isSuperAdmin && !plan?.features.inventory) {
     return (
       <div className="flex flex-col items-center justify-center py-20 text-center">
         <div className="w-20 h-20 bg-zinc-100 rounded-full flex items-center justify-center mb-6">

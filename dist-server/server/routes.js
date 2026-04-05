@@ -226,11 +226,12 @@ router.post('/subscription', authenticateToken, async (req, res) => {
     const uid = req.user?.id;
     const currentPeriodEnd = new Date(Date.now() + (billingCycle === 'monthly' ? 30 : 365) * 24 * 60 * 60 * 1000);
     try {
+        const targetPlanId = planId.toLowerCase();
         const endDate = currentPeriodEnd;
         const subscription = await prisma.subscription.upsert({
             where: { uid },
             update: {
-                planId: planId,
+                planId: targetPlanId,
                 status: 'active',
                 currentPeriodEnd,
                 endDate,
@@ -238,7 +239,7 @@ router.post('/subscription', authenticateToken, async (req, res) => {
             },
             create: {
                 uid: uid,
-                planId: planId,
+                planId: targetPlanId,
                 status: 'active',
                 currentPeriodEnd,
                 endDate,
@@ -283,11 +284,12 @@ router.post('/asaas/card', authenticateToken, async (req, res) => {
         if (payment.status === 'CONFIRMED' || payment.status === 'RECEIVED') {
             const currentPeriodEnd = new Date(Date.now() + (billingCycle === 'monthly' ? 30 : 365) * 24 * 60 * 60 * 1000);
             const endDate = currentPeriodEnd;
+            const targetPlanId = planId.toLowerCase();
             // Update Prisma
             await prisma.subscription.upsert({
                 where: { uid },
                 update: {
-                    planId: planId,
+                    planId: targetPlanId,
                     status: 'active',
                     currentPeriodEnd,
                     endDate,
@@ -295,7 +297,7 @@ router.post('/asaas/card', authenticateToken, async (req, res) => {
                 },
                 create: {
                     uid: uid,
-                    planId: planId,
+                    planId: targetPlanId,
                     status: 'active',
                     currentPeriodEnd,
                     endDate,
@@ -334,11 +336,12 @@ router.post('/asaas/webhook', async (req, res) => {
                 const { uid, planId, billingCycle } = JSON.parse(externalReference);
                 const currentPeriodEnd = new Date(Date.now() + (billingCycle === 'monthly' ? 30 : 365) * 24 * 60 * 60 * 1000);
                 const endDate = currentPeriodEnd;
+                const targetPlanId = planId.toLowerCase();
                 // Update Prisma
                 await prisma.subscription.upsert({
                     where: { uid },
                     update: {
-                        planId,
+                        planId: targetPlanId,
                         status: 'active',
                         currentPeriodEnd,
                         endDate,
@@ -346,7 +349,7 @@ router.post('/asaas/webhook', async (req, res) => {
                     },
                     create: {
                         uid,
-                        planId,
+                        planId: targetPlanId,
                         status: 'active',
                         currentPeriodEnd,
                         endDate,
@@ -948,11 +951,33 @@ router.post('/clients/:id/redeem', authenticateToken, async (req, res) => {
 });
 // Appointments
 router.get('/appointments', authenticateToken, async (req, res) => {
-    const appointments = await prisma.appointment.findMany({
-        where: { ownerUid: req.user?.id },
-        orderBy: { date: 'desc' }
-    });
-    res.json(appointments);
+    const userId = req.user?.id;
+    const role = req.user?.role;
+    try {
+        const user = await prisma.user.findUnique({ where: { id: userId } });
+        if (!user)
+            return res.status(404).json({ error: 'User not found' });
+        let where = { ownerUid: user.id };
+        // If Professional, filter only their appointments
+        if (role === 'professional' && user.staffId) {
+            where = { staffId: user.staffId };
+        }
+        else if (role === 'professional' && user.ownerId) {
+            // If it's a professional but ownerId exists (sub-account)
+            where = {
+                ownerUid: user.ownerId,
+                staffId: user.staffId
+            };
+        }
+        const appointments = await prisma.appointment.findMany({
+            where,
+            orderBy: { date: 'desc' }
+        });
+        res.json(appointments);
+    }
+    catch (err) {
+        res.status(500).json({ error: err.message });
+    }
 });
 router.post('/appointments', authenticateToken, async (req, res) => {
     const { clientId, clientName, phone, serviceId, serviceName, barberId, barberName, staffId, staffName, date, price, isFitIn } = req.body;
@@ -1052,6 +1077,149 @@ router.delete('/appointments/:id', authenticateToken, async (req, res) => {
     });
     res.json({ success: true });
 });
+router.post('/appointments/:id/no-show', authenticateToken, async (req, res) => {
+    const ownerUid = req.user?.id;
+    const appointmentId = req.params.id;
+    try {
+        const appointment = await prisma.appointment.findFirst({
+            where: { id: appointmentId, ownerUid }
+        });
+        if (!appointment)
+            return res.status(404).json({ error: 'Appointment not found' });
+        // Update appointment
+        await prisma.appointment.update({
+            where: { id: appointmentId },
+            data: {
+                status: 'no_show',
+                noShow: true
+            }
+        });
+        // Update client debt (50% of the service price)
+        const debtAmount = appointment.price * 0.5;
+        await prisma.client.update({
+            where: { id: appointment.clientId },
+            data: {
+                pendingDebt: { increment: debtAmount }
+            }
+        });
+        res.json({ success: true, debtGenerated: debtAmount });
+    }
+    catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
+// --- PROFESSIONAL DASHBOARD ROUTES ---
+router.put('/professional/chair-status', authenticateToken, async (req, res) => {
+    const { status } = req.body; // Livre, Ocupado, Em Intervalo
+    const userId = req.user?.id;
+    try {
+        const user = await prisma.user.findUnique({ where: { id: userId } });
+        if (!user || !user.staffId)
+            return res.status(403).json({ error: 'Professional record not found' });
+        await prisma.staff.update({
+            where: { id: user.staffId },
+            data: { status }
+        });
+        res.json({ success: true, status });
+    }
+    catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
+router.post('/appointments/:id/check-in', authenticateToken, async (req, res) => {
+    try {
+        const appointment = await prisma.appointment.update({
+            where: { id: req.params.id },
+            data: {
+                checkInAt: new Date(),
+                status: 'in_progress'
+            }
+        });
+        res.json(appointment);
+    }
+    catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
+router.post('/appointments/:id/finish', authenticateToken, async (req, res) => {
+    try {
+        const appointment = await prisma.appointment.update({
+            where: { id: req.params.id },
+            data: {
+                finishedAt: new Date(),
+                status: 'completed'
+            }
+        });
+        const ownerUid = appointment.ownerUid;
+        await prisma.transaction.create({
+            data: {
+                ownerUid,
+                type: 'income',
+                amount: appointment.price,
+                description: `Serviço: ${appointment.serviceName} - Cliente: ${appointment.clientName}`,
+                date: new Date(),
+                category: 'Serviços'
+            }
+        });
+        if (appointment.clientId) {
+            const settings = await prisma.setting.findUnique({ where: { uid: ownerUid } });
+            const fidelityConfig = settings?.fidelityConfig ? JSON.parse(settings.fidelityConfig) : null;
+            let pointsToAdd = 0;
+            if (fidelityConfig?.enabled) {
+                pointsToAdd += (fidelityConfig.pointsPerVisit || 0);
+                pointsToAdd += Math.floor((appointment.price || 0) * (fidelityConfig.pointsPerCurrency || 0));
+            }
+            await prisma.client.update({
+                where: { id: appointment.clientId },
+                data: {
+                    loyaltyPoints: { increment: pointsToAdd },
+                    loyaltyVisits: { increment: 1 }
+                }
+            });
+        }
+        res.json({ success: true, appointment });
+    }
+    catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
+router.get('/professional/earnings', authenticateToken, async (req, res) => {
+    const userId = req.user?.id;
+    try {
+        const user = await prisma.user.findUnique({ where: { id: userId } });
+        if (!user || !user.staffId)
+            return res.status(403).json({ error: 'Professional record not found' });
+        const staffId = user.staffId;
+        const staff = await prisma.staff.findUnique({ where: { id: staffId } });
+        const commissionRate = (staff?.commissionPercentage || 0) / 100;
+        const startOfMonth = new Date();
+        startOfMonth.setDate(1);
+        startOfMonth.setHours(0, 0, 0, 0);
+        const startOfToday = new Date();
+        startOfToday.setHours(0, 0, 0, 0);
+        const appointments = await prisma.appointment.findMany({
+            where: {
+                staffId,
+                status: 'completed',
+                date: { gte: startOfMonth }
+            }
+        });
+        const todayApps = appointments.filter(a => a.date >= startOfToday);
+        const totalRevenue = appointments.reduce((sum, app) => sum + (app.price || 0), 0);
+        const totalCommission = totalRevenue * commissionRate;
+        const totalRevenueToday = todayApps.reduce((sum, app) => sum + (app.price || 0), 0);
+        res.json({
+            totalRevenue,
+            totalCommission,
+            totalRevenueToday,
+            commissionPercentage: staff?.commissionPercentage,
+            count: appointments.length
+        });
+    }
+    catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
 // Finance (Transactions)
 router.get('/transactions', authenticateToken, async (req, res) => {
     const transactions = await prisma.transaction.findMany({
@@ -1146,7 +1314,12 @@ router.get('/dashboard/stats', authenticateToken, async (req, res) => {
 });
 // Super Admin Routes
 const isSuperAdmin = (req, res, next) => {
-    if (req.user?.email !== 'renatadouglas739@gmail.com') {
+    const superAdminEmails = [
+        'renatadouglas739@gmail.com',
+        'admin@sallonpromanager.com.br',
+        'sallonpromanager@gmail.com'
+    ];
+    if (!req.user?.email || !superAdminEmails.includes(req.user.email)) {
         return res.status(403).json({ error: 'Forbidden' });
     }
     next();
@@ -1204,9 +1377,9 @@ router.get('/superadmin/tenants', authenticateToken, isSuperAdmin, async (req, r
     res.json(users);
 });
 router.put('/superadmin/tenants/:id', authenticateToken, isSuperAdmin, async (req, res) => {
-    const { planId } = req.body;
+    const { planId, ...otherData } = req.body;
     const userId = req.params.id;
-    console.log(`[ADMIN] Update request: User=${userId}, Plan=${planId}`);
+    console.log(`[ADMIN] Update request: User=${userId}, Plan=${planId || 'N/A'}`);
     try {
         // Diagnostic: Check if user exists
         const userExists = await prisma.user.findUnique({ where: { id: userId } });
@@ -1214,27 +1387,42 @@ router.put('/superadmin/tenants/:id', authenticateToken, isSuperAdmin, async (re
             console.error(`[ADMIN] User not found: ${userId}`);
             return res.status(404).json({ error: 'User not found' });
         }
-        // Diagnostic: Check if plan exists
-        const planExists = await prisma.plan.findUnique({ where: { id: planId } });
-        if (!planExists) {
-            console.error(`[ADMIN] Plan not found: "${planId}"`);
-            return res.status(404).json({ error: `Plan not found: "${planId}"` });
+        // Update User table with all provided data
+        const updateData = { ...otherData };
+        if (planId) {
+            updateData.planId = planId.toLowerCase();
         }
-        // Update User table
-        await prisma.user.update({
+        const updatedUser = await prisma.user.update({
             where: { id: userId },
-            data: { planId }
+            data: updateData
         });
-        // Update or Create Subscription
-        const currentPeriodEnd = new Date();
-        currentPeriodEnd.setFullYear(currentPeriodEnd.getFullYear() + 1);
-        await prisma.subscription.upsert({
-            where: { uid: userId },
-            update: { planId, status: 'active', currentPeriodEnd },
-            create: { uid: userId, planId, status: 'active', currentPeriodEnd }
-        });
-        console.log(`[ADMIN] Success: Updated user and subscription for ${userId}`);
-        res.json({ success: true });
+        // If planId was provided, also update/create Subscription
+        if (planId) {
+            const targetPlanId = planId.toLowerCase();
+            // Calculate dates
+            const currentPeriodEnd = new Date();
+            currentPeriodEnd.setFullYear(currentPeriodEnd.getFullYear() + 1);
+            const endDate = currentPeriodEnd;
+            await prisma.subscription.upsert({
+                where: { uid: userId },
+                update: {
+                    planId: targetPlanId,
+                    status: 'active',
+                    currentPeriodEnd,
+                    endDate
+                },
+                create: {
+                    uid: userId,
+                    planId: targetPlanId,
+                    status: 'active',
+                    currentPeriodEnd,
+                    endDate
+                }
+            });
+            console.log(`[ADMIN] Updated subscription for ${userId} to ${targetPlanId}`);
+        }
+        console.log(`[ADMIN] Success: Updated user ${userId}`);
+        res.json(updatedUser);
     }
     catch (err) {
         console.error(`[ADMIN] FAILED for ${userId}:`, err);
@@ -1396,10 +1584,89 @@ router.post('/public/appointments', async (req, res) => {
         res.status(500).json({ error: err.message, success: false });
     }
 });
+router.get('/public/client-info/:slug/:phone', async (req, res) => {
+    const { slug, phone } = req.params;
+    try {
+        const shop = await prisma.setting.findUnique({ where: { slug } });
+        if (!shop)
+            return res.status(404).json({ error: 'Shop not found' });
+        const client = await prisma.client.findFirst({
+            where: { ownerUid: shop.uid, phone }
+        });
+        if (!client)
+            return res.status(404).json({ error: 'Client not found' });
+        res.json({
+            name: client.name,
+            pendingDebt: client.pendingDebt
+        });
+    }
+    catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
+router.get('/public/client-portal/:slug/:phone', async (req, res) => {
+    const { slug, phone } = req.params;
+    try {
+        const shop = await prisma.setting.findUnique({ where: { slug } });
+        if (!shop)
+            return res.status(404).json({ error: 'Shop not found' });
+        const client = await prisma.client.findFirst({
+            where: { ownerUid: shop.uid, phone }
+        });
+        if (!client)
+            return res.status(404).json({ error: 'Client not found' });
+        const appointments = await prisma.appointment.findMany({
+            where: { clientId: client.id },
+            orderBy: { date: 'desc' }
+        });
+        res.json({
+            client: {
+                name: client.name,
+                pendingDebt: client.pendingDebt
+            },
+            appointments
+        });
+    }
+    catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
+router.post('/public/appointments/:id/cancel', async (req, res) => {
+    const { id } = req.params;
+    const { reason } = req.body;
+    try {
+        const appointment = await prisma.appointment.findUnique({
+            where: { id }
+        });
+        if (!appointment)
+            return res.status(404).json({ error: 'Appointment not found' });
+        if (appointment.status === 'cancelled')
+            return res.status(400).json({ error: 'Already cancelled' });
+        const now = new Date();
+        const appDate = new Date(appointment.date);
+        const diffInHours = (appDate.getTime() - now.getTime()) / (1000 * 60 * 60);
+        if (diffInHours < 24) {
+            return res.status(400).json({
+                error: 'Cancellations with less than 24h notice must be handled via WhatsApp.',
+                requiresWhatsApp: true
+            });
+        }
+        await prisma.appointment.update({
+            where: { id },
+            data: {
+                status: 'cancelled',
+                cancellationReason: reason,
+                cancellationDate: now
+            }
+        });
+        res.json({ success: true });
+    }
+    catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
 // SuperAdmin Routes
-router.get('/superadmin/stats', authenticateToken, async (req, res) => {
-    if (req.user.role !== 'admin')
-        return res.status(403).json({ error: 'Forbidden' });
+router.get('/superadmin/stats', authenticateToken, isSuperAdmin, async (req, res) => {
     try {
         const totalUsers = await prisma.user.count();
         const activeSubscriptions = await prisma.subscription.count({ where: { status: 'active' } });
@@ -1411,9 +1678,7 @@ router.get('/superadmin/stats', authenticateToken, async (req, res) => {
         res.status(500).json({ error: 'Failed to fetch stats' });
     }
 });
-router.get('/superadmin/tenants', authenticateToken, async (req, res) => {
-    if (req.user.role !== 'admin')
-        return res.status(403).json({ error: 'Forbidden' });
+router.get('/superadmin/tenants', authenticateToken, isSuperAdmin, async (req, res) => {
     try {
         const tenants = await prisma.user.findMany({
             orderBy: { createdAt: 'desc' }
@@ -1424,9 +1689,7 @@ router.get('/superadmin/tenants', authenticateToken, async (req, res) => {
         res.status(500).json({ error: 'Failed to fetch tenants' });
     }
 });
-router.get('/superadmin/plans', authenticateToken, async (req, res) => {
-    if (req.user.role !== 'admin')
-        return res.status(403).json({ error: 'Forbidden' });
+router.get('/superadmin/plans', authenticateToken, isSuperAdmin, async (req, res) => {
     try {
         const plans = await prisma.plan.findMany();
         const parsedPlans = plans.map((p) => ({
@@ -1439,9 +1702,7 @@ router.get('/superadmin/plans', authenticateToken, async (req, res) => {
         res.status(500).json({ error: 'Failed to fetch plans' });
     }
 });
-router.get('/superadmin/tenant-usage/:userId', authenticateToken, async (req, res) => {
-    if (req.user.role !== 'admin')
-        return res.status(403).json({ error: 'Forbidden' });
+router.get('/superadmin/tenant-usage/:userId', authenticateToken, isSuperAdmin, async (req, res) => {
     try {
         const { userId } = req.params;
         const appointments = await prisma.appointment.count({ where: { ownerUid: userId } });
@@ -1461,9 +1722,7 @@ router.get('/superadmin/tenant-usage/:userId', authenticateToken, async (req, re
         res.status(500).json({ error: 'Failed to fetch usage' });
     }
 });
-router.post('/superadmin/tenants/:userId/wallet/recharge', authenticateToken, async (req, res) => {
-    if (req.user.role !== 'admin')
-        return res.status(403).json({ error: 'Forbidden' });
+router.post('/superadmin/tenants/:userId/wallet/recharge', authenticateToken, isSuperAdmin, async (req, res) => {
     try {
         const { userId } = req.params;
         const { amount, description } = req.body;
@@ -1493,25 +1752,8 @@ router.post('/superadmin/tenants/:userId/wallet/recharge', authenticateToken, as
         res.status(500).json({ error: error.message });
     }
 });
-router.put('/superadmin/tenants/:userId', authenticateToken, async (req, res) => {
-    if (req.user.role !== 'admin')
-        return res.status(403).json({ error: 'Forbidden' });
-    try {
-        const { userId } = req.params;
-        const data = req.body;
-        const updated = await prisma.user.update({
-            where: { id: userId },
-            data
-        });
-        res.json(updated);
-    }
-    catch (error) {
-        res.status(500).json({ error: 'Failed to update tenant' });
-    }
-});
-router.put('/superadmin/plans/:planId', authenticateToken, async (req, res) => {
-    if (req.user.role !== 'admin')
-        return res.status(403).json({ error: 'Forbidden' });
+// End of consolidated routes
+router.put('/superadmin/plans/:planId', authenticateToken, isSuperAdmin, async (req, res) => {
     try {
         const { planId } = req.params;
         const data = req.body;
@@ -1528,9 +1770,7 @@ router.put('/superadmin/plans/:planId', authenticateToken, async (req, res) => {
         res.status(500).json({ error: 'Failed to update plan' });
     }
 });
-router.post('/superadmin/plans', authenticateToken, async (req, res) => {
-    if (req.user.role !== 'admin')
-        return res.status(403).json({ error: 'Forbidden' });
+router.post('/superadmin/plans', authenticateToken, isSuperAdmin, async (req, res) => {
     try {
         const { id, name, slug, priceMonthly, priceYearly, features } = req.body;
         const plan = await prisma.plan.create({
@@ -1549,9 +1789,7 @@ router.post('/superadmin/plans', authenticateToken, async (req, res) => {
         res.status(500).json({ error: error.message });
     }
 });
-router.delete('/superadmin/plans/:planId', authenticateToken, async (req, res) => {
-    if (req.user.role !== 'admin')
-        return res.status(403).json({ error: 'Forbidden' });
+router.delete('/superadmin/plans/:planId', authenticateToken, isSuperAdmin, async (req, res) => {
     try {
         const { planId } = req.params;
         await prisma.plan.delete({
@@ -1574,6 +1812,7 @@ router.post('/subscriptions', authenticateToken, async (req, res) => {
                 status: 'active',
                 startDate: new Date(startDate),
                 endDate: new Date(endDate),
+                currentPeriodEnd: new Date(endDate),
                 updatedAt: new Date()
             },
             create: {
@@ -1581,7 +1820,8 @@ router.post('/subscriptions', authenticateToken, async (req, res) => {
                 planId,
                 status: 'active',
                 startDate: new Date(startDate),
-                endDate: new Date(endDate)
+                endDate: new Date(endDate),
+                currentPeriodEnd: new Date(endDate)
             }
         });
         // Also update user's planId

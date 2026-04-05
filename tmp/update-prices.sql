@@ -1,0 +1,1 @@
+UPDATE plans SET "priceYearly" = ("priceMonthly" * 12 * 0.8)::numeric(10,2);

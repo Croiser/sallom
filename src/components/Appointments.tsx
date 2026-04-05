@@ -12,7 +12,8 @@ import {
   Trash2,
   LayoutList,
   ChevronLeft,
-  ChevronRight
+  ChevronRight,
+  AlertCircle
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { Appointment, Client, Service, Staff, ShopSettings } from '../types';
@@ -129,6 +130,21 @@ export default function Appointments() {
     }
   };
 
+  const handleNoShow = async (id: string) => {
+    if (confirm('Marcar como Faltou (No-Show)? Esto gerará uma cobrança de 50% do valor do serviço para a cliente.')) {
+      try {
+        await api.post(`/appointments/${id}/no-show`);
+        fetchData();
+        setToast({ message: 'No-Show registrado! Débito gerado para a cliente.', type: 'success' });
+        setTimeout(() => setToast(null), 3000);
+      } catch (err) {
+        console.error('Failed to register No-Show:', err);
+        setToast({ message: 'Erro ao registrar No-Show.', type: 'error' });
+        setTimeout(() => setToast(null), 3000);
+      }
+    }
+  };
+
   const updateStatus = async (id: string, status: Appointment['status']) => {
     try {
       await api.put(`/appointments/${id}/status`, { status });
@@ -166,8 +182,8 @@ export default function Appointments() {
   };
 
   const filteredAppointments = appointments.filter(app => {
-    const matchesSearch = app.clientName.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                         app.serviceName.toLowerCase().includes(searchTerm.toLowerCase());
+    const matchesSearch = (app.clientName?.toLowerCase() || '').includes(searchTerm.toLowerCase()) ||
+                         (app.serviceName?.toLowerCase() || '').includes(searchTerm.toLowerCase());
     const matchesStatus = statusFilter === 'all' || app.status === statusFilter;
     const matchesStaff = staffFilter === 'all' || app.staffId === staffFilter;
     
@@ -352,9 +368,10 @@ export default function Appointments() {
                   </span>
                   <span className={`text-[10px] uppercase font-bold px-2 py-0.5 rounded-full ${
                     app.status === 'scheduled' ? 'bg-zinc-100 text-zinc-600' : 
-                    app.status === 'completed' ? 'bg-emerald-100 text-emerald-700' : 'bg-rose-100 text-rose-700'
+                    app.status === 'completed' ? 'bg-emerald-100 text-emerald-700' : 
+                    app.status === 'no_show' ? 'bg-amber-100 text-amber-700' : 'bg-rose-100 text-rose-700'
                   }`}>
-                    {app.status === 'scheduled' ? 'Agendado' : app.status === 'completed' ? 'Concluído' : 'Cancelado'}
+                    {app.status === 'scheduled' ? 'Agendado' : app.status === 'completed' ? 'Concluído' : app.status === 'no_show' ? 'No-Show' : 'Cancelado'}
                   </span>
                 </div>
                 <div className="flex items-center justify-between mb-2">
@@ -374,6 +391,13 @@ export default function Appointments() {
                         title="Concluir"
                       >
                         <Check size={14} />
+                      </button>
+                      <button 
+                        onClick={() => handleNoShow(app.id)}
+                        className="p-1.5 text-rose-400 hover:bg-rose-50 rounded-lg transition-colors"
+                        title="Faltou (No-Show)"
+                      >
+                        <AlertCircle size={14} />
                       </button>
                       <button 
                         onClick={() => updateStatus(app.id, 'cancelled')}
@@ -454,6 +478,7 @@ export default function Appointments() {
             <option value="all">Todos os Status</option>
             <option value="scheduled">Agendado</option>
             <option value="completed">Concluído</option>
+            <option value="no_show">No-Show</option>
             <option value="cancelled">Cancelado</option>
           </select>
 
@@ -497,7 +522,7 @@ export default function Appointments() {
                     <td className="px-6 py-4">
                       <div className="flex items-center gap-3">
                         <div className="w-8 h-8 bg-zinc-100 rounded-full flex items-center justify-center text-xs font-bold text-zinc-600">
-                          {app.clientName.charAt(0)}
+                          {app.clientName?.charAt(0) || '?'}
                         </div>
                         <div className="flex flex-col">
                           <span className="font-medium text-zinc-900">{app.clientName}</span>
@@ -522,9 +547,10 @@ export default function Appointments() {
                         text-[10px] uppercase tracking-wider font-bold px-2 py-1 rounded-full
                         ${app.status === 'scheduled' ? 'bg-rose-100 text-rose-700' : 
                           app.status === 'completed' ? 'bg-emerald-100 text-emerald-700' : 
+                          app.status === 'no_show' ? 'bg-amber-100 text-amber-700' :
                           'bg-rose-100 text-rose-700'}
                       `}>
-                        {app.status === 'scheduled' ? 'Agendado' : app.status === 'completed' ? 'Concluído' : 'Cancelado'}
+                        {app.status === 'scheduled' ? 'Agendado' : app.status === 'completed' ? 'Concluído' : app.status === 'no_show' ? 'No-Show' : 'Cancelado'}
                       </span>
                     </td>
                     <td className="px-6 py-4 text-right">
@@ -537,6 +563,13 @@ export default function Appointments() {
                               title="Concluir"
                             >
                               <Check size={18} />
+                            </button>
+                            <button 
+                              onClick={() => handleNoShow(app.id)}
+                              className="p-2 text-amber-600 hover:bg-amber-50 rounded-lg transition-colors"
+                              title="Faltou (No-Show)"
+                            >
+                              <AlertCircle size={18} />
                             </button>
                             <button 
                               onClick={() => updateStatus(app.id, 'cancelled')}
@@ -650,6 +683,7 @@ export default function Appointments() {
                               mb-1 p-1.5 rounded-lg text-[10px] leading-tight shadow-sm border
                               ${app.status === 'completed' ? 'bg-emerald-50 border-emerald-100 text-emerald-700' : 
                                 app.status === 'cancelled' ? 'bg-rose-50 border-rose-100 text-rose-700' : 
+                                app.status === 'no_show' ? 'bg-amber-50 border-amber-100 text-amber-700' :
                                 app.isFitIn ? 'bg-amber-50 border-amber-100 text-amber-700' :
                                 'bg-rose-50 border-rose-100 text-rose-700'}
                             `}

@@ -3,7 +3,7 @@ export interface UserProfile {
   uid: string;
   name: string;
   email: string;
-  role: 'admin' | 'barber' | 'superadmin';
+  role: 'admin' | 'barber' | 'superadmin' | 'professional';
   shopName?: string;
   createdAt: string;
   status?: 'active' | 'suspended' | 'trial';
@@ -23,6 +23,7 @@ export interface Client {
   createdAt: string;
   loyaltyPoints: number;
   loyaltyVisits: number;
+  pendingDebt?: number; // New: No-show fee
 }
 
 export interface Service {
@@ -44,10 +45,17 @@ export interface Appointment {
   staffId?: string;
   staffName?: string;
   date: string; // ISO string
-  status: 'scheduled' | 'completed' | 'cancelled';
+  status: 'scheduled' | 'cancelled' | 'cancelled_on_time' | 'cancelled_late' | 'no_show' | 'completed' | 'in_progress';
   price: number;
   ownerUid: string;
   isFitIn?: boolean;
+  
+  // New: Professional & Cancellation Metadata
+  noShow?: boolean;
+  cancellationReason?: string;
+  cancellationDate?: string;
+  checkInAt?: string;
+  finishedAt?: string;
 }
 
 export interface Transaction {
@@ -68,6 +76,8 @@ export interface Staff {
   active: boolean;
   commissionPercentage: number;
   portfolio?: string[];
+  status?: 'Livre' | 'Ocupado' | 'Em Intervalo'; // New: Desk status
+  notes?: string;
 }
 
 export interface ShopSettings {

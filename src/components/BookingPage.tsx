@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { ShopSettings, Service, Staff, BusinessHours, Appointment } from '../types';
-import { Sparkles, Calendar, Clock, User, CheckCircle2, ChevronRight, ChevronLeft, MapPin, Phone, Copy } from 'lucide-react';
+import { Sparkles, Calendar, Clock, User, CheckCircle2, ChevronRight, ChevronLeft, MapPin, Phone, Copy, AlertCircle } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { format, addDays, startOfToday, isSameDay, parse, isAfter, isBefore } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
@@ -28,6 +28,8 @@ export default function BookingPage({ slug }: BookingPageProps) {
   const [isBooking, setIsBooking] = useState(false);
   const [bookingSuccess, setBookingSuccess] = useState(false);
   const [showCustomAlert, setShowCustomAlert] = useState(false);
+  const [pendingDebt, setPendingDebt] = useState(0);
+  const [clientNameFromDebt, setClientNameFromDebt] = useState('');
 
   const triggerAlert = () => {
     setShowCustomAlert(true);
@@ -89,6 +91,24 @@ export default function BookingPage({ slug }: BookingPageProps) {
 
   const [appointmentId, setAppointmentId] = useState<string | null>(null);
 
+  const checkClientDebt = async (phone: string) => {
+    if (phone.replace(/\D/g, '').length < 10) return;
+    try {
+      const data = await api.get(`/public/client-info/${slug}/${phone}`);
+      if (data && data.pendingDebt > 0) {
+        setPendingDebt(data.pendingDebt);
+        setClientNameFromDebt(data.name);
+        // If we found a name, pre-fill it
+        setClientInfo(prev => ({ ...prev, name: data.name }));
+      } else {
+        setPendingDebt(0);
+      }
+    } catch (err) {
+      // Client might not exist yet, ignore
+      setPendingDebt(0);
+    }
+  };
+
   const handleBooking = async () => {
     if (!selectedService || !selectedStaff || !selectedTime || !shop) return;
     setIsBooking(true);
@@ -148,10 +168,9 @@ export default function BookingPage({ slug }: BookingPageProps) {
       </div>
     );
   }
-
   if (bookingSuccess) {
     return (
-      <div className="min-h-screen bg-zinc-950 flex items-center justify-center p-6">
+      <div className="min-h-screen bg-zinc-950 flex items-center justify-center p-6 text-center">
         <motion.div 
           initial={{ opacity: 0, scale: 0.9 }}
           animate={{ opacity: 1, scale: 1 }}
@@ -161,12 +180,13 @@ export default function BookingPage({ slug }: BookingPageProps) {
             <CheckCircle2 className="text-emerald-500" size={40} />
           </div>
           <div className="space-y-2">
-            <h2 className="text-2xl font-bold text-white">Agendamento Realizado!</h2>
-            <p className="text-zinc-400">Tudo pronto para o seu atendimento no {ownerProfile?.shopName || 'nosso salão'}.</p>
+            <h2 className="text-2xl font-bold text-white uppercase italic tracking-tighter">Agendamento Confirmado!</h2>
+            <p className="text-zinc-400 text-sm">Tudo pronto para o seu atendimento no {ownerProfile?.shopName || 'nosso salão'}.</p>
           </div>
           
-          <div className="bg-zinc-950 rounded-2xl p-6 text-left space-y-4 border border-zinc-800">
-            <h3 className="text-sm font-bold text-zinc-500 uppercase tracking-widest">Resumo do Pedido</h3>
+          <div className="bg-zinc-950 rounded-3xl p-6 text-left space-y-4 border border-zinc-800 relative overflow-hidden">
+             <div className="absolute top-0 right-0 w-24 h-24 bg-rose-500/5 rounded-full blur-2xl" />
+             <h3 className="text-[10px] font-black text-rose-500 uppercase tracking-widest">Resumo do Pedido</h3>
             <div className="space-y-3">
               <div className="flex justify-between text-sm">
                 <span className="text-zinc-400">Serviço:</span>
@@ -239,6 +259,14 @@ export default function BookingPage({ slug }: BookingPageProps) {
                 <span>{shop.address || 'Endereço não informado'}</span>
               </div>
             </div>
+          </div>
+          <div className="flex items-center gap-2">
+            <button 
+              onClick={() => window.location.href = `/portal/${slug}`}
+              className="text-xs font-bold text-rose-500 bg-rose-500/10 px-4 py-2 rounded-xl hover:bg-rose-500/20 transition-all border border-rose-500/20"
+            >
+              Área da Cliente
+            </button>
           </div>
         </div>
       </header>
@@ -517,10 +545,40 @@ export default function BookingPage({ slug }: BookingPageProps) {
                     type="tel"
                     placeholder="(00) 00000-0000"
                     value={clientInfo.phone}
-                    onChange={e => setClientInfo({ ...clientInfo, phone: e.target.value })}
+                    onChange={e => {
+                      const val = e.target.value;
+                      setClientInfo({ ...clientInfo, phone: val });
+                    }}
+                    onBlur={() => checkClientDebt(clientInfo.phone)}
                     className="w-full bg-zinc-900 border border-zinc-800 rounded-2xl px-6 py-4 text-white focus:border-rose-500 outline-none transition-all"
                   />
                 </div>
+
+                 <AnimatePresence>
+                  {pendingDebt > 0 && (
+                    <motion.div 
+                      initial={{ opacity: 0, y: 10 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      className="bg-rose-500/10 border-2 border-rose-500/20 p-8 rounded-[2.5rem] space-y-4 relative overflow-hidden"
+                    >
+                      <div className="absolute top-0 right-0 w-32 h-32 bg-rose-500/5 rounded-full blur-[60px]" />
+                      <div className="flex items-center gap-3 text-rose-500">
+                        <AlertCircle size={24} className="animate-pulse" />
+                        <h3 className="font-black text-lg uppercase italic tracking-tighter">Aviso de Pendência</h3>
+                      </div>
+                      <div className="space-y-2 relative z-10">
+                        <p className="text-sm text-zinc-300 leading-relaxed">
+                          Olá <span className="text-white font-bold">{clientNameFromDebt}</span>, identificamos uma taxa de <span className="text-rose-500 font-bold">R$ {pendingDebt.toFixed(2)}</span> pendente de um agendamento anterior (<span className="italic">No-Show/Cancelamento Tardio</span>).
+                        </p>
+                        <div className="bg-rose-500/20 px-4 py-2 rounded-xl inline-block">
+                           <p className="text-[10px] text-rose-500 font-black uppercase tracking-widest">
+                             * Valor adicionado ao total de hoje
+                           </p>
+                        </div>
+                      </div>
+                    </motion.div>
+                  )}
+                </AnimatePresence>
 
                 {/* Summary Card */}
                 <div className="bg-rose-500/5 border border-rose-500/20 rounded-3xl p-6 space-y-4">
@@ -543,9 +601,15 @@ export default function BookingPage({ slug }: BookingPageProps) {
                         {format(selectedDate, "dd 'de' MMMM", { locale: ptBR })} às {selectedTime}
                       </span>
                     </div>
+                    {pendingDebt > 0 && (
+                      <div className="flex justify-between text-sm text-rose-500 font-bold">
+                        <span>Taxa de Pendência:</span>
+                        <span>R$ {pendingDebt.toFixed(2)}</span>
+                      </div>
+                    )}
                     <div className="pt-3 border-t border-zinc-800 flex justify-between items-center">
-                      <span className="text-zinc-500">Total:</span>
-                      <span className="text-2xl font-bold text-rose-500">R$ {selectedService?.price.toFixed(2)}</span>
+                      <span className="text-zinc-500">Total a Pagar:</span>
+                      <span className="text-2xl font-bold text-rose-500">R$ {( (selectedService?.price || 0) + pendingDebt).toFixed(2)}</span>
                     </div>
                   </div>
                 </div>

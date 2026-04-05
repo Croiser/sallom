@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { 
   LayoutDashboard, 
   Calendar as CalendarIcon, 
-  Users as UsersIcon, 
+  Group as UsersIcon, 
   Sparkles as SparklesIcon,
   DollarSign, 
   LogOut, 
@@ -92,11 +92,21 @@ export default function Layout({ children, activeTab, setActiveTab }: LayoutProp
     userProfile?.email === 'renatadouglas739@gmail.com' || 
     userProfile?.email === 'sallonpromanager@gmail.com';
 
+  const isProfessional = userProfile?.role === 'professional';
+
   const filteredMenuItems = menuItems.filter(item => {
+    if (isSuperAdmin) return true;
+    
+    // Professionals only see restricted menu
+    if (isProfessional) {
+      const allowedForPro = ['dashboard', 'appointments', 'clients', 'settings', 'help', 'whatsapp-chats'];
+      return allowedForPro.includes(item.id);
+    }
+
     if (item.id === 'whatsapp' || item.id === 'whatsapp-connection' || item.id === 'whatsapp-chats') {
       return plan?.features?.whatsapp === true;
     }
-    return item.id !== 'whatsapp';
+    return true;
   });
 
   const fullMenuItems = isSuperAdmin 

@@ -40,6 +40,13 @@ export default function WhatsApp({ onNavigate }: WhatsAppProps) {
   const [success, setSuccess] = useState(false);
   const [connecting, setConnecting] = useState(false);
 
+  const isSuperAdmin = 
+    user?.role === 'admin' || 
+    user?.role === 'superadmin' ||
+    user?.email === 'admin@sallonpromanager.com.br' ||
+    user?.email === 'renatadouglas739@gmail.com' || 
+    user?.email === 'sallonpromanager@gmail.com';
+
   useEffect(() => {
     if (!user) return;
 
@@ -97,7 +104,7 @@ export default function WhatsApp({ onNavigate }: WhatsAppProps) {
 
   if (loading || subLoading) return <div className="flex justify-center p-10"><div className="animate-spin rounded-full h-8 w-8 border-b-2 border-rose-500"></div></div>;
 
-  if (!plan?.features.whatsapp) {
+  if (!isSuperAdmin && !plan?.features.whatsapp) {
     return (
       <div className="flex flex-col items-center justify-center py-20 text-center">
         <div className="w-20 h-20 bg-rose-100 rounded-full flex items-center justify-center mb-6">

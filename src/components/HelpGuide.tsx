@@ -2,7 +2,7 @@ import React from 'react';
 import { 
   BookOpen, 
   Calendar as CalendarIcon, 
-  Users as UsersIcon, 
+  Group as UsersIcon, 
   Sparkles, 
   DollarSign, 
   Package, 

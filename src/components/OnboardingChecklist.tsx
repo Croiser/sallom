@@ -4,7 +4,7 @@ import {
   Circle as CircleIcon, 
   ChevronRight as ChevronIcon, 
   Sparkles as SparklesIcon, 
-  Users as UsersIcon, 
+  Group as UsersIcon, 
   Calendar as CalendarIcon, 
   DollarSign as DollarIcon,
   ArrowRight as ArrowIcon,

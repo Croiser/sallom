@@ -24,6 +24,8 @@ import BookingPage from './components/BookingPage';
 import AutomationSettings from './components/AutomationSettings';
 import WhatsAppConnection from './components/WhatsAppConnection';
 import WhatsAppChatList from './components/whatsapp/WhatsAppChatList';
+import ProfessionalDashboard from './components/ProfessionalDashboard';
+import ClientPortal from './components/ClientPortal';
 import { Plan } from './types';
 import { ShieldAlert } from 'lucide-react';
 import { api } from './services/api';
@@ -155,9 +157,15 @@ export default function App() {
     }
 
     // If on a subdomain, we show the booking page by default
-    // unless the path is /admin
+    // unless the path is /admin or /portal
     if (path.includes('/admin')) {
       // Allow login/admin view even on subdomain
+    } else if (path.includes('/portal')) {
+      return (
+        <ErrorBoundary>
+          <ClientPortal slug={subdomainSlug} />
+        </ErrorBoundary>
+      );
     } else {
       return (
         <ErrorBoundary>
@@ -165,6 +173,16 @@ export default function App() {
         </ErrorBoundary>
       );
     }
+  }
+
+  // Public Routes ( /portal/:slug, /book/:slug, etc. )
+  if (path.startsWith('/portal/')) {
+    const slug = path.split('/')[2];
+    return (
+      <ErrorBoundary>
+        <ClientPortal slug={slug} />
+      </ErrorBoundary>
+    );
   }
 
   // Public Booking Route (/book/:slug, /agendar/:slug, /agenda/:slug, /empresa/:slug, /cliente/:slug)
@@ -234,11 +252,21 @@ export default function App() {
     );
   }
 
+  const isAdmin = 
+    user?.role === 'admin' || 
+    user?.role === 'superadmin' ||
+    user?.email === 'admin@sallonpromanager.com.br' ||
+    user?.email === 'renatadouglas739@gmail.com' || 
+    user?.email === 'sallonpromanager@gmail.com';
+
+  // Multi-Tenancy: Professional View (Admins and Owners see full dashboard)
+  const isProfessional = user?.role === 'professional' && !isAdmin;
+
   const renderContent = () => {
     const props = { onNavigate: handleNavigate };
     switch (activeTab) {
       case 'dashboard':
-        return <Dashboard {...props} />;
+        return isProfessional ? <ProfessionalDashboard /> : <Dashboard {...props} />;
       case 'appointments':
         return <Appointments />;
       case 'clients':
