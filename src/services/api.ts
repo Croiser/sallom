@@ -33,4 +33,8 @@ export const api = {
   startWahaSession: () => request('/whatsapp/waha/session/start', { method: 'POST' }),
   getWhatsAppSettings: () => request('/whatsapp-settings', { method: 'GET' }),
   updateWhatsAppSettings: (data: any) => request('/whatsapp-settings', { method: 'PUT', body: JSON.stringify(data) }),
+  
+  // Sales & PDV
+  getSales: () => request('/sales', { method: 'GET' }),
+  createSale: (data: any) => request('/sales', { method: 'POST', body: JSON.stringify(data) }),
 };

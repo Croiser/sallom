@@ -19,7 +19,8 @@ import {
   HelpCircle,
   Flower2,
   Settings2,
-  QrCode
+  QrCode,
+  ShoppingCart
 } from 'lucide-react';
 import { UserProfile } from '../types';
 import { motion, AnimatePresence } from 'motion/react';
@@ -76,6 +77,7 @@ export default function Layout({ children, activeTab, setActiveTab }: LayoutProp
     { id: 'inventory', label: 'Estoque', icon: Package },
     { id: 'finance', label: 'Financeiro', icon: DollarSign },
     { id: 'reports', label: 'Relatórios', icon: BarChart3 },
+    { id: 'pdv', label: 'PDV / Vendas', icon: ShoppingCart },
     { id: 'whatsapp', label: 'WhatsApp', icon: MessageIcon },
     { id: 'whatsapp-chats', label: 'Mensagens', icon: MessageSquare },
     { id: 'settings', label: 'Configurações', icon: SettingsIcon },

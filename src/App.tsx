@@ -26,6 +26,7 @@ import WhatsAppConnection from './components/WhatsAppConnection';
 import WhatsAppChatList from './components/whatsapp/WhatsAppChatList';
 import ProfessionalDashboard from './components/ProfessionalDashboard';
 import ClientPortal from './components/ClientPortal';
+import PDV from './components/PDV';
 import { Plan } from './types';
 import { ShieldAlert } from 'lucide-react';
 import { api } from './services/api';
@@ -281,6 +282,8 @@ export default function App() {
         return <Inventory onNavigate={handleNavigate} />;
       case 'reports':
         return <Reports onNavigate={handleNavigate} />;
+      case 'pdv':
+        return <PDV />;
       case 'subscription':
         return checkoutData ? (
           <Checkout 

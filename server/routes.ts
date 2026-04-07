@@ -514,8 +514,11 @@ router.get('/staff', authenticateToken, async (req: AuthRequest, res) => {
 });
 
 router.post('/staff', authenticateToken, async (req: AuthRequest, res) => {
-  const { name, phone, commissionPercentage, active, portfolio } = req.body;
+  const { name, phone, commissionPercentage, active, portfolio, email, password } = req.body;
+  const ownerUid = req.user?.id as string;
+
   try {
+    // 1. Create the Staff record
     const staff = await (prisma.staff as any).create({
       data: {
         name, 
@@ -523,9 +526,32 @@ router.post('/staff', authenticateToken, async (req: AuthRequest, res) => {
         commissionPercentage: Number(commissionPercentage || 0), 
         active: active !== undefined ? active : true, 
         portfolio: portfolio ? JSON.stringify(portfolio) : "[]",
-        ownerUid: req.user?.id as string
+        ownerUid
       }
     });
+
+    // 2. If email/password provided, create a User record for login
+    if (email && password) {
+      const existingUser = await prisma.user.findUnique({ where: { email } });
+      if (existingUser) {
+        return res.status(400).json({ error: 'Este e-mail já está sendo usado por outro usuário.' });
+      }
+
+      const hashedPassword = await bcrypt.hash(password, 10);
+      await prisma.user.create({
+        data: {
+          name,
+          email,
+          password: hashedPassword,
+          role: 'professional',
+          staffId: staff.id,
+          ownerId: ownerUid,
+          shopName: `Profissional: ${name}`,
+          slug: `prof-${staff.id.slice(-6)}`
+        } as any
+      });
+    }
+
     res.json(staff);
   } catch (err: any) {
     console.error('Error creating staff:', err);
@@ -980,7 +1006,7 @@ router.delete('/clients/:id', authenticateToken, async (req: AuthRequest, res) =
 });
 
 router.put('/clients/:id', authenticateToken, async (req: AuthRequest, res) => {
-  const { name, phone, email, notes, loyaltyPoints, loyaltyVisits } = req.body;
+  const { name, phone, email, notes, loyaltyPoints, loyaltyVisits, pendingDebt } = req.body;
   await prisma.client.update({
     where: { id: req.params.id },
     data: { 
@@ -989,8 +1015,9 @@ router.put('/clients/:id', authenticateToken, async (req: AuthRequest, res) => {
       email, 
       notes, 
       loyaltyPoints: loyaltyPoints !== undefined ? loyaltyPoints : undefined, 
-      loyaltyVisits: loyaltyVisits !== undefined ? loyaltyVisits : undefined 
-    }
+      loyaltyVisits: loyaltyVisits !== undefined ? loyaltyVisits : undefined,
+      pendingDebt: pendingDebt !== undefined ? pendingDebt : undefined
+    } as any
   });
   res.json({ success: true });
 });
@@ -1710,6 +1737,109 @@ router.post('/whatsapp/webhook', async (req, res) => {
   res.json({ success: true });
 });
 
+// Sales & PDV
+router.get('/sales', authenticateToken, async (req: AuthRequest, res) => {
+  try {
+    const sales = await prisma.sale.findMany({
+      where: { ownerUid: req.user?.id },
+      include: {
+        items: {
+          include: {
+            product: true,
+            service: true
+          }
+        },
+        client: true,
+        staff: true
+      },
+      orderBy: { createdAt: 'desc' }
+    });
+    res.json(sales);
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+router.post('/sales', authenticateToken, async (req: AuthRequest, res) => {
+  const { clientId, staffId, paymentMethod, items, includeDebt } = req.body;
+  const ownerUid = req.user?.id as string;
+
+  try {
+    const result = await prisma.$transaction(async (tx) => {
+      // 1. Calculate total
+      let totalAmount = 0;
+      const saleItemsData = [];
+
+      for (const item of items) {
+        const lineTotal = item.quantity * item.unitPrice;
+        totalAmount += lineTotal;
+        
+        saleItemsData.push({
+          productId: item.productId || null,
+          serviceId: item.serviceId || null,
+          quantity: item.quantity,
+          unitPrice: item.unitPrice,
+          totalPrice: lineTotal
+        });
+
+        // 2. Decrement stock if it's a product
+        if (item.productId) {
+          await tx.product.update({
+            where: { id: item.productId },
+            data: { stock: { decrement: item.quantity } }
+          });
+        }
+      }
+
+      // 3. Handle Debt payment if requested
+      if (includeDebt && clientId) {
+        const client = await tx.client.findUnique({ where: { id: clientId } });
+        if (client && (client as any).pendingDebt > 0) {
+          totalAmount += (client as any).pendingDebt;
+          await tx.client.update({
+            where: { id: clientId },
+            data: { pendingDebt: 0 } as any
+          });
+        }
+      }
+
+      // 4. Create Sale
+      const sale = await tx.sale.create({
+        data: {
+          ownerUid,
+          clientId: clientId || null,
+          staffId: staffId || null,
+          totalAmount,
+          paymentMethod,
+          items: {
+            create: saleItemsData
+          }
+        },
+        include: { items: true }
+      });
+
+      // 4. Create Financial Transaction
+      await tx.transaction.create({
+        data: {
+          ownerUid,
+          type: 'income',
+          amount: totalAmount,
+          description: `Venda PDV #${sale.id.split('-')[0]}`,
+          date: new Date(),
+          category: 'Venda de Produtos/Serviços'
+        }
+      });
+
+      return sale;
+    });
+
+    res.json(result);
+  } catch (err: any) {
+    console.error('[SALES_ERROR]', err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
 // --- PUBLIC ROUTES (For Booking Page) ---
 router.get('/public/plans', async (req, res) => {
   const plansData = await prisma.plan.findMany();
@@ -1721,16 +1851,79 @@ router.get('/public/plans', async (req, res) => {
 });
 
 router.get('/public/shop/:slug', async (req, res) => {
-  const settings = await prisma.setting.findUnique({ where: { slug: req.params.slug } }) as any;
-  if (!settings) return res.status(404).json({ error: 'Shop not found' });
-  
-  const owner = await prisma.user.findUnique({
-    where: { id: settings.uid },
-    select: { name: true, shopName: true }
-  });
-  
-  settings.businessHours = settings.businessHours ? JSON.parse(settings.businessHours) : [];
-  res.json({ shop: settings, owner });
+  const { slug } = req.params;
+  console.log(`[PublicShop] Searching for slug: "${slug}"`);
+  try {
+    // 1. Try finding by User slug (primary tenant ID)
+    let user = await prisma.user.findFirst({
+      where: { 
+        OR: [
+          { slug: slug },
+          { slug: slug.toLowerCase() }
+        ]
+      },
+      select: { id: true, name: true, shopName: true, status: true, slug: true }
+    });
+
+    let settings;
+    if (user) {
+      console.log(`[PublicShop] Found user by slug: ${user.id}`);
+      settings = await prisma.setting.findUnique({ where: { uid: user.id } }) as any;
+    } else {
+      console.log(`[PublicShop] User not found by slug, trying Setting slug...`);
+      settings = await prisma.setting.findFirst({ 
+        where: { 
+          OR: [
+            { slug: slug },
+            { slug: slug.toLowerCase() }
+          ]
+        } 
+      }) as any;
+      
+      if (settings) {
+        console.log(`[PublicShop] Found setting by slug, finding owner: ${settings.uid}`);
+        user = await prisma.user.findUnique({
+          where: { id: settings.uid },
+          select: { id: true, name: true, shopName: true, status: true, slug: true }
+        });
+      }
+    }
+
+    if (!user) {
+      console.log(`[PublicShop] No user found for slug "${slug}". Returning 404.`);
+      return res.status(404).json({ error: 'Shop not found' });
+    }
+
+    // Ensure settings exists (create default if missing)
+    if (!settings) {
+      console.log(`[PublicShop] Settings missing for user ${user.id}, creating defaults...`);
+      settings = await prisma.setting.create({
+        data: {
+          uid: user.id,
+          slug: user.slug || slug,
+          businessHours: JSON.stringify([
+            { day: 'Segunda-feira', open: '09:00', close: '18:00', closed: false },
+            { day: 'Terça-feira', open: '09:00', close: '18:00', closed: false },
+            { day: 'Quarta-feira', open: '09:00', close: '18:00', closed: false },
+            { day: 'Quinta-feira', open: '09:00', close: '18:00', closed: false },
+            { day: 'Sexta-feira', open: '09:00', close: '18:00', closed: false },
+            { day: 'Sábado', open: '09:00', close: '14:00', closed: false },
+            { day: 'Domingo', open: '00:00', close: '00:00', closed: true }
+          ])
+        }
+      });
+    }
+
+    const bh = typeof settings.businessHours === 'string' ? JSON.parse(settings.businessHours) : settings.businessHours;
+    console.log(`[PublicShop] Successfully returning shop data for ${user.shopName}`);
+    res.json({ 
+      shop: { ...settings, businessHours: bh, uid: user.id }, 
+      owner: { name: user.name, shopName: user.shopName, id: user.id } 
+    });
+  } catch (err: any) {
+    console.error('[PublicShop] Critical Error:', err);
+    res.status(500).json({ error: err.message });
+  }
 });
 
 router.get('/public/services/:uid', async (req, res) => {
@@ -1835,14 +2028,22 @@ router.post('/public/appointments/:id/cancel', async (req, res) => {
   }
 });
 
-router.get('/public/client-portal/:slug/:phone', async (req, res) => {
+router.get('/public/client-info/:slug/:phone', async (req, res) => {
   const { slug, phone } = req.params;
   try {
-    const shop = await prisma.setting.findUnique({ where: { slug } });
-    if (!shop) return res.status(404).json({ error: 'Shop not found' });
+    // Find the shop owner first
+    let user = await prisma.user.findUnique({ where: { slug } });
+    if (!user) {
+      const shop = await prisma.setting.findUnique({ where: { slug } });
+      if (shop) {
+        user = await prisma.user.findUnique({ where: { id: shop.uid } });
+      }
+    }
+
+    if (!user) return res.status(404).json({ error: 'Shop not found' });
 
     const client = await prisma.client.findFirst({
-      where: { ownerUid: shop.uid, phone },
+      where: { ownerUid: user.id, phone },
       include: {
         appointments: {
           orderBy: { date: 'desc' }
@@ -1860,73 +2061,6 @@ router.get('/public/client-portal/:slug/:phone', async (req, res) => {
       },
       appointments: client.appointments
     });
-  } catch (err: any) {
-    res.status(500).json({ error: err.message });
-  }
-});
-
-router.get('/public/client-portal/:slug/:phone', async (req, res) => {
-  const { slug, phone } = req.params;
-  try {
-    const shop = await prisma.setting.findUnique({ where: { slug } });
-    if (!shop) return res.status(404).json({ error: 'Shop not found' });
-
-    const client = await prisma.client.findFirst({
-      where: { ownerUid: shop.uid, phone }
-    });
-
-    if (!client) return res.status(404).json({ error: 'Client not found' });
-
-    const appointments = await prisma.appointment.findMany({
-      where: { clientId: client.id },
-      orderBy: { date: 'desc' }
-    });
-
-    res.json({
-      client: {
-        name: client.name,
-        pendingDebt: (client as any).pendingDebt
-      },
-      appointments
-    });
-  } catch (err: any) {
-    res.status(500).json({ error: err.message });
-  }
-});
-
-router.post('/public/appointments/:id/cancel', async (req, res) => {
-  const { id } = req.params;
-  const { reason } = req.body;
-
-  try {
-    const appointment = await prisma.appointment.findUnique({
-      where: { id }
-    });
-
-    if (!appointment) return res.status(404).json({ error: 'Appointment not found' });
-    if (appointment.status === 'cancelled') return res.status(400).json({ error: 'Already cancelled' });
-
-    const now = new Date();
-    const appDate = new Date(appointment.date);
-    const diffInHours = (appDate.getTime() - now.getTime()) / (1000 * 60 * 60);
-
-    if (diffInHours < 24) {
-      return res.status(400).json({ 
-        error: 'Cancellations with less than 24h notice must be handled via WhatsApp.',
-        requiresWhatsApp: true
-      });
-    }
-
-    await prisma.appointment.update({
-      where: { id },
-      data: {
-        status: 'cancelled',
-        cancellationReason: reason,
-        cancellationDate: now
-      } as any
-    });
-
-    res.json({ success: true });
   } catch (err: any) {
     res.status(500).json({ error: err.message });
   }

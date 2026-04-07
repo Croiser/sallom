@@ -6,6 +6,10 @@ interface StaffManagementProps {
   staff: Staff[];
   newStaffName: string;
   setNewStaffName: (name: string) => void;
+  newStaffEmail: string;
+  setNewStaffEmail: (email: string) => void;
+  newStaffPassword: string;
+  setNewStaffPassword: (password: string) => void;
   plan: Plan | null;
   onAdd: () => void;
   onDelete: (id: string) => void;
@@ -16,6 +20,10 @@ export default function StaffManagement({
   staff,
   newStaffName,
   setNewStaffName,
+  newStaffEmail,
+  setNewStaffEmail,
+  newStaffPassword,
+  setNewStaffPassword,
   plan,
   onAdd,
   onDelete,
@@ -42,21 +50,52 @@ export default function StaffManagement({
         )}
       </div>
       <div className="p-8 space-y-8">
-        <div className="flex gap-4 p-4 bg-surface-50 rounded-[1.5rem] border border-surface-100">
-          <input
-            type="text"
-            value={newStaffName}
-            onChange={e => setNewStaffName(e.target.value)}
-            className="input-premium bg-white"
-            placeholder="Nome do novo profissional..."
-          />
-          <button
-            onClick={onAdd}
-            className="btn-primary shrink-0 group"
-          >
-            <Plus size={20} className="group-hover:rotate-90 transition-transform" />
-            Contratar
-          </button>
+        <div className="flex flex-col gap-4 p-4 bg-surface-50 rounded-[1.5rem] border border-surface-100">
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <div className="space-y-1">
+              <label className="text-[10px] font-black text-zinc-400 uppercase tracking-widest ml-1">Nome Completo</label>
+              <input
+                type="text"
+                value={newStaffName}
+                onChange={e => setNewStaffName(e.target.value)}
+                className="input-premium bg-white"
+                placeholder="Ex: João Silva"
+              />
+            </div>
+            <div className="space-y-1">
+              <label className="text-[10px] font-black text-zinc-400 uppercase tracking-widest ml-1">E-mail (Para Login)</label>
+              <input
+                type="email"
+                value={newStaffEmail}
+                onChange={e => setNewStaffEmail(e.target.value)}
+                className="input-premium bg-white"
+                placeholder="joao@email.com"
+              />
+            </div>
+            <div className="space-y-1">
+              <label className="text-[10px] font-black text-zinc-400 uppercase tracking-widest ml-1">Senha Inicial</label>
+              <input
+                type="password"
+                value={newStaffPassword}
+                onChange={e => setNewStaffPassword(e.target.value)}
+                className="input-premium bg-white"
+                placeholder="••••••••"
+              />
+            </div>
+          </div>
+          <div className="flex justify-between items-center bg-brand-50/50 p-4 rounded-2xl border border-brand-100/50">
+            <p className="text-[11px] text-brand-600 font-medium">
+              <span className="font-black uppercase tracking-widest mr-2">Dica:</span> 
+              Ao preencher e-mail e senha, um acesso será criado automaticamente para o profissional.
+            </p>
+            <button
+              onClick={onAdd}
+              className="btn-primary shrink-0 group"
+            >
+              <Plus size={20} className="group-hover:rotate-90 transition-transform" />
+              Adicionar Profissional
+            </button>
+          </div>
         </div>
 
         <div className="grid grid-cols-1 gap-5">

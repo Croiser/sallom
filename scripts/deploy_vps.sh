@@ -30,12 +30,12 @@ ssh -i "$VPS_KEY" -o StrictHostKeyChecking=no -o BatchMode=yes $VPS_USER@$VPS_IP
     
     # Build and restart containers
     echo "🏗️ Building and restarting containers..."
-    docker-compose down
-    docker-compose up -d --build
+    docker compose down
+    docker compose up -d --build
     
     # Prisma Migrations
     echo "🗄️ Running Prisma migrations..."
-    docker-compose exec -T app npx prisma migrate deploy
+    docker compose exec -T app npx prisma migrate deploy
     
     echo "✅ Remote processing complete!"
 EOF

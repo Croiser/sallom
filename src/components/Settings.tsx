@@ -25,7 +25,8 @@ import {
   Smartphone as SmartphoneIcon,
   Facebook as FacebookIcon,
   Music2 as MusicIcon,
-  Gift as GiftIcon
+  Gift as GiftIcon,
+  Users as UsersIcon
 } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import { useSubscription } from '../hooks/useSubscription';
@@ -63,6 +64,8 @@ export default function Settings({ onNavigate }: SettingsProps) {
   const [loading, setLoading] = useState(true);
 
   const [newStaffName, setNewStaffName] = useState('');
+  const [newStaffEmail, setNewStaffEmail] = useState('');
+  const [newStaffPassword, setNewStaffPassword] = useState('');
   const [newHolidayName, setNewHolidayName] = useState('');
   const [newHolidayDate, setNewHolidayDate] = useState('');
   const [isWhatsAppConnected, setIsWhatsAppConnected] = useState(false);
@@ -222,11 +225,15 @@ export default function Settings({ onNavigate }: SettingsProps) {
     try {
       await api.post('/staff', {
         name: newStaffName,
+        email: newStaffEmail,
+        password: newStaffPassword,
         active: true,
         commissionPercentage: 0,
         portfolio: []
       });
       setNewStaffName('');
+      setNewStaffEmail('');
+      setNewStaffPassword('');
       fetchData();
       alert('Profissional adicionado com sucesso!');
     } catch (err: any) {
@@ -338,6 +345,33 @@ export default function Settings({ onNavigate }: SettingsProps) {
                   </div>
                   <GlobeIcon className="absolute -bottom-4 -right-4 text-zinc-800/50" size={100} />
                 </div>
+
+                <div className="p-6 bg-rose-600 rounded-2xl text-white relative overflow-hidden">
+                  <div className="relative z-10">
+                    <p className="text-rose-100 text-sm mb-2">Seu Portal do Cliente (Sallon Mobile):</p>
+                    <div className="flex items-center gap-3 bg-white/10 p-3 rounded-xl border border-white/20 backdrop-blur-sm">
+                      <code className="text-white font-mono text-sm flex-1 truncate">
+                        sallon.dodile.com.br/portal/{settings?.slug || 'seu-salao'}
+                      </code>
+                      <button
+                        onClick={() => {
+                          const url = `https://sallon.dodile.com.br/portal/${settings?.slug || 'seu-salao'}`;
+                          navigator.clipboard.writeText(url);
+                          // We could add a local state for this specific copy button, but reusing 'copied' is fine for v1
+                          setCopied(true);
+                          setTimeout(() => setCopied(false), 2000);
+                        }}
+                        className="p-2 hover:bg-white/10 rounded-lg transition-colors text-white/70 hover:text-white"
+                      >
+                        {copied ? <CheckIcon size={18} className="text-emerald-300" /> : <CopyIcon size={18} />}
+                      </button>
+                    </div>
+                    <p className="mt-4 text-xs text-rose-100/70">
+                      O Portal onde suas clientes consultam históricos, débitos e agendam sem login.
+                    </p>
+                  </div>
+                  <UsersIcon className="absolute -bottom-4 -right-4 text-white/10" size={100} />
+                </div>
               </div>
             </section>
             <BusinessProfile settings={settings} setSettings={setSettings} />
@@ -372,6 +406,10 @@ export default function Settings({ onNavigate }: SettingsProps) {
               staff={staff} 
               newStaffName={newStaffName} 
               setNewStaffName={setNewStaffName} 
+              newStaffEmail={newStaffEmail}
+              setNewStaffEmail={setNewStaffEmail}
+              newStaffPassword={newStaffPassword}
+              setNewStaffPassword={setNewStaffPassword}
               plan={plan} 
               onAdd={handleAddStaff} 
               onDelete={(id) => handleDelete('staff', id)} 

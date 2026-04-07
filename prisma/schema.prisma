@@ -38,6 +38,7 @@ model User {
   whatsappMessages  WhatsappMessage[]
   wallet            Wallet?
   anamnesis         Anamnesis[]
+  sales             Sale[]
 
   @@map("users")
 }
@@ -50,6 +51,7 @@ model Service {
   price        Float
   owner        User          @relation(fields: [ownerUid], references: [id], onDelete: Cascade)
   appointments Appointment[]
+  saleItems    SaleItem[]
 
   @@map("services")
 }
@@ -65,6 +67,7 @@ model Staff {
   notes                String?       // New: For staff records
   portfolio            String?       // JSON array of URLs
   owner                User          @relation(fields: [ownerUid], references: [id], onDelete: Cascade)
+  sales                Sale[]
 
   @@map("staff")
 }
@@ -83,6 +86,7 @@ model Client {
   owner         User          @relation(fields: [ownerUid], references: [id], onDelete: Cascade)
   appointments  Appointment[]
   anamnesis     Anamnesis[]
+  sales         Sale[]
 
   @@map("clients")
 }
@@ -167,6 +171,7 @@ model Product {
   stock    Int
   category String
   owner    User   @relation(fields: [ownerUid], references: [id], onDelete: Cascade)
+  saleItems SaleItem[]
 
   @@map("products")
 }
@@ -268,4 +273,37 @@ model Anamnesis {
   owner        User     @relation(fields: [ownerUid], references: [id], onDelete: Cascade)
 
   @@map("anamnesis")
+}
+
+model Sale {
+  id            String     @id @default(uuid())
+  ownerUid      String
+  clientId      String?
+  staffId       String?
+  totalAmount   Float
+  paymentMethod String     // 'money' | 'card' | 'pix'
+  createdAt     DateTime   @default(now())
+  
+  owner         User       @relation(fields: [ownerUid], references: [id], onDelete: Cascade)
+  client        Client?    @relation(fields: [clientId], references: [id], onDelete: SetNull)
+  staff         Staff?     @relation(fields: [staffId], references: [id], onDelete: SetNull)
+  items         SaleItem[]
+
+  @@map("sales")
+}
+
+model SaleItem {
+  id        String   @id @default(uuid())
+  saleId    String
+  productId String?
+  serviceId String?
+  quantity  Int      @default(1)
+  unitPrice Float
+  totalPrice Float
+  
+  sale      Sale     @relation(fields: [saleId], references: [id], onDelete: Cascade)
+  product   Product? @relation(fields: [productId], references: [id], onDelete: SetNull)
+  service   Service? @relation(fields: [serviceId], references: [id], onDelete: SetNull)
+
+  @@map("sale_items")
 }

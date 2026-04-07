@@ -11,7 +11,8 @@ import {
   Gift as GiftIcon, 
   Star as StarIcon, 
   ArrowRight as ArrowIcon, 
-  Check as CheckIcon 
+  Check as CheckIcon,
+  DollarSign 
 } from 'lucide-react';
 import { Client, ShopSettings } from '../types';
 import { whatsappService } from '../services/whatsappService';
@@ -29,6 +30,7 @@ export default function Clients() {
   const [isRedeemModalOpen, setIsRedeemModalOpen] = useState(false);
   const [selectedClientForRedeem, setSelectedClientForRedeem] = useState<Client | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
+  const [filterDebtors, setFilterDebtors] = useState(false);
   const [selectedClientForAnamnesis, setSelectedClientForAnamnesis] = useState<Client | null>(null);
   const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' } | null>(null);
   
@@ -110,6 +112,21 @@ export default function Clients() {
       }
     }
   };
+  
+  const handlePayDebt = async (clientId: string) => {
+    if (confirm('Deseja marcar o débito deste cliente como pago?')) {
+      try {
+        await api.put(`/clients/${clientId}`, { pendingDebt: 0 });
+        fetchData();
+        setToast({ message: 'Débito liquidado com sucesso!', type: 'success' });
+        setTimeout(() => setToast(null), 3000);
+      } catch (err) {
+        console.error('Failed to pay debt:', err);
+        setToast({ message: 'Erro ao liquidar débito.', type: 'error' });
+        setTimeout(() => setToast(null), 3000);
+      }
+    }
+  };
 
   const handleRedeem = async () => {
     if (!selectedClientForRedeem || !settings?.fidelityConfig) return;
@@ -129,13 +146,42 @@ export default function Clients() {
     }
   };
 
-  const filteredClients = clients.filter(client => 
-    client.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    client.phone.includes(searchTerm)
-  );
+  const filteredClients = clients.filter(client => {
+    const matchesSearch = client.name.toLowerCase().includes(searchTerm.toLowerCase()) || 
+           client.phone?.includes(searchTerm) || 
+           client.email?.toLowerCase().includes(searchTerm.toLowerCase());
+    
+    const matchesDebtFilter = filterDebtors ? (client as any).pendingDebt > 0 : true;
+    
+    return matchesSearch && matchesDebtFilter;
+  });
+
+  const totalPendingDebt = clients.reduce((sum, client) => sum + ((client as any).pendingDebt || 0), 0);
+  const debtorsCount = clients.filter(c => (c as any).pendingDebt > 0).length;
 
   return (
     <div className="space-y-6">
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <div className="bg-white p-6 rounded-3xl border border-zinc-200 shadow-sm flex items-center justify-between">
+          <div>
+            <p className="text-sm text-zinc-500 font-medium">Total em Débitos</p>
+            <p className="text-3xl font-black text-rose-600">R$ {totalPendingDebt.toFixed(2)}</p>
+          </div>
+          <div className="w-12 h-12 bg-rose-50 rounded-2xl flex items-center justify-center text-rose-500">
+            <DollarSign size={24} />
+          </div>
+        </div>
+        <div className="bg-white p-6 rounded-3xl border border-zinc-200 shadow-sm flex items-center justify-between">
+          <div>
+            <p className="text-sm text-zinc-500 font-medium">Clientes Devedores</p>
+            <p className="text-3xl font-black text-zinc-900">{debtorsCount}</p>
+          </div>
+          <div className="w-12 h-12 bg-zinc-100 rounded-2xl flex items-center justify-center text-zinc-600">
+            <UsersIcon size={24} />
+          </div>
+        </div>
+      </div>
+
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div className="relative flex-1 max-w-md">
           <SearchIcon className="absolute left-4 top-1/2 -translate-y-1/2 text-zinc-400" size={18} />
@@ -147,13 +193,21 @@ export default function Clients() {
             className="w-full bg-white border border-zinc-200 pl-12 pr-4 py-3 rounded-2xl focus:outline-none focus:ring-2 focus:ring-amber-500/20 focus:border-amber-500 transition-all"
           />
         </div>
-        <button
-          onClick={() => setIsModalOpen(true)}
-          className="bg-amber-500 hover:bg-amber-400 text-zinc-900 font-bold px-6 py-3 rounded-2xl flex items-center justify-center gap-2 transition-all shadow-lg shadow-amber-500/20"
-        >
-          <PlusIcon size={20} />
-          Novo Cliente
-        </button>
+        <div className="flex items-center gap-2">
+          <button
+            onClick={() => setFilterDebtors(!filterDebtors)}
+            className={`px-4 py-3 rounded-2xl font-bold text-sm transition-all border ${filterDebtors ? 'bg-rose-500 text-white border-rose-500' : 'bg-white text-zinc-600 border-zinc-200'}`}
+          >
+            Apenas Devedores
+          </button>
+          <button
+            onClick={() => setIsModalOpen(true)}
+            className="bg-amber-500 hover:bg-amber-400 text-zinc-900 font-bold px-6 py-3 rounded-2xl flex items-center justify-center gap-2 transition-all shadow-lg shadow-amber-500/20"
+          >
+            <PlusIcon size={20} />
+            Novo Cliente
+          </button>
+        </div>
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
@@ -198,6 +252,22 @@ export default function Clients() {
                   <p className="text-lg font-bold text-zinc-900">{client.loyaltyVisits || 0}</p>
                 </div>
               </div>
+
+              {(client as any).pendingDebt > 0 && (
+                <div className="mt-4 p-4 bg-rose-50 rounded-2xl border border-rose-100 flex items-center justify-between">
+                  <div>
+                    <p className="text-[10px] font-black uppercase text-rose-500 tracking-wider">Débito No-Show</p>
+                    <p className="text-lg font-black text-rose-600">R$ {(client as any).pendingDebt.toFixed(2)}</p>
+                  </div>
+                  <button 
+                    onClick={() => handlePayDebt(client.id)}
+                    className="p-2 bg-white text-rose-500 rounded-xl border border-rose-200 hover:bg-rose-500 hover:text-white transition-all shadow-sm"
+                    title="Marcar como Pago"
+                  >
+                    <CheckIcon size={18} />
+                  </button>
+                </div>
+              )}
 
               <button
                 onClick={() => setSelectedClientForAnamnesis(client)}
