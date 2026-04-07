@@ -431,27 +431,38 @@ router.post('/asaas/webhook', async (req, res) => {
 // Settings
 router.get('/settings', authenticateToken, async (req: AuthRequest, res) => {
   const settings = await prisma.setting.findUnique({ where: { uid: req.user?.id } }) as any;
+  const user = await prisma.user.findUnique({ where: { id: req.user?.id }, select: { shopName: true } });
+  
+  const result = settings || { uid: req.user?.id };
   if (settings) {
-    settings.businessHours = settings.businessHours ? JSON.parse(settings.businessHours) : [];
-    settings.whatsappConfig = settings.whatsappConfig ? JSON.parse(settings.whatsappConfig) : null;
-    settings.holidays = settings.holidays ? JSON.parse(settings.holidays) : [];
-    settings.fidelityConfig = settings.fidelityConfig ? JSON.parse(settings.fidelityConfig) : null;
+    result.businessHours = settings.businessHours ? JSON.parse(settings.businessHours) : [];
+    result.whatsappConfig = settings.whatsappConfig ? JSON.parse(settings.whatsappConfig) : null;
+    result.holidays = settings.holidays ? JSON.parse(settings.holidays) : [];
+    result.fidelityConfig = settings.fidelityConfig ? JSON.parse(settings.fidelityConfig) : null;
   }
-  res.json(settings);
+  
+  // Add shopName from User model as 'name'
+  result.name = user?.shopName || '';
+  
+  res.json(result);
 });
 
 router.put('/settings', authenticateToken, async (req: AuthRequest, res) => {
   const { 
-    slug, address, addressNumber, neighborhood, city, state, zipCode, cnpj,
+    name, slug, address, addressNumber, neighborhood, city, state, zipCode, cnpj,
     description, phone, instagram, facebook, tiktok,
     businessHours, whatsappConfig, holidays, fidelityConfig 
   } = req.body;
 
-  // Update slug in User model as well to keep them in sync
-  if (slug) {
+  // Update shopName and slug in User model to keep them in sync
+  const userUpdateData: any = {};
+  if (name !== undefined) userUpdateData.shopName = name;
+  if (slug !== undefined) userUpdateData.slug = slug;
+
+  if (Object.keys(userUpdateData).length > 0) {
     await prisma.user.update({
       where: { id: req.user?.id },
-      data: { slug }
+      data: userUpdateData
     });
   }
 
@@ -1949,7 +1960,10 @@ router.get('/public/staff/:uid', async (req, res) => {
 });
 
 router.post('/public/appointments', async (req, res) => {
-  const { ownerUid, clientName, phone, serviceId, serviceName, staffId, staffName, date, price } = req.body;
+  let { ownerUid, clientName, phone, serviceId, serviceName, staffId, staffName, date, price } = req.body;
+  
+  // Sanitize phone (keep only digits)
+  phone = phone.replace(/\D/g, '');
   
   try {
     // Find or create client
@@ -2028,8 +2042,9 @@ router.post('/public/appointments/:id/cancel', async (req, res) => {
   }
 });
 
-router.get('/public/client-info/:slug/:phone', async (req, res) => {
-  const { slug, phone } = req.params;
+router.get('/public/client-portal/:slug/:phone', async (req, res) => {
+  let { slug, phone } = req.params;
+  phone = phone.replace(/\D/g, '');
   try {
     // Find the shop owner first
     let user = await prisma.user.findUnique({ where: { slug } });

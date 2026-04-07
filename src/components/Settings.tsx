@@ -374,7 +374,11 @@ export default function Settings({ onNavigate }: SettingsProps) {
                 </div>
               </div>
             </section>
-            <BusinessProfile settings={settings} setSettings={setSettings} />
+            <BusinessProfile 
+              settings={settings} 
+              setSettings={setSettings} 
+              onSave={handleSaveSettings}
+            />
           </div>
         );
 

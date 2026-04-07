@@ -94,8 +94,9 @@ export default function BookingPage({ slug }: BookingPageProps) {
   const checkClientDebt = async (phone: string) => {
     if (phone.replace(/\D/g, '').length < 10) return;
     try {
-      const data = await api.get(`/public/client-info/${slug}/${phone}`);
-      if (data && data.pendingDebt > 0) {
+      const sanitizedPhone = phone.replace(/\D/g, '');
+      const data = await api.get(`/public/client-portal/${slug}/${sanitizedPhone}`);
+      if (data && data.client && data.client.pendingDebt > 0) {
         setPendingDebt(data.pendingDebt);
         setClientNameFromDebt(data.name);
         // If we found a name, pre-fill it
@@ -115,11 +116,12 @@ export default function BookingPage({ slug }: BookingPageProps) {
 
     try {
       const appointmentDate = parse(selectedTime, 'HH:mm', selectedDate);
+      const sanitizedPhone = clientInfo.phone.replace(/\D/g, '');
       
       const response = await api.post('/public/appointments', {
         ownerUid: shop.uid,
         clientName: clientInfo.name,
-        phone: clientInfo.phone,
+        phone: sanitizedPhone,
         serviceId: selectedService.id,
         serviceName: selectedService.name,
         staffId: selectedStaff.id,

@@ -14,9 +14,10 @@ import { ShopSettings } from '../../types';
 interface BusinessProfileProps {
   settings: ShopSettings | null;
   setSettings: React.Dispatch<React.SetStateAction<ShopSettings | null>>;
+  onSave: (e?: React.FormEvent) => Promise<void>;
 }
 
-export default function BusinessProfile({ settings, setSettings }: BusinessProfileProps) {
+export default function BusinessProfile({ settings, setSettings, onSave }: BusinessProfileProps) {
   return (
     <section className="bg-white rounded-[2rem] border border-surface-200 overflow-hidden shadow-premium">
       <div className="p-8 border-b border-surface-100 bg-surface-50/50">
@@ -123,6 +124,14 @@ export default function BusinessProfile({ settings, setSettings }: BusinessProfi
             </div>
           </div>
         </div>
+      </div>
+      <div className="p-8 bg-surface-50/50 border-t border-surface-100 flex justify-end">
+        <button
+          onClick={() => onSave()}
+          className="flex items-center gap-2 bg-brand-500 text-white px-8 py-4 rounded-2xl font-black shadow-lg shadow-brand-500/20 hover:bg-brand-600 transition-all active:scale-95"
+        >
+          Salvar Alterações
+        </button>
       </div>
     </section>
   );

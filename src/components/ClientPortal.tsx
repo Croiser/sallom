@@ -37,7 +37,8 @@ export default function ClientPortal({ slug }: ClientPortalProps) {
     setLoading(true);
     setError(null);
     try {
-      const result = await api.get(`/public/client-portal/${slug}/${phone}`);
+      const sanitizedPhone = phone.replace(/\D/g, '');
+      const result = await api.get(`/public/client-portal/${slug}/${sanitizedPhone}`);
       setData(result);
       setIsLoggedIn(true);
     } catch (err: any) {
