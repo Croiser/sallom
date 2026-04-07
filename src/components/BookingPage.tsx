@@ -97,10 +97,10 @@ export default function BookingPage({ slug }: BookingPageProps) {
       const sanitizedPhone = phone.replace(/\D/g, '');
       const data = await api.get(`/public/client-portal/${slug}/${sanitizedPhone}`);
       if (data && data.client && data.client.pendingDebt > 0) {
-        setPendingDebt(data.pendingDebt);
-        setClientNameFromDebt(data.name);
+        setPendingDebt(data.client.pendingDebt);
+        setClientNameFromDebt(data.client.name);
         // If we found a name, pre-fill it
-        setClientInfo(prev => ({ ...prev, name: data.name }));
+        setClientInfo(prev => ({ ...prev, name: data.client.name }));
       } else {
         setPendingDebt(0);
       }
