@@ -26,7 +26,8 @@ import {
   Facebook as FacebookIcon,
   Music2 as MusicIcon,
   Gift as GiftIcon,
-  Users as UsersIcon
+  Users as UsersIcon,
+  ShieldAlert
 } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import { useSubscription } from '../hooks/useSubscription';
@@ -419,6 +420,49 @@ export default function Settings({ onNavigate }: SettingsProps) {
               onDelete={(id) => handleDelete('staff', id)} 
               onUpdate={handleUpdateStaff}
             />
+
+            <section className="bg-white rounded-[2rem] border border-surface-200 overflow-hidden shadow-premium">
+              <div className="p-8 border-b border-surface-100 bg-surface-50/50">
+                <div className="flex items-center gap-4">
+                  <div className="w-12 h-12 bg-zinc-950 rounded-2xl flex items-center justify-center shadow-lg shadow-zinc-950/20">
+                    <ShieldAlert className="text-white" size={24} />
+                  </div>
+                  <div>
+                    <h2 className="text-xl font-black text-zinc-950 tracking-tight">Permissões de Segurança</h2>
+                    <p className="text-zinc-500 text-sm font-medium">Controle o que sua equipe pode acessar</p>
+                  </div>
+                </div>
+              </div>
+
+              <div className="p-8 space-y-6">
+                <div className="flex items-center justify-between p-6 bg-surface-50 rounded-3xl border border-surface-100 hover:border-brand-200 transition-all group">
+                  <div className="space-y-1">
+                    <h3 className="font-bold text-zinc-950 group-hover:text-brand-600 transition-colors">Visibilidade Global da Agenda</h3>
+                    <p className="text-sm text-zinc-500">Permitir que todos os profissionais vejam os agendamentos de toda a equipe</p>
+                  </div>
+                  <label className="relative inline-flex items-center cursor-pointer">
+                    <input 
+                      type="checkbox" 
+                      className="sr-only peer"
+                      checked={settings?.allowProfessionalViewAllAgendas || false}
+                      onChange={(e) => {
+                        setSettings(prev => prev ? { ...prev, allowProfessionalViewAllAgendas: e.target.checked } : null);
+                      }}
+                    />
+                    <div className="w-14 h-8 bg-zinc-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full rtl:peer-checked:after:-translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[4px] after:start-[4px] after:bg-white after:border-zinc-300 after:border after:rounded-full after:h-6 after:w-6 after:transition-all peer-checked:bg-zinc-950"></div>
+                  </label>
+                </div>
+                
+                <div className="flex justify-end pt-4">
+                  <button
+                    onClick={() => handleSaveSettings()}
+                    className="bg-brand-500 text-white px-8 py-3 rounded-xl font-bold hover:bg-brand-600 transition-colors shadow-lg shadow-brand-500/20"
+                  >
+                    Salvar Permissões
+                  </button>
+                </div>
+              </div>
+            </section>
           </div>
         );
 

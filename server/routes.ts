@@ -439,6 +439,7 @@ router.get('/settings', authenticateToken, async (req: AuthRequest, res) => {
     result.whatsappConfig = settings.whatsappConfig ? JSON.parse(settings.whatsappConfig) : null;
     result.holidays = settings.holidays ? JSON.parse(settings.holidays) : [];
     result.fidelityConfig = settings.fidelityConfig ? JSON.parse(settings.fidelityConfig) : null;
+    result.allowProfessionalViewAllAgendas = settings.allowProfessionalViewAllAgendas;
   }
   
   // Add shopName from User model as 'name'
@@ -451,7 +452,8 @@ router.put('/settings', authenticateToken, async (req: AuthRequest, res) => {
   const { 
     name, slug, address, addressNumber, neighborhood, city, state, zipCode, cnpj,
     description, phone, instagram, facebook, tiktok,
-    businessHours, whatsappConfig, holidays, fidelityConfig 
+    businessHours, whatsappConfig, holidays, fidelityConfig,
+    allowProfessionalViewAllAgendas 
   } = req.body;
 
   // Update shopName and slug in User model to keep them in sync
@@ -474,7 +476,8 @@ router.put('/settings', authenticateToken, async (req: AuthRequest, res) => {
       businessHours: JSON.stringify(businessHours),
       whatsappConfig: JSON.stringify(whatsappConfig),
       holidays: JSON.stringify(holidays),
-      fidelityConfig: JSON.stringify(fidelityConfig)
+      fidelityConfig: JSON.stringify(fidelityConfig),
+      allowProfessionalViewAllAgendas
     },
     create: {
       uid: req.user?.id as string,
@@ -483,7 +486,8 @@ router.put('/settings', authenticateToken, async (req: AuthRequest, res) => {
       businessHours: JSON.stringify(businessHours),
       whatsappConfig: JSON.stringify(whatsappConfig),
       holidays: JSON.stringify(holidays),
-      fidelityConfig: JSON.stringify(fidelityConfig)
+      fidelityConfig: JSON.stringify(fidelityConfig),
+      allowProfessionalViewAllAgendas
     }
   });
   res.json({ success: true });
@@ -1092,15 +1096,18 @@ router.get('/appointments', authenticateToken, async (req: AuthRequest, res) => 
 
     let where: any = { ownerUid: user.id };
     
-    // If Professional, filter only their appointments
-    if (role === 'professional' && (user as any).staffId) {
-      where = { staffId: (user as any).staffId };
-    } else if (role === 'professional' && (user as any).ownerId) {
-      // If it's a professional but ownerId exists (sub-account)
-      where = { 
-        ownerUid: (user as any).ownerId,
-        staffId: (user as any).staffId 
-      };
+    // Check if it's a professional and their visibility permissions
+    if (role === 'professional' && ((user as any).staffId || (user as any).ownerId)) {
+      const ownerUid = (user as any).ownerId || user.id;
+      const settings = await prisma.setting.findUnique({ where: { uid: ownerUid } });
+      
+      if (settings?.allowProfessionalViewAllAgendas) {
+        // If owner allows viewing all, only filter by ownerUid
+        where = { ownerUid };
+      } else {
+        // Default: filter by staffId only
+        where = { staffId: (user as any).staffId };
+      }
     }
 
     const appointments = await prisma.appointment.findMany({

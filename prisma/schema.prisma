@@ -144,6 +144,7 @@ model Setting {
   whatsappConfig String? // JSON string
   holidays       String? // JSON string
   fidelityConfig String? // JSON string
+  allowProfessionalViewAllAgendas Boolean @default(false)
   user           User    @relation(fields: [uid], references: [id], onDelete: Cascade)
 
   @@map("settings")

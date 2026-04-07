@@ -570,7 +570,7 @@ export default function BookingPage({ slug }: BookingPageProps) {
                       </div>
                       <div className="space-y-2 relative z-10">
                         <p className="text-sm text-zinc-300 leading-relaxed">
-                          Olá <span className="text-white font-bold">{clientNameFromDebt}</span>, identificamos uma taxa de <span className="text-rose-500 font-bold">R$ {pendingDebt.toFixed(2)}</span> pendente de um agendamento anterior (<span className="italic">No-Show/Cancelamento Tardio</span>).
+                          Olá <span className="text-white font-bold">{clientNameFromDebt}</span>, identificamos uma taxa de <span className="text-rose-500 font-bold">R$ {(pendingDebt || 0).toFixed(2)}</span> pendente de um agendamento anterior (<span className="italic">No-Show/Cancelamento Tardio</span>).
                         </p>
                         <div className="bg-rose-500/20 px-4 py-2 rounded-xl inline-block">
                            <p className="text-[10px] text-rose-500 font-black uppercase tracking-widest">
@@ -606,12 +606,12 @@ export default function BookingPage({ slug }: BookingPageProps) {
                     {pendingDebt > 0 && (
                       <div className="flex justify-between text-sm text-rose-500 font-bold">
                         <span>Taxa de Pendência:</span>
-                        <span>R$ {pendingDebt.toFixed(2)}</span>
+                        <span>R$ {(pendingDebt || 0).toFixed(2)}</span>
                       </div>
                     )}
                     <div className="pt-3 border-t border-zinc-800 flex justify-between items-center">
                       <span className="text-zinc-500">Total a Pagar:</span>
-                      <span className="text-2xl font-bold text-rose-500">R$ {( (selectedService?.price || 0) + pendingDebt).toFixed(2)}</span>
+                      <span className="text-2xl font-bold text-rose-500">R$ {((selectedService?.price || 0) + (pendingDebt || 0)).toFixed(2)}</span>
                     </div>
                   </div>
                 </div>

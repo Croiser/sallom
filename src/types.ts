@@ -111,6 +111,7 @@ export interface ShopSettings {
   };
   holidays?: Holiday[];
   fidelityConfig?: FidelityConfig;
+  allowProfessionalViewAllAgendas?: boolean;
 }
 
 export interface FidelityConfig {
