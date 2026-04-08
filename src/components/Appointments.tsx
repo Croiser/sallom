@@ -13,13 +13,15 @@ import {
   LayoutList,
   ChevronLeft,
   ChevronRight,
-  AlertCircle
+  AlertCircle,
+  Repeat
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
-import { Appointment, Client, Service, Staff, ShopSettings } from '../types';
+import { Appointment, Client, Service, Staff, ShopSettings, ServiceCombo } from '../types';
 import { whatsappService } from '../services/whatsappService';
 import { useAuth } from '../contexts/AuthContext';
 import { api } from '../services/api';
+import RecurringAppointmentModal from './RecurringAppointmentModal';
 
 export default function Appointments() {
   const { user } = useAuth();
@@ -27,8 +29,10 @@ export default function Appointments() {
   const [clients, setClients] = useState<Client[]>([]);
   const [services, setServices] = useState<Service[]>([]);
   const [staff, setStaff] = useState<Staff[]>([]);
+  const [combos, setCombos] = useState<ServiceCombo[]>([]);
   const [settings, setSettings] = useState<ShopSettings | null>(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [isRecurringOpen, setIsRecurringOpen] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState<string>('all');
   const [staffFilter, setStaffFilter] = useState<string>('all');
@@ -48,18 +52,20 @@ export default function Appointments() {
 
   const fetchData = async () => {
     try {
-      const [appsData, clientsData, servicesData, staffData, settingsData] = await Promise.all([
+      const [appsData, clientsData, servicesData, staffData, settingsData, combosData] = await Promise.all([
         api.get('/appointments'),
         api.get('/clients'),
         api.get('/services'),
         api.get('/staff'),
-        api.get('/settings')
+        api.get('/settings'),
+        api.get('/combos')
       ]);
       setAppointments(appsData);
       setClients(clientsData);
       setServices(servicesData);
       setStaff(staffData);
       setSettings(settingsData);
+      setCombos(combosData || []);
     } catch (err) {
       console.error('Failed to fetch data:', err);
     }
@@ -500,6 +506,15 @@ export default function Appointments() {
           <Plus size={20} />
           Novo Agendamento
         </button>
+        <button
+          id="recurring-open-btn"
+          onClick={() => setIsRecurringOpen(true)}
+          className="bg-zinc-900 hover:bg-zinc-700 text-white font-bold px-5 py-3 rounded-2xl flex items-center justify-center gap-2 transition-all shadow-lg shadow-zinc-900/20"
+          title="Agendamento Recorrente"
+        >
+          <Repeat size={18} />
+          Recorrente
+        </button>
       </div>
 
       {viewMode === 'list' ? (
@@ -826,6 +841,20 @@ export default function Appointments() {
           </div>
         </div>
       )}
+      {/* Recurring Appointment Modal */}
+      <RecurringAppointmentModal
+        isOpen={isRecurringOpen}
+        onClose={() => setIsRecurringOpen(false)}
+        clients={clients}
+        services={services}
+        staff={staff}
+        combos={combos}
+        onSuccess={(msg) => {
+          setToast({ message: msg, type: 'success' });
+          setTimeout(() => setToast(null), 5000);
+          fetchData();
+        }}
+      />
     </div>
   );
 }

@@ -10,6 +10,8 @@ import { authenticateToken, AuthRequest } from './middleware.js';
 import { asaas } from './asaas.js';
 import { emailService } from './email.js';
 import { GoogleGenAI } from "@google/genai";
+import { appointmentGuard } from './middleware/appointmentGuard.js';
+import { validateRecurrenceSeries, calculateComboDuration } from './services/recurrenceService.js';
 
 const router = express.Router();
 
@@ -2369,4 +2371,345 @@ router.post('/ai/generate-assets', async (req, res) => {
     }
 });
 
+// ===========================================================
+// --- COMBOS (Service Packages) ---
+// ===========================================================
+
+router.get('/combos', authenticateToken, async (req: AuthRequest, res) => {
+  try {
+    const combos = await (prisma as any).serviceCombo.findMany({
+      where: { ownerUid: req.user?.id },
+      include: {
+        items: {
+          include: { service: true },
+          orderBy: { order: 'asc' }
+        }
+      },
+      orderBy: { createdAt: 'desc' }
+    });
+
+    // Attach computed totalDurationMin to each combo
+    const result = combos.map((combo: any) => ({
+      ...combo,
+      totalDurationMin: combo.items.reduce(
+        (acc: number, item: any) => acc + item.service.duration, 0
+      )
+    }));
+
+    res.json(result);
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+router.post('/combos', authenticateToken, async (req: AuthRequest, res) => {
+  try {
+    const { name, description, price, services } = req.body;
+    // services = [{ serviceId: string, order: number }]
+
+    if (!services || services.length === 0) {
+      return res.status(400).json({ error: 'Um combo precisa ter ao menos 1 serviço' });
+    }
+
+    const combo = await (prisma as any).serviceCombo.create({
+      data: {
+        name,
+        description,
+        price: price ? Number(price) : null,
+        ownerUid: req.user?.id as string,
+        items: {
+          create: services.map((s: any) => ({
+            serviceId: s.serviceId,
+            order: s.order
+          }))
+        }
+      },
+      include: {
+        items: {
+          include: { service: true },
+          orderBy: { order: 'asc' }
+        }
+      }
+    });
+
+    const totalDurationMin = combo.items.reduce(
+      (acc: number, item: any) => acc + item.service.duration, 0
+    );
+
+    res.status(201).json({ ...combo, totalDurationMin });
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+router.put('/combos/:id', authenticateToken, async (req: AuthRequest, res) => {
+  try {
+    const { name, description, price, services } = req.body;
+    const comboId = req.params.id;
+
+    // Verify ownership
+    const existing = await (prisma as any).serviceCombo.findFirst({
+      where: { id: comboId, ownerUid: req.user?.id }
+    });
+    if (!existing) return res.status(404).json({ error: 'Combo não encontrado' });
+
+    // Delete old items and recreate
+    await (prisma as any).comboItem.deleteMany({ where: { comboId } });
+
+    const combo = await (prisma as any).serviceCombo.update({
+      where: { id: comboId },
+      data: {
+        name,
+        description,
+        price: price ? Number(price) : null,
+        items: {
+          create: services.map((s: any) => ({
+            serviceId: s.serviceId,
+            order: s.order
+          }))
+        }
+      },
+      include: {
+        items: {
+          include: { service: true },
+          orderBy: { order: 'asc' }
+        }
+      }
+    });
+
+    const totalDurationMin = combo.items.reduce(
+      (acc: number, item: any) => acc + item.service.duration, 0
+    );
+
+    res.json({ ...combo, totalDurationMin });
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+router.delete('/combos/:id', authenticateToken, async (req: AuthRequest, res) => {
+  try {
+    await (prisma as any).serviceCombo.deleteMany({
+      where: { id: req.params.id, ownerUid: req.user?.id }
+    });
+    res.json({ success: true });
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// ===========================================================
+// --- RECURRING APPOINTMENTS ---
+// ===========================================================
+
+/**
+ * POST /appointments/recurring/validate
+ * Batch-validates a recurring series without saving anything.
+ * Returns a list of conflict dates to display in the conflict modal.
+ */
+router.post('/appointments/recurring/validate', authenticateToken, async (req: AuthRequest, res) => {
+  try {
+    const {
+      staffId,
+      serviceId,
+      comboId,
+      startTime,        // "HH:MM"
+      dayOfWeek,        // 0-6
+      frequency,        // "weekly" | "biweekly"
+      seriesStartDate,  // "YYYY-MM-DD"
+      seriesEndDate     // "YYYY-MM-DD"
+    } = req.body;
+
+    const ownerUid = req.user?.id as string;
+
+    // Determine duration: from combo or from single service
+    let durationMin = 0;
+    if (comboId) {
+      durationMin = await calculateComboDuration(comboId, prisma as any);
+    } else if (serviceId) {
+      const svc = await prisma.service.findFirst({ where: { id: serviceId, ownerUid } });
+      durationMin = svc?.duration || 60;
+    } else {
+      return res.status(400).json({ error: 'serviceId ou comboId é obrigatório' });
+    }
+
+    const result = await validateRecurrenceSeries(
+      ownerUid,
+      staffId,
+      startTime,
+      durationMin,
+      Number(dayOfWeek),
+      new Date(seriesStartDate),
+      new Date(seriesEndDate),
+      frequency || 'weekly',
+      prisma as any
+    );
+
+    res.json(result);
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+/**
+ * POST /appointments/recurring
+ * Persists a validated recurring series.
+ * Expects resolvedDates[] with manual overrides for conflict dates.
+ */
+router.post('/appointments/recurring', authenticateToken, async (req: AuthRequest, res) => {
+  try {
+    const {
+      staffId,
+      staffName,
+      clientId,
+      clientName,
+      clientPhone,
+      serviceId,
+      serviceName,
+      comboId,
+      price,
+      frequency,
+      dayOfWeek,
+      seriesStartDate,
+      seriesEndDate,
+      resolvedDates // [{ date: 'YYYY-MM-DD', startTime: 'HH:MM', skipped?: boolean }]
+    } = req.body;
+
+    const ownerUid = req.user?.id as string;
+
+    // Determine duration
+    let durationMin = 0;
+    if (comboId) {
+      durationMin = await calculateComboDuration(comboId, prisma as any);
+    } else if (serviceId) {
+      const svc = await prisma.service.findFirst({ where: { id: serviceId, ownerUid } });
+      durationMin = svc?.duration || 60;
+    }
+
+    // Create the parent RecurrenceGroup
+    const group = await (prisma as any).recurrenceGroup.create({
+      data: {
+        ownerUid,
+        staffId,
+        frequency: frequency || 'weekly',
+        dayOfWeek: Number(dayOfWeek),
+        startDate: new Date(seriesStartDate),
+        endDate: new Date(seriesEndDate),
+        startTime: resolvedDates?.[0]?.startTime || '09:00',
+        serviceId: serviceId || null,
+        comboId: comboId || null,
+      }
+    });
+
+    // Create individual appointments (skipping 'skipped' dates)
+    const appointmentsToCreate = (resolvedDates || [])
+      .filter((d: any) => !d.skipped)
+      .map((d: any) => {
+        const [h, m] = (d.startTime || '09:00').split(':').map(Number);
+        const startDt = new Date(`${d.date}T00:00:00`);
+        startDt.setHours(h, m, 0, 0);
+        const endDt = new Date(startDt.getTime() + durationMin * 60_000);
+
+        return {
+          ownerUid,
+          clientId: clientId || 'guest',
+          clientName,
+          phone: clientPhone || '',
+          serviceId: serviceId || '',
+          serviceName: serviceName || (comboId ? 'Combo' : 'Serviço'),
+          barberId: staffId || ownerUid,
+          barberName: staffName || '',
+          staffId: staffId || null,
+          staffName: staffName || null,
+          date: startDt,
+          startTime: startDt,
+          endTime: endDt,
+          totalDurationMin: durationMin,
+          recurrenceGroupId: group.id,
+          comboId: comboId || null,
+          price: Number(price) || 0,
+          status: 'scheduled'
+        };
+      });
+
+    if (appointmentsToCreate.length === 0) {
+      return res.status(400).json({ error: 'Nenhuma data válida para criar agendamentos' });
+    }
+
+    await (prisma.appointment as any).createMany({ data: appointmentsToCreate });
+
+    res.status(201).json({
+      success: true,
+      recurrenceGroupId: group.id,
+      totalCreated: appointmentsToCreate.length
+    });
+  } catch (err: any) {
+    console.error('Error creating recurring appointments:', err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+/**
+ * DELETE /appointments/recurring/:groupId
+ * Cancels all future appointments for a recurring group.
+ * Pass ?cancelAll=true to cancel the entire series (including past).
+ */
+router.delete('/appointments/recurring/:groupId', authenticateToken, async (req: AuthRequest, res) => {
+  try {
+    const { groupId } = req.params;
+    const cancelAll = req.query.cancelAll === 'true';
+    const ownerUid = req.user?.id as string;
+
+    // Verify group ownership
+    const group = await (prisma as any).recurrenceGroup.findFirst({
+      where: { id: groupId, ownerUid }
+    });
+    if (!group) return res.status(404).json({ error: 'Série não encontrada' });
+
+    const dateFilter = cancelAll ? {} : { startTime: { gte: new Date() } };
+
+    const updated = await (prisma.appointment as any).updateMany({
+      where: {
+        recurrenceGroupId: groupId,
+        ownerUid,
+        status: { not: 'cancelled' },
+        ...dateFilter
+      },
+      data: { status: 'cancelled' }
+    });
+
+    // If cancelling all, mark the group as cancelled too
+    if (cancelAll) {
+      await (prisma as any).recurrenceGroup.update({
+        where: { id: groupId },
+        data: { status: 'cancelled' }
+      });
+    }
+
+    res.json({ success: true, cancelledCount: updated.count });
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+/**
+ * GET /appointments/recurring/:groupId
+ * Returns all appointments for a recurrence group.
+ */
+router.get('/appointments/recurring/:groupId', authenticateToken, async (req: AuthRequest, res) => {
+  try {
+    const appointments = await (prisma.appointment as any).findMany({
+      where: {
+        recurrenceGroupId: req.params.groupId,
+        ownerUid: req.user?.id
+      },
+      orderBy: { startTime: 'asc' }
+    });
+    res.json(appointments);
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
 export default router;
+

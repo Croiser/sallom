@@ -31,7 +31,7 @@ import {
 } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import { useSubscription } from '../hooks/useSubscription';
-import { ShopSettings, Staff, Holiday } from '../types';
+import { ShopSettings, Staff, Holiday, ServiceCombo } from '../types';
 import { api } from '../services/api';
 import BusinessProfile from './settings/BusinessProfile';
 import BusinessHours from './settings/BusinessHours';
@@ -39,6 +39,8 @@ import StaffManagement from './settings/StaffManagement';
 import HolidayManagement from './settings/HolidayManagement';
 import FidelityProgram from './settings/FidelityProgram';
 import WhatsAppIntegration from './settings/WhatsAppIntegration';
+import ComboManager from './settings/ComboManager';
+
 
 interface SettingsProps {
   onNavigate?: (tab: string, data?: { planId?: string, cycle?: 'monthly' | 'yearly' }) => void;
@@ -61,6 +63,7 @@ export default function Settings({ onNavigate }: SettingsProps) {
   const [activeTab, setActiveTab] = useState<SettingsTab>('perfil');
   const [settings, setSettings] = useState<ShopSettings | null>(null);
   const [staff, setStaff] = useState<Staff[]>([]);
+  const [services, setServices] = useState<any[]>([]);
   const [holidays, setHolidays] = useState<Holiday[]>([]);
   const [loading, setLoading] = useState(true);
 
@@ -88,16 +91,16 @@ export default function Settings({ onNavigate }: SettingsProps) {
 
   const fetchData = async () => {
     try {
-      const [settingsData, staffData] = await Promise.all([
+      const [settingsData, staffData, servicesData] = await Promise.all([
         api.get('/settings'),
-        api.get('/staff')
+        api.get('/staff'),
+        api.get('/services')
       ]);
       
       if (settingsData) {
         setSettings(settingsData);
         setHolidays(settingsData.holidays || []);
       } else {
-        // Default settings if none exist
         setSettings({
           name: '',
           slug: '',
@@ -110,6 +113,7 @@ export default function Settings({ onNavigate }: SettingsProps) {
         } as ShopSettings);
       }
       setStaff(staffData);
+      setServices(servicesData || []);
     } catch (err) {
       console.error('Failed to fetch settings:', err);
     } finally {
@@ -401,8 +405,10 @@ export default function Settings({ onNavigate }: SettingsProps) {
               onAdd={handleAddHoliday} 
               onDelete={(id) => handleDelete('holidays', id)}
             />
+            <ComboManager services={services} onRefresh={fetchData} />
           </div>
         );
+
 
       case 'equipe':
         return (

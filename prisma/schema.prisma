@@ -52,6 +52,7 @@ model Service {
   owner        User          @relation(fields: [ownerUid], references: [id], onDelete: Cascade)
   appointments Appointment[]
   saleItems    SaleItem[]
+  comboItems   ComboItem[]
 
   @@map("services")
 }
@@ -68,6 +69,7 @@ model Staff {
   portfolio            String?       // JSON array of URLs
   owner                User          @relation(fields: [ownerUid], references: [id], onDelete: Cascade)
   sales                Sale[]
+  appointments         Appointment[]
 
   @@map("staff")
 }
@@ -92,35 +94,97 @@ model Client {
 }
 
 model Appointment {
-  id          String   @id @default(uuid())
-  ownerUid    String
-  clientId    String
-  clientName  String
-  phone       String?
-  serviceId   String
-  serviceName String
-  barberId    String
-  barberName  String
-  staffId     String?
-  staffName   String?
-  date        DateTime
-  status      String   @default("scheduled")
-  price       Float
-  isFitIn       Boolean   @default(false)
-  createdAt     DateTime  @default(now())
-  
-  // New Fields
+  id               String    @id @default(uuid())
+  ownerUid         String
+  clientId         String
+  clientName       String
+  phone            String?
+  serviceId        String
+  serviceName      String
+  barberId         String
+  barberName       String
+  staffId          String?
+  staffName        String?
+  date             DateTime
+  // Scheduling precision fields
+  startTime        DateTime? // Exact start datetime (for overlap checks)
+  endTime          DateTime? // Exact end datetime = startTime + totalDurationMin
+  totalDurationMin Int?      // Total duration in minutes (sum of combo items or single service)
+  // Recurrence & Combo
+  recurrenceGroupId String?
+  comboId          String?
+  status           String    @default("scheduled")
+  price            Float
+  isFitIn          Boolean   @default(false)
+  createdAt        DateTime  @default(now())
+
+  // Cancellation & Workflow fields
   cancellationReason String?
   cancellationDate   DateTime?
   noShow             Boolean   @default(false)
-  checkInAt          DateTime? // New: Professional workflow
-  finishedAt         DateTime? // New: Professional workflow
+  checkInAt          DateTime?
+  finishedAt         DateTime?
 
-  owner   User    @relation(fields: [ownerUid], references: [id], onDelete: Cascade)
-  client  Client  @relation(fields: [clientId], references: [id], onDelete: Cascade)
-  service Service @relation(fields: [serviceId], references: [id], onDelete: Cascade)
+  owner           User             @relation(fields: [ownerUid], references: [id], onDelete: Cascade)
+  client          Client           @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  service         Service          @relation(fields: [serviceId], references: [id], onDelete: Cascade)
+  staff           Staff?           @relation(fields: [staffId], references: [id], onDelete: SetNull)
+  recurrenceGroup RecurrenceGroup? @relation(fields: [recurrenceGroupId], references: [id], onDelete: SetNull)
+  combo           ServiceCombo?    @relation(fields: [comboId], references: [id], onDelete: SetNull)
 
+  @@index([staffId, startTime, endTime]) // Critical for overlap queries
+  @@index([ownerUid, startTime])
+  @@index([recurrenceGroupId])
   @@map("appointments")
+}
+
+// --- Recurrence ---
+
+model RecurrenceGroup {
+  id           String        @id @default(uuid())
+  ownerUid     String
+  staffId      String?
+  frequency    String        // "weekly" | "biweekly" | "monthly"
+  dayOfWeek    Int           // 0=Sun, 1=Mon, ... 6=Sat
+  startDate    DateTime
+  endDate      DateTime
+  startTime    String        // "10:00" — time of day for the series
+  serviceId    String?
+  comboId      String?
+  status       String        @default("active") // "active" | "cancelled"
+  createdAt    DateTime      @default(now())
+  appointments Appointment[]
+
+  @@index([ownerUid])
+  @@index([staffId])
+  @@map("recurrence_groups")
+}
+
+// --- Combos ---
+
+model ServiceCombo {
+  id           String        @id @default(uuid())
+  ownerUid     String
+  name         String
+  description  String?
+  price        Float?
+  createdAt    DateTime      @default(now())
+  items        ComboItem[]
+  appointments Appointment[]
+
+  @@index([ownerUid])
+  @@map("service_combos")
+}
+
+model ComboItem {
+  id        String       @id @default(uuid())
+  comboId   String
+  serviceId String
+  order     Int          // Execution order within combo
+  combo     ServiceCombo @relation(fields: [comboId], references: [id], onDelete: Cascade)
+  service   Service      @relation(fields: [serviceId], references: [id], onDelete: Cascade)
+
+  @@map("combo_items")
 }
 
 model Setting {

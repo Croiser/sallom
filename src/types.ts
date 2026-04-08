@@ -49,14 +49,89 @@ export interface Appointment {
   price: number;
   ownerUid: string;
   isFitIn?: boolean;
-  
-  // New: Professional & Cancellation Metadata
+
+  // Scheduling precision
+  startTime?: string;          // ISO datetime — exact slot start
+  endTime?: string;            // ISO datetime — exact slot end
+  totalDurationMin?: number;   // Total duration in minutes
+
+  // Recurrence & Combo
+  recurrenceGroupId?: string;
+  comboId?: string;
+
+  // Cancellation & Workflow Metadata
   noShow?: boolean;
   cancellationReason?: string;
   cancellationDate?: string;
   checkInAt?: string;
   finishedAt?: string;
 }
+
+// --- Combos ---
+
+export interface ComboItem {
+  id: string;
+  comboId: string;
+  serviceId: string;
+  order: number;
+  service: Service;
+}
+
+export interface ServiceCombo {
+  id: string;
+  ownerUid: string;
+  name: string;
+  description?: string;
+  price?: number;
+  createdAt: string;
+  items: ComboItem[];
+  totalDurationMin: number; // Computed by backend
+}
+
+// --- Recurrence ---
+
+export interface RecurrenceGroup {
+  id: string;
+  ownerUid: string;
+  staffId?: string;
+  frequency: 'weekly' | 'biweekly';
+  dayOfWeek: number; // 0=Sun ... 6=Sat
+  startDate: string;
+  endDate: string;
+  startTime: string; // "HH:MM"
+  serviceId?: string;
+  comboId?: string;
+  status: 'active' | 'cancelled';
+  createdAt: string;
+}
+
+export interface RecurrenceConflict {
+  originalDate: string;       // "YYYY-MM-DD"
+  reason: 'holiday' | 'closed_day' | 'overlap';
+  holidayName?: string;
+  overlappingAppointmentId?: string;
+  suggestedDate?: string | null; // Filled by user in the modal
+  suggestedStartTime?: string | null;
+  skipped?: boolean;
+}
+
+export interface RecurrenceValidationResult {
+  hasConflicts: boolean;
+  summary: {
+    totalDates: number;
+    validDates: number;
+    conflictDates: number;
+  };
+  validDatesList: string[];
+  conflicts: RecurrenceConflict[];
+}
+
+export interface ResolvedDate {
+  date: string;           // "YYYY-MM-DD"
+  startTime: string;      // "HH:MM"
+  skipped?: boolean;
+}
+
 
 export interface Transaction {
   id: string;
