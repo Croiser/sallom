@@ -430,22 +430,44 @@ router.post('/asaas/webhook', async (req, res) => {
 
 // Settings
 router.get('/settings', authenticateToken, async (req: AuthRequest, res) => {
-  const settings = await prisma.setting.findUnique({ where: { uid: req.user?.id } }) as any;
-  const user = await prisma.user.findUnique({ where: { id: req.user?.id }, select: { shopName: true } });
-  
-  const result = settings || { uid: req.user?.id };
-  if (settings) {
-    result.businessHours = settings.businessHours ? JSON.parse(settings.businessHours) : [];
-    result.whatsappConfig = settings.whatsappConfig ? JSON.parse(settings.whatsappConfig) : null;
-    result.holidays = settings.holidays ? JSON.parse(settings.holidays) : [];
-    result.fidelityConfig = settings.fidelityConfig ? JSON.parse(settings.fidelityConfig) : null;
-    result.allowProfessionalViewAllAgendas = settings.allowProfessionalViewAllAgendas;
+  const userId = req.user?.id;
+  const role = req.user?.role;
+
+  try {
+    const user = await prisma.user.findUnique({ where: { id: userId } });
+    if (!user) return res.status(404).json({ error: 'User not found' });
+
+    // For professionals, we need to fetch the owner's settings
+    const targetUid = (role === 'professional' && (user as any).ownerId) 
+      ? (user as any).ownerId 
+      : userId;
+
+    const settings = await prisma.setting.findUnique({ where: { uid: targetUid } }) as any;
+    const ownerUser = await prisma.user.findUnique({ where: { id: targetUid }, select: { shopName: true } });
+    
+    let result: any = settings ? { ...settings } : { uid: targetUid };
+    
+    if (settings) {
+      result.businessHours = settings.businessHours ? JSON.parse(settings.businessHours) : [];
+      result.whatsappConfig = settings.whatsappConfig ? JSON.parse(settings.whatsappConfig) : null;
+      result.holidays = settings.holidays ? JSON.parse(settings.holidays) : [];
+      result.fidelityConfig = settings.fidelityConfig ? JSON.parse(settings.fidelityConfig) : null;
+      result.allowProfessionalViewAllAgendas = settings.allowProfessionalViewAllAgendas;
+    } else {
+      // Ensure defaults if no settings found
+      result.businessHours = [];
+      result.whatsappConfig = null;
+      result.holidays = [];
+      result.fidelityConfig = null;
+    }
+    
+    // Add shopName from target owner model as 'name'
+    result.name = ownerUser?.shopName || '';
+    
+    res.json(result);
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
   }
-  
-  // Add shopName from User model as 'name'
-  result.name = user?.shopName || '';
-  
-  res.json(result);
 });
 
 router.put('/settings', authenticateToken, async (req: AuthRequest, res) => {
