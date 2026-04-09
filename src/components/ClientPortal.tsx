@@ -202,33 +202,33 @@ export default function ClientPortal({ slug }: ClientPortalProps) {
           {activeTab === 'agenda' ? (
             upcomingApps.length > 0 ? (
               upcomingApps.map(app => (
-                <div key={app.id} className="bg-zinc-900 border border-zinc-800 p-6 rounded-[2.5rem] space-y-4 relative overflow-hidden group">
+                <div key={app.id} className="bg-zinc-900 border border-zinc-800 p-4 rounded-3xl relative overflow-hidden group">
                   <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-3">
-                      <div className="bg-zinc-800 p-3 rounded-2xl text-rose-500">
-                        <Clock size={20} />
+                    <div className="flex items-center gap-4">
+                      <div className="bg-zinc-800 p-2.5 rounded-xl text-rose-500">
+                        <Clock size={16} />
                       </div>
                       <div>
-                        <p className="text-[10px] font-bold text-zinc-500 uppercase tracking-widest">
+                        <p className="text-[10px] font-bold text-zinc-500 uppercase tracking-widest leading-none mb-1">
                           {format(new Date(app.date), "dd 'de' MMMM", { locale: ptBR })}
                         </p>
-                        <p className="text-xl font-bold text-white uppercase italic">{format(new Date(app.date), 'HH:mm')}h</p>
+                        <p className="text-sm font-bold text-white uppercase italic leading-none">{format(new Date(app.date), 'HH:mm')}h</p>
                       </div>
                     </div>
-                    <button className="p-3 bg-zinc-800 rounded-2xl text-zinc-500 hover:text-rose-500 transition-colors">
-                      <MessageSquare size={18} />
+                    <button className="p-2 bg-zinc-800 rounded-xl text-zinc-500 hover:text-rose-500 transition-colors">
+                      <MessageSquare size={16} />
                     </button>
                   </div>
                   
-                  <div className="space-y-1">
-                    <h4 className="text-lg font-bold text-white leading-tight">{app.serviceName}</h4>
-                    <p className="text-sm text-zinc-500 italic">Com {app.staffName || 'Equipe'}</p>
+                  <div className="mt-3 space-y-0.5">
+                    <h4 className="text-sm font-bold text-white leading-tight">{app.serviceName}</h4>
+                    <p className="text-[10px] text-zinc-500 italic">Com {app.staffName || 'Equipe'}</p>
                   </div>
 
-                  <div className="pt-4 flex gap-3">
+                  <div className="pt-3 flex gap-2">
                     <button 
                       onClick={() => handleCancelClick(app)}
-                      className="flex-1 bg-zinc-800 text-zinc-400 py-4 rounded-2xl font-bold text-xs hover:bg-rose-500/10 hover:text-rose-500 transition-all border border-zinc-700/50"
+                      className="flex-1 bg-zinc-800 text-zinc-400 py-2.5 rounded-xl font-bold text-xs hover:bg-rose-500/10 hover:text-rose-500 transition-all border border-zinc-700/50"
                     >
                       Cancelar Horário
                     </button>
