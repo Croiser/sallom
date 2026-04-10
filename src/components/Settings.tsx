@@ -46,7 +46,7 @@ interface SettingsProps {
   onNavigate?: (tab: string, data?: { planId?: string, cycle?: 'monthly' | 'yearly' }) => void;
 }
 
-type SettingsTab = 'perfil' | 'agenda' | 'equipe' | 'financeiro' | 'comunicacao';
+type SettingsTab = 'perfil' | 'agenda' | 'equipe' | 'financeiro' | 'comunicacao' | 'formularios';
 
 const tabs: { id: SettingsTab; label: string; icon: React.ReactNode }[] = [
   { id: 'perfil', label: 'Perfil', icon: <BuildingIcon size={18} /> },
@@ -54,6 +54,7 @@ const tabs: { id: SettingsTab; label: string; icon: React.ReactNode }[] = [
   { id: 'equipe', label: 'Equipe', icon: <UserPlusIcon size={18} /> },
   { id: 'financeiro', label: 'Financeiro', icon: <CrownIcon size={18} /> },
   { id: 'comunicacao', label: 'Comunicação', icon: <MessageIcon size={18} /> },
+  { id: 'formularios', label: 'Formulários/Anamnese', icon: <CheckIcon size={18} /> },
 ];
 
 export default function Settings({ onNavigate }: SettingsProps) {
@@ -500,6 +501,50 @@ export default function Settings({ onNavigate }: SettingsProps) {
               onSave={handleSaveSettings} 
               onNavigate={onNavigate}
             />
+          </div>
+        );
+
+      case 'formularios':
+        return (
+          <div className="space-y-10">
+            <section className="bg-white rounded-[2rem] border border-surface-200 overflow-hidden shadow-premium">
+              <div className="p-8 border-b border-surface-100 bg-surface-50/50">
+                <div className="flex items-center gap-4">
+                  <div className="w-12 h-12 bg-emerald-500 rounded-2xl flex items-center justify-center shadow-lg shadow-emerald-500/20">
+                    <CheckIcon className="text-white" size={24} />
+                  </div>
+                  <div>
+                    <h2 className="text-xl font-black text-zinc-950 tracking-tight">Fichas de Anamnese</h2>
+                    <p className="text-zinc-500 text-sm font-medium">Ative e configure formulários específicos para seu segmento</p>
+                  </div>
+                </div>
+              </div>
+
+              <div className="p-8 space-y-6">
+                <div className="flex items-center justify-between p-6 bg-surface-50 rounded-3xl border border-surface-100 hover:border-brand-200 transition-all group">
+                  <div className="space-y-1">
+                    <h3 className="font-bold text-zinc-950 group-hover:text-brand-600 transition-colors">Ficha de Podologia</h3>
+                    <p className="text-sm text-zinc-500">Ativar formulário de Anamnese Podológica (inclui marcações visuais de pés e enfermidades locais)</p>
+                  </div>
+                  <label className="relative inline-flex items-center cursor-pointer">
+                    <input 
+                      type="checkbox" 
+                      className="sr-only peer"
+                      checked={settings?.podologyAnamnesisActive || false}
+                      onChange={(e) => setSettings(s => s ? { ...s, podologyAnamnesisActive: e.target.checked } : null)}
+                    />
+                    <div className="w-14 h-7 bg-surface-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-surface-200 after:border after:rounded-full after:h-6 after:w-6 after:transition-all peer-checked:bg-emerald-500"></div>
+                  </label>
+                </div>
+                
+                {settings?.podologyAnamnesisActive && (
+                  <div className="p-6 bg-emerald-50 border border-emerald-100 rounded-2xl">
+                    <h4 className="font-semibold text-emerald-900 mb-2">✅ Módulo de Podologia Ativado</h4>
+                    <p className="text-sm text-emerald-700">O botão "Preencher Anamnese (Podologia)" agora estará disponível no perfil de todos os seus clientes.</p>
+                  </div>
+                )}
+              </div>
+            </section>
           </div>
         );
 

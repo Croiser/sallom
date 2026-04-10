@@ -20,6 +20,7 @@ import { useAuth } from '../contexts/AuthContext';
 import { motion, AnimatePresence } from 'motion/react';
 import { api } from '../services/api';
 import ClientAnamnesis from './ClientAnamnesis';
+import PodologyAnamnesisForm from './PodologyAnamnesisForm';
 import { ClipboardList } from 'lucide-react';
 
 export default function Clients() {
@@ -32,6 +33,7 @@ export default function Clients() {
   const [searchTerm, setSearchTerm] = useState('');
   const [filterDebtors, setFilterDebtors] = useState(false);
   const [selectedClientForAnamnesis, setSelectedClientForAnamnesis] = useState<Client | null>(null);
+  const [selectedClientForPodology, setSelectedClientForPodology] = useState<Client | null>(null);
   const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' } | null>(null);
   
   // Form State
@@ -269,13 +271,24 @@ export default function Clients() {
                 </div>
               )}
 
-              <button
-                onClick={() => setSelectedClientForAnamnesis(client)}
-                className="mt-3 w-full bg-zinc-900 hover:bg-zinc-800 text-white font-bold py-2 rounded-xl transition-all flex items-center justify-center gap-2 border border-zinc-800"
-              >
-                <ClipboardList size={16} className="text-rose-500" />
-                Ficha de Anamnese
-              </button>
+              <div className="flex flex-col gap-2 w-full">
+                <button
+                  onClick={() => setSelectedClientForAnamnesis(client)}
+                  className="mt-3 w-full bg-zinc-900 hover:bg-zinc-800 text-white font-bold py-2 rounded-xl transition-all flex items-center justify-center gap-2 border border-zinc-800"
+                >
+                  <ClipboardList size={16} className="text-rose-500" />
+                  Ficha de Anamnese
+                </button>
+                {settings?.podologyAnamnesisActive && (
+                  <button
+                    onClick={() => setSelectedClientForPodology(client)}
+                    className="w-full bg-emerald-50 text-emerald-700 hover:bg-emerald-100 font-bold py-2 rounded-xl transition-all flex items-center justify-center gap-2 border border-emerald-200"
+                  >
+                    <ClipboardList size={16} className="text-emerald-500" />
+                    Anamnese (Podologia)
+                  </button>
+                )}
+              </div>
 
             {settings?.fidelityConfig?.enabled && client.loyaltyPoints >= (settings.fidelityConfig.minPointsToRedeem || 100) && (
               <button
@@ -423,6 +436,20 @@ export default function Clients() {
               </div>
             </motion.div>
           </div>
+        )}
+      </AnimatePresence>
+
+      {/* Podology Anamnesis Modal */}
+      <AnimatePresence>
+        {selectedClientForPodology && (
+          <PodologyAnamnesisForm 
+            clientId={selectedClientForPodology.id}
+            clientName={selectedClientForPodology.name}
+            onClose={() => setSelectedClientForPodology(null)}
+            onSuccess={() => {
+              setSelectedClientForPodology(null);
+            }}
+          />
         )}
       </AnimatePresence>
 

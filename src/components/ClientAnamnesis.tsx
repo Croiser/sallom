@@ -16,8 +16,18 @@ export default function ClientAnamnesis({ clientId }: ClientAnamnesisProps) {
 
   const fetchRecords = async () => {
     try {
-      const data = await api.get(`/clients/${clientId}/anamnesis`);
-      setRecords(data);
+      const [generalData, podologyData] = await Promise.all([
+        api.get(`/clients/${clientId}/anamnesis`).catch(() => []),
+        api.get(`/podology-anamnesis/client/${clientId}`).catch(() => [])
+      ]);
+      
+      const formattedPodology = podologyData.map((p: any) => ({
+        ...p,
+        isPodology: true,
+        procedure: 'Podologia',
+      }));
+
+      setRecords([...generalData, ...formattedPodology].sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()));
     } catch (error) {
       console.error('Erro ao buscar fichas:', error);
     } finally {
@@ -29,12 +39,16 @@ export default function ClientAnamnesis({ clientId }: ClientAnamnesisProps) {
     fetchRecords();
   }, [clientId]);
 
-  const handleDelete = async (id: string) => {
+  const handleDelete = async (record: any) => {
     if (!confirm('Deseja excluir esta ficha permanentemente?')) return;
     try {
-      await api.delete(`/anamnesis/${id}`);
-      setRecords(prev => prev.filter(r => r.id !== id));
-      if (selectedRecord?.id === id) setSelectedRecord(null);
+      if (record.isPodology) {
+        await api.delete(`/podology-anamnesis/${record.id}`);
+      } else {
+        await api.delete(`/anamnesis/${record.id}`);
+      }
+      setRecords(prev => prev.filter(r => r.id !== record.id));
+      if (selectedRecord?.id === record.id) setSelectedRecord(null);
     } catch (error) {
       alert('Erro ao excluir ficha.');
     }
@@ -80,7 +94,7 @@ export default function ClientAnamnesis({ clientId }: ClientAnamnesisProps) {
                   </p>
                 </div>
                 <button 
-                  onClick={(e) => { e.stopPropagation(); handleDelete(record.id); }}
+                  onClick={(e) => { e.stopPropagation(); handleDelete(record); }}
                   className="p-2 text-zinc-600 hover:text-rose-500 hover:bg-rose-500/10 rounded-lg transition-all"
                 >
                   <Trash2 size={16} />
@@ -121,16 +135,40 @@ export default function ClientAnamnesis({ clientId }: ClientAnamnesisProps) {
                 </button>
               </div>
               <div className="p-8 space-y-6 max-h-[60vh] overflow-y-auto">
-                <div className="grid grid-cols-2 gap-6">
-                  <DetailItem label="Alergias" value={selectedRecord.content.alergias} />
-                  <DetailItem label="Medicamentos" value={selectedRecord.content.medicamentos} />
-                  <DetailItem label="Tipo de Pele / Cabelo" value={selectedRecord.content.tipoPele} />
-                  <DetailItem label="Procedimentos Anteriores" value={selectedRecord.content.procedimentosAnteriores} />
-                </div>
-                <div className="p-4 bg-zinc-950 rounded-2xl border border-zinc-800">
-                  <p className="text-xs font-bold text-zinc-500 uppercase mb-2">Observações Técnicas</p>
-                  <p className="text-sm text-zinc-300 leading-relaxed">{selectedRecord.content.observacoes || 'Nenhuma observação adicional.'}</p>
-                </div>
+                {selectedRecord.isPodology ? (
+                  <>
+                    {/* Render specific podology details */}
+                    <div className="grid grid-cols-2 gap-6">
+                      <DetailItem label="Profissão" value={selectedRecord.profession} />
+                      <DetailItem label="Tipo de Calçado" value={selectedRecord.shoeType} />
+                      <DetailItem label="Alergias" value={selectedRecord.allergies} />
+                      <DetailItem label="Medicamentos" value={selectedRecord.medications} />
+                    </div>
+                    <div className="p-4 bg-zinc-950 rounded-2xl border border-zinc-800">
+                      <p className="text-xs font-bold text-zinc-500 uppercase mb-2">Observações do Profissional</p>
+                      <p className="text-sm text-zinc-300 leading-relaxed">{selectedRecord.professionalObservations || 'Nenhuma observação.'}</p>
+                    </div>
+                    
+                    <div className="flex justify-end pt-4">
+                      <button onClick={() => window.print()} className="px-6 py-2 bg-emerald-500 text-white rounded-xl font-bold flex items-center gap-2 hover:bg-emerald-600 transition-colors">
+                        <FileText size={16} /> Imprimir Ficha
+                      </button>
+                    </div>
+                  </>
+                ) : (
+                  <>
+                    <div className="grid grid-cols-2 gap-6">
+                      <DetailItem label="Alergias" value={selectedRecord.content?.alergias} />
+                      <DetailItem label="Medicamentos" value={selectedRecord.content?.medicamentos} />
+                      <DetailItem label="Tipo de Pele / Cabelo" value={selectedRecord.content?.tipoPele} />
+                      <DetailItem label="Procedimentos Anteriores" value={selectedRecord.content?.procedimentosAnteriores} />
+                    </div>
+                    <div className="p-4 bg-zinc-950 rounded-2xl border border-zinc-800">
+                      <p className="text-xs font-bold text-zinc-500 uppercase mb-2">Observações Técnicas</p>
+                      <p className="text-sm text-zinc-300 leading-relaxed">{selectedRecord.content?.observacoes || 'Nenhuma observação adicional.'}</p>
+                    </div>
+                  </>
+                )}
               </div>
             </motion.div>
           </div>

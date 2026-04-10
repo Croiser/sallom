@@ -19,6 +19,7 @@
         "@sentry/node": "^8.30.0",
         "@sentry/react": "^8.30.0",
         "@tailwindcss/vite": "^4.1.14",
+        "@types/react-signature-canvas": "^1.0.7",
         "@types/tar": "^6.1.13",
         "axios": "^1.13.6",
         "bcryptjs": "^3.0.3",
@@ -35,6 +36,7 @@
         "pm2": "^5.4.2",
         "react": "^19.0.0",
         "react-dom": "^19.0.0",
+        "react-signature-canvas": "^1.1.0-alpha.2",
         "recharts": "^3.8.0",
         "tar": "^7.5.11"
     },

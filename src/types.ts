@@ -188,6 +188,7 @@ export interface ShopSettings {
   holidays?: Holiday[];
   fidelityConfig?: FidelityConfig;
   allowProfessionalViewAllAgendas?: boolean;
+  podologyAnamnesisActive?: boolean;
 }
 
 export interface FidelityConfig {

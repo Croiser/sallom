@@ -38,6 +38,7 @@ model User {
   whatsappMessages  WhatsappMessage[]
   wallet            Wallet?
   anamnesis         Anamnesis[]
+  podologyAnamnesis PodologyAnamnesis[]
   sales             Sale[]
 
   @@map("users")
@@ -88,6 +89,7 @@ model Client {
   owner         User          @relation(fields: [ownerUid], references: [id], onDelete: Cascade)
   appointments  Appointment[]
   anamnesis     Anamnesis[]
+  podologyAnamnesis PodologyAnamnesis[]
   sales         Sale[]
 
   @@map("clients")
@@ -209,6 +211,7 @@ model Setting {
   holidays       String? // JSON string
   fidelityConfig String? // JSON string
   allowProfessionalViewAllAgendas Boolean @default(false)
+  podologyAnamnesisActive         Boolean @default(false)
   user           User    @relation(fields: [uid], references: [id], onDelete: Cascade)
 
   @@map("settings")
@@ -371,4 +374,81 @@ model SaleItem {
   service   Service? @relation(fields: [serviceId], references: [id], onDelete: SetNull)
 
   @@map("sale_items")
+}
+
+model PodologyAnamnesis {
+  id                    String   @id @default(uuid())
+  clientId              String
+  ownerUid              String
+  
+  // Personal & General
+  profession            String?
+  referral              String?
+  shoeType              String?
+  
+  // History Checkboxes
+  hypertension          Boolean  @default(false)
+  diabetes              Boolean  @default(false)
+  leprosy               Boolean  @default(false)
+  pacemaker             Boolean  @default(false)
+  smokingAlcoholism     Boolean  @default(false)
+  vascularDisease       Boolean  @default(false)
+  oncology              Boolean  @default(false)
+  renalDisorder         Boolean  @default(false)
+  hormonalDisorder      Boolean  @default(false)
+  intestinalDisorder    Boolean  @default(false)
+  cardiopathy           Boolean  @default(false)
+  neuropathy            Boolean  @default(false)
+  hepatitis             Boolean  @default(false)
+  hivStd                Boolean  @default(false)
+  epilepsy              Boolean  @default(false)
+  pregnantLactating     Boolean  @default(false)
+  
+  // History Texts
+  allergies             String?
+  recentSurgeries       String?
+  medications           String?
+  
+  // Technical Evaluation
+  dryness               Boolean  @default(false)
+  cracks                Boolean  @default(false)
+  nailOnychomycosis     Boolean  @default(false)
+  plantarOnychomycosis  Boolean  @default(false)
+  tineaPedis            Boolean  @default(false)
+  onychophosis          Boolean  @default(false)
+  onychocryptosis       Boolean  @default(false)
+  granuloma             Boolean  @default(false)
+  hyperhidrosis         Boolean  @default(false)
+  anhidrosis            Boolean  @default(false)
+  dyshidrosis           Boolean  @default(false)
+  psoriasis             Boolean  @default(false)
+  calluses              Boolean  @default(false)
+  hyperkeratosis        Boolean  @default(false)
+  bromidrosis           Boolean  @default(false)
+  exostosis             Boolean  @default(false)
+  warts                 Boolean  @default(false)
+  incorrectCut          Boolean  @default(false)
+  
+  // Nail Type
+  nailType              String? // 'Normal', 'Telha', etc.
+  
+  // Visual Markings / Canvas state (base64 or JSON of paths)
+  footMarks             String? @db.Text
+  
+  // Notes
+  specialNotes          String? @db.Text
+  professionalObservations String? @db.Text
+  
+  // Verification and Signature
+  disclaimerAccepted    Boolean  @default(false)
+  patientSignatureUrl   String?  @db.Text
+  professionalSignatureUrl String? @db.Text
+  
+  createdAt             DateTime @default(now())
+  updatedAt             DateTime @updatedAt
+  
+  client                Client   @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  owner                 User     @relation(fields: [ownerUid], references: [id], onDelete: Cascade)
+
+  @@map("podology_anamnesis")
 }
