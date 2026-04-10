@@ -42,6 +42,7 @@ export interface Appointment {
   serviceName: string;
   barberId: string;
   barberName: string;
+  phone?: string;
   staffId?: string;
   staffName?: string;
   date: string; // ISO string

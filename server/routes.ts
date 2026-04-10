@@ -861,55 +861,98 @@ router.post('/whatsapp/trigger', authenticateToken, async (req: AuthRequest, res
     const uid = req.user?.id as string;
     
     const settings = await prisma.whatsappSettings.findUnique({ where: { uid } });
-    if (!settings || !settings.enabled || !settings.apiKey || !settings.phoneNumberId) {
+    if (!settings || !settings.enabled) {
       return res.status(400).json({ error: 'WhatsApp configuration missing or disabled' });
     }
 
-    const metaService = new WhatsAppMetaService(settings.apiKey, settings.phoneNumberId);
-    
-    // Mapping internal types to Meta Template Names
-    // Default names - User should have these approved in Meta
-    let templateName = 'hello_world'; // fallback
-    if (type === 'welcome') templateName = 'welcome_message_v1';
-    if (type === 'reminder') templateName = 'appointment_reminder_v1';
-    if (type === 'confirmation') templateName = 'appointment_confirmation_v1';
+    let result_final: any = null;
+    let templateNameUsed = type;
 
-    // Meta templates use positional parameters {{1}}, {{2}}...
-    // We map our variables to components. This is a simplified version.
-    // Real implementation would depend on the template structure at Meta.
-    const components = [
-      {
-        type: 'body',
-        parameters: Object.entries(variables).map(([key, value]) => ({
-          type: 'text',
-          text: String(value)
-        }))
-      }
-    ];
+    // Check if WAHA is connected
+    if (settings.status === 'connected') {
+      const waha = new WAHAService(WAHA_API_URL);
+      
+      const templates = settings.templates ? JSON.parse(settings.templates as string) : {};
+      
+      let baseText = '';
+      if (type === 'welcome') baseText = templates.welcome || "Olá, {nome_cliente}! Bem-vindo(a) ao {shop_name}.";
+      if (type === 'reminder') baseText = templates.reminder || "Olá, {nome_cliente}! Lembrando do seu horário: {data} às {hora}.";
+      if (type === 'confirmation') baseText = templates.confirmation || "✅ Seu agendamento foi confirmado para {data} às {hora} em {shop_name}!";
 
-    const result = await metaService.sendTemplateMessage(recipientNumber, templateName, 'pt_BR', components);
-    
-    // Debit Wallet if enabled (Meta also costs)
-    try {
-      const wallet = await prisma.wallet.findUnique({ where: { ownerUid: uid } });
-      if (wallet && wallet.isActive && Number(wallet.balance) >= 0.10) {
-        await prisma.wallet.update({
-          where: { id: wallet.id },
-          data: { balance: { decrement: 0.10 } }
-        });
-        await prisma.walletTransaction.create({
-          data: {
-            walletId: wallet.id,
-            type: 'debit',
-            category: 'automation_usage',
-            amount: 0.10,
-            description: `WhatsApp (Meta): ${type}`
-          }
-        });
-      }
-    } catch (e) { console.error('Wallet debit failed:', e); }
+      const voucherText = WAHAService.applySpintax(baseText)
+        .replace(/{nome_cliente}/g, recipientName || 'Cliente')
+        .replace(/{shop_name}/g, variables.shop_name || 'Nosso Salão')
+        .replace(/{data}/g, variables.data || '')
+        .replace(/{hora}/g, variables.hora || '');
 
-    const result_final = result;
+      result_final = await waha.sendTextMessage(settings.wahaInstanceName || 'default', recipientNumber, voucherText);
+      templateNameUsed = `WAHA (${type})`;
+
+      // Debit Wallet for WAHA usage
+      try {
+        const wallet = await prisma.wallet.findUnique({ where: { ownerUid: uid } });
+        if (wallet && wallet.isActive && Number(wallet.balance) >= 0.10) {
+          await prisma.wallet.update({
+            where: { id: wallet.id },
+            data: { balance: { decrement: 0.10 } }
+          });
+          await prisma.walletTransaction.create({
+            data: {
+              walletId: wallet.id,
+              type: 'debit',
+              category: 'automation_usage',
+              amount: 0.10,
+              description: `WhatsApp (WAHA): ${type}`
+            }
+          });
+        }
+      } catch (e) { console.error('Wallet debit failed (WAHA):', e); }
+
+    } else if (settings.apiKey && settings.phoneNumberId) {
+      // Fallback to Meta API if configured but WAHA is not connected
+      const metaService = new WhatsAppMetaService(settings.apiKey, settings.phoneNumberId);
+      
+      // Mapping internal types to Meta Template Names
+      let templateName = 'hello_world'; // fallback
+      if (type === 'welcome') templateName = 'welcome_message_v1';
+      if (type === 'reminder') templateName = 'appointment_reminder_v1';
+      if (type === 'confirmation') templateName = 'appointment_confirmation_v1';
+
+      const components = [
+        {
+          type: 'body',
+          parameters: Object.entries(variables).map(([key, value]) => ({
+            type: 'text',
+            text: String(value)
+          }))
+        }
+      ];
+
+      result_final = await metaService.sendTemplateMessage(recipientNumber, templateName, 'pt_BR', components);
+      templateNameUsed = `Meta Template: ${templateName} (${type})`;
+      
+      // Debit Wallet if enabled (Meta also costs)
+      try {
+        const wallet = await prisma.wallet.findUnique({ where: { ownerUid: uid } });
+        if (wallet && wallet.isActive && Number(wallet.balance) >= 0.10) {
+          await prisma.wallet.update({
+            where: { id: wallet.id },
+            data: { balance: { decrement: 0.10 } }
+          });
+          await prisma.walletTransaction.create({
+            data: {
+              walletId: wallet.id,
+              type: 'debit',
+              category: 'automation_usage',
+              amount: 0.10,
+              description: `WhatsApp (Meta): ${type}`
+            }
+          });
+        }
+      } catch (e) { console.error('Wallet debit failed (Meta):', e); }
+    } else {
+      return res.status(400).json({ error: 'Nenhuma integração do WhatsApp configurada (QR Code ou Meta).' });
+    }
     
     // Log message
     await prisma.whatsappMessage.create({
@@ -917,14 +960,14 @@ router.post('/whatsapp/trigger', authenticateToken, async (req: AuthRequest, res
         ownerUid: uid,
         recipientNumber,
         recipientName,
-        content: `Template: ${templateName} (${type})`,
-        type,
-        status: 'Enviada',
-        externalId: result.messages?.[0]?.id
+        content: templateNameUsed,
+        type: 'template',
+        status: 'sent',
+        externalId: result_final?.messages?.[0]?.id || result_final?.messageId || 'unknown'
       }
     });
 
-    res.json({ success: true, result });
+    res.json(result_final);
   } catch (err: any) {
     console.error('WhatsApp trigger error:', err.response?.data || err.message);
     res.status(500).json({ error: err.message });
