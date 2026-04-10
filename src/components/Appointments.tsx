@@ -41,6 +41,7 @@ export default function Appointments() {
   const [currentDate, setCurrentDate] = useState(new Date());
   const [selectedDate, setSelectedDate] = useState(new Date());
   const [previewDate, setPreviewDate] = useState<Date | null>(null);
+  const [expandedGroups, setExpandedGroups] = useState<string[]>([]);
   const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' } | null>(null);
   
   // Form State
@@ -195,6 +196,24 @@ export default function Appointments() {
     const matchesStaff = staffFilter === 'all' || app.staffId === staffFilter;
     
     return matchesSearch && matchesStatus && matchesStaff;
+  });
+
+  const toggleGroup = (groupId: string) => {
+    setExpandedGroups(prev => prev.includes(groupId) ? prev.filter(g => g !== groupId) : [...prev, groupId]);
+  };
+
+  const groupedAppointments = filteredAppointments.reduce((acc, app) => {
+    if (app.recurrenceGroupId) {
+      if (!acc.groups[app.recurrenceGroupId]) acc.groups[app.recurrenceGroupId] = [];
+      acc.groups[app.recurrenceGroupId].push(app);
+    } else {
+      acc.singles.push(app);
+    }
+    return acc;
+  }, { groups: {} as Record<string, Appointment[]>, singles: [] as Appointment[] });
+
+  Object.values(groupedAppointments.groups).forEach(group => {
+    group.sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
   });
 
   // Calendar Logic
@@ -438,6 +457,93 @@ export default function Appointments() {
     );
   };
 
+  const renderAppointmentRow = (app: Appointment, isGroupChild = false) => (
+    <tr key={app.id} className={`hover:bg-zinc-50 transition-colors ${isGroupChild ? 'bg-zinc-50/50' : ''}`}>
+      <td className="px-6 py-4">
+        <div className="flex items-center gap-3">
+          {isGroupChild && <div className="w-4 h-px bg-zinc-200 ml-4" />}
+          <div className="w-8 h-8 bg-zinc-100 rounded-full flex items-center justify-center text-xs font-bold text-zinc-600">
+            {app.clientName?.charAt(0) || '?'}
+          </div>
+          <div className="flex flex-col">
+            <span className="font-medium text-zinc-900">{app.clientName}</span>
+            {app.isFitIn && <span className="text-[10px] text-rose-600 font-bold uppercase">Encaixe</span>}
+          </div>
+        </div>
+      </td>
+      <td className="px-6 py-4 text-zinc-600">{app.serviceName}</td>
+      <td className="px-6 py-4 text-zinc-600">{app.staffName || 'Geral'}</td>
+      <td className="px-6 py-4">
+        <div className="flex flex-col">
+          <span className="text-zinc-900 font-medium">
+            {new Date(app.date).toLocaleDateString('pt-BR')}
+          </span>
+          <span className="text-xs text-zinc-500">
+            {new Date(app.date).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}
+          </span>
+        </div>
+      </td>
+      <td className="px-6 py-4">
+        <span className={`
+          text-[10px] uppercase tracking-wider font-bold px-2 py-1 rounded-full
+          ${app.status === 'scheduled' ? 'bg-rose-100 text-rose-700' : 
+            app.status === 'completed' ? 'bg-emerald-100 text-emerald-700' : 
+            app.status === 'no_show' ? 'bg-amber-100 text-amber-700' :
+            'bg-rose-100 text-rose-700'}
+        `}>
+          {app.status === 'scheduled' ? 'Agendado' : app.status === 'completed' ? 'Concluído' : app.status === 'no_show' ? 'No-Show' : 'Cancelado'}
+        </span>
+      </td>
+      <td className="px-6 py-4 text-right">
+        <div className="flex items-center justify-end gap-2">
+          {app.phone && (
+            <a
+              href={`https://wa.me/55${app.phone.replace(/\\D/g, '')}?text=${encodeURIComponent('Olá, ' + app.clientName + '! Tudo bem? Aqui é do salão.')}`}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="p-2 text-emerald-500 hover:bg-emerald-50 rounded-lg transition-colors"
+              title="Conversar no WhatsApp"
+            >
+              <MessageCircle size={18} />
+            </a>
+          )}
+          {app.status === 'scheduled' && (
+            <>
+              <button 
+                onClick={() => updateStatus(app.id, 'completed')}
+                className="p-2 text-emerald-600 hover:bg-emerald-50 rounded-lg transition-colors"
+                title="Concluir"
+              >
+                <Check size={18} />
+              </button>
+              <button 
+                onClick={() => handleNoShow(app.id)}
+                className="p-2 text-amber-600 hover:bg-amber-50 rounded-lg transition-colors"
+                title="Faltou (No-Show)"
+              >
+                <AlertCircle size={18} />
+              </button>
+              <button 
+                onClick={() => updateStatus(app.id, 'cancelled')}
+                className="p-2 text-rose-600 hover:bg-rose-50 rounded-lg transition-colors"
+                title="Cancelar"
+              >
+                <X size={18} />
+              </button>
+            </>
+          )}
+          <button 
+            onClick={() => handleDelete(app.id)}
+            className="p-2 text-zinc-400 hover:bg-rose-50 hover:text-rose-600 rounded-lg transition-colors"
+            title="Excluir"
+          >
+            <Trash2 size={18} />
+          </button>
+        </div>
+      </td>
+    </tr>
+  );
+
   return (
     <div className="space-y-6">
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
@@ -533,90 +639,56 @@ export default function Appointments() {
                 </tr>
               </thead>
               <tbody className="divide-y divide-zinc-100">
-                {filteredAppointments.length > 0 ? filteredAppointments.map((app) => (
-                  <tr key={app.id} className="hover:bg-zinc-50 transition-colors">
-                    <td className="px-6 py-4">
-                      <div className="flex items-center gap-3">
-                        <div className="w-8 h-8 bg-zinc-100 rounded-full flex items-center justify-center text-xs font-bold text-zinc-600">
-                          {app.clientName?.charAt(0) || '?'}
-                        </div>
-                        <div className="flex flex-col">
-                          <span className="font-medium text-zinc-900">{app.clientName}</span>
-                          {app.isFitIn && <span className="text-[10px] text-rose-600 font-bold uppercase">Encaixe</span>}
-                        </div>
-                      </div>
-                    </td>
-                    <td className="px-6 py-4 text-zinc-600">{app.serviceName}</td>
-                    <td className="px-6 py-4 text-zinc-600">{app.staffName || 'Geral'}</td>
-                    <td className="px-6 py-4">
-                      <div className="flex flex-col">
-                        <span className="text-zinc-900 font-medium">
-                          {new Date(app.date).toLocaleDateString('pt-BR')}
-                        </span>
-                        <span className="text-xs text-zinc-500">
-                          {new Date(app.date).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}
-                        </span>
-                      </div>
-                    </td>
-                    <td className="px-6 py-4">
-                      <span className={`
-                        text-[10px] uppercase tracking-wider font-bold px-2 py-1 rounded-full
-                        ${app.status === 'scheduled' ? 'bg-rose-100 text-rose-700' : 
-                          app.status === 'completed' ? 'bg-emerald-100 text-emerald-700' : 
-                          app.status === 'no_show' ? 'bg-amber-100 text-amber-700' :
-                          'bg-rose-100 text-rose-700'}
-                      `}>
-                        {app.status === 'scheduled' ? 'Agendado' : app.status === 'completed' ? 'Concluído' : app.status === 'no_show' ? 'No-Show' : 'Cancelado'}
-                      </span>
-                    </td>
-                    <td className="px-6 py-4 text-right">
-                      <div className="flex items-center justify-end gap-2">
-                        {app.phone && (
-                          <a
-                            href={`https://wa.me/55${app.phone.replace(/\D/g, '')}?text=${encodeURIComponent(`Olá, ${app.clientName}! Tudo bem? Aqui é do salão.`)}`}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className="p-2 text-emerald-500 hover:bg-emerald-50 rounded-lg transition-colors"
-                            title="Conversar no WhatsApp"
+                {filteredAppointments.length > 0 ? (
+                  <>
+                    {groupedAppointments.singles.map((app) => renderAppointmentRow(app))}
+                    
+                    {Object.entries(groupedAppointments.groups).map(([groupId, groupApps]) => {
+                      const isExpanded = expandedGroups.includes(groupId);
+                      const firstApp = groupApps[0];
+                      
+                      return (
+                        <React.Fragment key={groupId}>
+                          {/* Group Header */}
+                          <tr 
+                            onClick={() => toggleGroup(groupId)} 
+                            className="hover:bg-zinc-50 transition-colors cursor-pointer bg-zinc-50/50 group"
                           >
-                            <MessageCircle size={18} />
-                          </a>
-                        )}
-                        {app.status === 'scheduled' && (
-                          <>
-                            <button 
-                              onClick={() => updateStatus(app.id, 'completed')}
-                              className="p-2 text-emerald-600 hover:bg-emerald-50 rounded-lg transition-colors"
-                              title="Concluir"
-                            >
-                              <Check size={18} />
-                            </button>
-                            <button 
-                              onClick={() => handleNoShow(app.id)}
-                              className="p-2 text-amber-600 hover:bg-amber-50 rounded-lg transition-colors"
-                              title="Faltou (No-Show)"
-                            >
-                              <AlertCircle size={18} />
-                            </button>
-                            <button 
-                              onClick={() => updateStatus(app.id, 'cancelled')}
-                              className="p-2 text-rose-600 hover:bg-rose-50 rounded-lg transition-colors"
-                              title="Cancelar"
-                            >
-                              <X size={18} />
-                            </button>
-                          </>
-                        )}
-                        <button 
-                          onClick={() => handleDelete(app.id)}
-                          className="p-2 text-zinc-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-colors"
-                        >
-                          <Trash2 size={18} />
-                        </button>
-                      </div>
-                    </td>
-                  </tr>
-                )) : (
+                            <td className="px-6 py-4">
+                              <div className="flex items-center gap-3">
+                                <button className="p-1.5 text-zinc-400 group-hover:text-rose-500 transition-colors bg-white rounded-lg shadow-sm border border-zinc-200">
+                                   <ChevronRight size={14} className={`transition-transform duration-200 ${isExpanded ? 'rotate-90' : ''}`} />
+                                </button>
+                                <div className="flex flex-col px-2">
+                                  <span className="font-bold text-zinc-900">{firstApp.clientName}</span>
+                                  <span className="text-[10px] text-rose-600 font-bold uppercase tracking-wider bg-rose-50 px-1.5 py-0.5 rounded-md inline-block w-max mt-1">Série Recorrente</span>
+                                </div>
+                              </div>
+                            </td>
+                            <td className="px-6 py-4 text-zinc-600 font-medium">{firstApp.serviceName}</td>
+                            <td className="px-6 py-4 text-zinc-600">{firstApp.staffName || 'Geral'}</td>
+                            <td className="px-6 py-4">
+                              <span className="text-zinc-600 font-medium text-sm">
+                                {groupApps.length} agendamentos associados
+                              </span>
+                            </td>
+                            <td className="px-6 py-4">
+                              <span className="text-[10px] uppercase font-bold px-2 py-1 bg-zinc-100 text-zinc-500 rounded-lg items-center inline-flex">
+                                 A partir de {new Date(firstApp.date).toLocaleDateString('pt-BR')}
+                              </span>
+                            </td>
+                            <td className="px-6 py-4 text-right">
+                              {/* Empty actions for group header */}
+                            </td>
+                          </tr>
+
+                          {/* Children */}
+                          {isExpanded && groupApps.map(app => renderAppointmentRow(app, true))}
+                        </React.Fragment>
+                      );
+                    })}
+                  </>
+                ) : (
                   <tr>
                     <td colSpan={6} className="px-6 py-20 text-center space-y-4">
                       <div className="w-16 h-16 bg-rose-50 text-rose-500 rounded-2xl flex items-center justify-center mx-auto">

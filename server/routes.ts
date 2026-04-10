@@ -765,6 +765,49 @@ router.post('/whatsapp/waha/send', authenticateToken, async (req: AuthRequest, r
   }
 });
 
+router.post('/whatsapp/trigger', authenticateToken, async (req: AuthRequest, res) => {
+  try {
+    const { recipientNumber, recipientName, type, variables } = req.body;
+    const uid = req.user?.id as string;
+    
+    const settings = await prisma.whatsappSettings.findUnique({ where: { uid } }) as any;
+    if (!settings || !settings.enabled) {
+      return res.json({ success: false, reason: 'WhatsApp not enabled for this tenant' });
+    }
+
+    const templates = settings.templates ? JSON.parse(settings.templates) : {};
+    let templateStr = templates[type];
+
+    if (!templateStr) {
+      return res.json({ success: false, reason: `Template not found for type: ${type}` });
+    }
+
+    // Process template variables e.g. {nome_cliente} -> variables['nome_cliente']
+    let text = templateStr;
+    Object.keys(variables || {}).forEach(key => {
+      // WAHA template keys might be wrapped in {key}
+      const regex = new RegExp(`{${key}}`, 'g');
+      text = text.replace(regex, variables[key]);
+    });
+
+    // Format phone number to international WAHA format (e.g. 5545999959186@c.us)
+    let formattedNumber = recipientNumber.replace(/\D/g, '');
+    if (!formattedNumber.startsWith('55')) formattedNumber = '55' + formattedNumber;
+    const chatId = `${formattedNumber}@c.us`;
+
+    const waha = new WAHAService(WAHA_API_URL);
+    const result = await waha.sendTextMessage('default', chatId, text).catch(err => {
+      console.error('Failed to dispatch to WAHA:', err.message);
+      throw err;
+    });
+
+    res.json({ success: true, data: result });
+  } catch (err: any) {
+    console.error('Trigger Error:', err.message);
+    res.status(500).json({ error: err.message });
+  }
+});
+
 router.get('/whatsapp/chats', authenticateToken, async (req: AuthRequest, res) => {
   try {
     const waha = new WAHAService(WAHA_API_URL);
