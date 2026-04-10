@@ -14,7 +14,8 @@ import {
   ChevronLeft,
   ChevronRight,
   AlertCircle,
-  Repeat
+  Repeat,
+  MessageCircle
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { Appointment, Client, Service, Staff, ShopSettings, ServiceCombo } from '../types';
@@ -570,6 +571,17 @@ export default function Appointments() {
                     </td>
                     <td className="px-6 py-4 text-right">
                       <div className="flex items-center justify-end gap-2">
+                        {app.phone && (
+                          <a
+                            href={`https://wa.me/55${app.phone.replace(/\D/g, '')}?text=${encodeURIComponent(`Olá, ${app.clientName}! Tudo bem? Aqui é do salão.`)}`}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="p-2 text-emerald-500 hover:bg-emerald-50 rounded-lg transition-colors"
+                            title="Conversar no WhatsApp"
+                          >
+                            <MessageCircle size={18} />
+                          </a>
+                        )}
                         {app.status === 'scheduled' && (
                           <>
                             <button 
