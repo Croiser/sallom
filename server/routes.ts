@@ -2423,6 +2423,49 @@ router.delete('/anamnesis/:id', authenticateToken, async (req: AuthRequest, res)
   }
 });
 
+// Podology Specific Anamnesis
+router.get('/clients/:id/podology-anamnesis', authenticateToken, async (req: AuthRequest, res) => {
+  try {
+    const records = await (prisma as any).podologyAnamnesis.findMany({
+      where: { clientId: req.params.id, ownerUid: req.user?.id },
+      orderBy: { createdAt: 'desc' }
+    });
+    res.json(records);
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+router.post('/podology-anamnesis', authenticateToken, async (req: AuthRequest, res) => {
+  try {
+    const ownerUid = req.user?.id as string;
+    const { clientId, ...rest } = req.body;
+    
+    const record = await (prisma as any).podologyAnamnesis.create({
+      data: {
+        ...rest,
+        clientId,
+        ownerUid
+      }
+    });
+
+    // Also update RG/CPF on client if provided
+    if (rest.rg || rest.cpf) {
+      await prisma.client.update({
+        where: { id: clientId },
+        data: {
+          rg: rest.rg || undefined,
+          cpf: rest.cpf || undefined
+        }
+      });
+    }
+
+    res.json(record);
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
 // AI & Assets
 router.post('/ai/generate-assets', async (req, res) => {
     try {

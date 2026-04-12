@@ -81,6 +81,8 @@ model Client {
   name          String
   phone         String
   email         String?
+  rg            String?
+  cpf           String?
   notes         String?
   loyaltyPoints Int           @default(0)
   loyaltyVisits Int           @default(0)
@@ -385,6 +387,8 @@ model PodologyAnamnesis {
   profession            String?
   referral              String?
   shoeType              String?
+  rg                    String?
+  cpf                   String?
   
   // History Checkboxes
   hypertension          Boolean  @default(false)

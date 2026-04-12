@@ -538,11 +538,24 @@ export default function Settings({ onNavigate }: SettingsProps) {
                 </div>
                 
                 {settings?.podologyAnamnesisActive && (
-                  <div className="p-6 bg-emerald-50 border border-emerald-100 rounded-2xl">
-                    <h4 className="font-semibold text-emerald-900 mb-2">✅ Módulo de Podologia Ativado</h4>
+                  <div className="p-6 bg-emerald-50 border border-emerald-100 rounded-2xl animate-in fade-in slide-in-from-top-2 duration-300">
+                    <h4 className="font-semibold text-emerald-900 mb-2 flex items-center gap-2">
+                      <div className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
+                      Módulo de Podologia Ativado
+                    </h4>
                     <p className="text-sm text-emerald-700">O botão "Preencher Anamnese (Podologia)" agora estará disponível no perfil de todos os seus clientes.</p>
                   </div>
                 )}
+
+                <div className="pt-8 mt-8 border-t border-zinc-100 flex justify-end">
+                  <button
+                    onClick={handleSaveSettings}
+                    className="flex items-center gap-2 px-8 py-4 bg-zinc-950 text-white rounded-2xl font-bold hover:bg-zinc-800 transition-all active:scale-95 shadow-lg shadow-zinc-200"
+                  >
+                    <SaveIcon size={18} strokeWidth={3} />
+                    Salvar Alterações
+                  </button>
+                </div>
               </div>
             </section>
           </div>
