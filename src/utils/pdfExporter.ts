@@ -1,5 +1,4 @@
 import { jsPDF } from 'jspdf';
-import 'jspdf-autotable';
 
 interface PDFExportData {
   clientName: string;
