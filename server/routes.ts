@@ -477,7 +477,8 @@ router.put('/settings', authenticateToken, async (req: AuthRequest, res) => {
     name, slug, address, addressNumber, neighborhood, city, state, zipCode, cnpj,
     description, phone, instagram, facebook, tiktok,
     businessHours, whatsappConfig, holidays, fidelityConfig,
-    allowProfessionalViewAllAgendas, podologyAnamnesisActive
+    allowProfessionalViewAllAgendas, podologyAnamnesisActive,
+    logoUrl
   } = req.body;
 
   // Update shopName and slug in User model to keep them in sync
@@ -502,7 +503,8 @@ router.put('/settings', authenticateToken, async (req: AuthRequest, res) => {
       holidays: JSON.stringify(holidays),
       fidelityConfig: JSON.stringify(fidelityConfig),
       allowProfessionalViewAllAgendas,
-      podologyAnamnesisActive
+      podologyAnamnesisActive,
+      logoUrl
     },
     create: {
       uid: req.user?.id as string,
@@ -513,7 +515,8 @@ router.put('/settings', authenticateToken, async (req: AuthRequest, res) => {
       holidays: JSON.stringify(holidays),
       fidelityConfig: JSON.stringify(fidelityConfig),
       allowProfessionalViewAllAgendas,
-      podologyAnamnesisActive
+      podologyAnamnesisActive,
+      logoUrl
     }
   });
   res.json({ success: true });

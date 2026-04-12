@@ -7,10 +7,11 @@ interface PDFExportData {
   profession?: string;
   referral?: string;
   shoeType?: string;
+  workPosture?: string;
   allergies?: string;
   medications?: string;
   recentSurgeries?: string;
-  specialNotes?: string;
+  preProcedureNotes?: string;
   professionalObservations?: string;
   nailType?: string;
   footMarks?: string; // base64
@@ -19,16 +20,17 @@ interface PDFExportData {
   history: Record<string, boolean>;
   evalConditions: Record<string, boolean>;
   date: string;
+  logoUrl?: string;
 }
 
 const HISTORY_LABELS: Record<string, string> = {
-  hypertension: 'Hipertensão',
+  hypertension: 'Hipo/Hipertensão',
   diabetes: 'Diabetes',
   leprosy: 'Hanseníase',
   pacemaker: 'Marca-passo',
-  smokingAlcoholism: 'Tabagismo/Alcoolismo',
+  smokingAlcoholism: 'Tabagismo/Etilismo',
   vascularDisease: 'Doença Vascular',
-  oncology: 'Oncologia',
+  oncology: 'Doença Oncológica',
   renalDisorder: 'Distúrbio Renal',
   hormonalDisorder: 'Distúrbio Hormonal',
   intestinalDisorder: 'Distúrbio Intestinal',
@@ -37,23 +39,23 @@ const HISTORY_LABELS: Record<string, string> = {
   hepatitis: 'Hepatite',
   hivStd: 'HIV / DST',
   epilepsy: 'Epilepsia',
-  pregnantLactating: 'Gestante/Lactante',
+  pregnantLactating: 'Gestante ou Lactante',
 };
 
 const EVAL_LABELS: Record<string, string> = {
   dryness: 'Ressecamento',
-  cracks: 'Fissuras / Rachaduras',
-  nailOnychomycosis: 'Onicomicose (Unha)',
-  plantarOnychomycosis: 'Onicomicose (Plantar)',
-  tineaPedis: 'Tinea Pedis (Frieira)',
+  cracks: 'Rachadura / Fissura',
+  nailOnychomycosis: 'Onicomicose Ungueal',
+  plantarOnychomycosis: 'Onicomicose Plantar',
+  tineaPedis: 'Tinea Pedis',
   onychophosis: 'Onicofose',
-  onychocryptosis: 'Onicocriptose (Encravada)',
+  onychocryptosis: 'Onicocriptose',
   granuloma: 'Granuloma',
   hyperhidrosis: 'Hiperidrose',
   anhidrosis: 'Anidrose',
-  dyshidrosis: 'Disidrose',
+  dyshidrosis: 'Desidrose',
   psoriasis: 'Psoríase',
-  calluses: 'Calos / Calosidades',
+  calluses: 'Calos e Calosidades',
   hyperkeratosis: 'Hiperqueratose',
   bromidrosis: 'Bromidrose',
   exostosis: 'Exostose',
@@ -64,148 +66,190 @@ const EVAL_LABELS: Record<string, string> = {
 export const exportPodologyToPDF = async (data: PDFExportData) => {
   const doc = new jsPDF();
   const pageWidth = doc.internal.pageSize.getWidth();
-  let y = 20;
+  let y = 15;
 
-  // Header
-  doc.setFont('helvetica', 'bold');
-  doc.setFontSize(18);
-  doc.text('FICHA DE ANAMNESE (PODOLOGIA)', pageWidth / 2, y, { align: 'center' });
-  y += 10;
-  doc.setFontSize(10);
-  doc.setFont('helvetica', 'normal');
-  doc.text(`Data da Avaliação: ${data.date}`, pageWidth / 2, y, { align: 'center' });
-  y += 15;
+  // Clinic Logo Helper
+  const addImageFromUrl = async (url: string, x: number, y: number, w: number, h: number) => {
+    return new Promise((resolve) => {
+      const img = new Image();
+      img.crossOrigin = "Anonymous";
+      img.onload = () => {
+        try {
+          doc.addImage(img, 'PNG', x, y, w, h);
+          resolve(true);
+        } catch (e) {
+          console.error('Image add error:', e);
+          resolve(false);
+        }
+      };
+      img.onerror = () => resolve(false);
+      img.src = url;
+    });
+  };
+
+  // 0. Logo and Header
+  if (data.logoUrl) {
+    await addImageFromUrl(data.logoUrl, 15, y, 30, 30);
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(22);
+    doc.text('FICHA ANAMNESE', 55, y + 15);
+    doc.setFontSize(14);
+    doc.text('(PODOLOGIA)', 55, y + 22);
+    y += 35;
+  } else {
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(22);
+    doc.text('FICHA ANAMNESE (PODOLOGIA)', pageWidth / 2, y + 10, { align: 'center' });
+    y += 25;
+  }
 
   // 1. DADOS PESSOAIS
-  doc.setFillColor(240, 240, 240);
-  doc.rect(15, y, pageWidth - 30, 8, 'F');
+  doc.setFillColor(30, 30, 30);
+  doc.rect(15, y, pageWidth - 30, 7, 'F');
   doc.setFont('helvetica', 'bold');
-  doc.text('1. DADOS PESSOAIS', 20, y + 5.5);
+  doc.setFontSize(10);
+  doc.setTextColor(255, 255, 255);
+  doc.text('1. DADOS PESSOAIS', 20, y + 5);
   y += 12;
 
+  doc.setTextColor(0, 0, 0);
   doc.setFontSize(9);
   doc.text(`Nome: ${data.clientName}`, 20, y);
-  y += 6;
-  doc.text(`RG: ${data.rg || 'N/A'}`, 20, y);
-  doc.text(`CPF: ${data.cpf || 'N/A'}`, 100, y);
-  y += 6;
-  doc.text(`Profissão: ${data.profession || 'N/A'}`, 20, y);
-  doc.text(`Indicação: ${data.referral || 'N/A'}`, 100, y);
+  doc.text(`DN: ${data.date}`, 150, y); // Using current date as DN placeholder if not available
+  y += 7;
+  doc.text(`RG: ${data.rg || '_________________'}`, 20, y);
+  doc.text(`CPF: ${data.cpf || '_________________'}`, pageWidth / 2, y);
+  y += 7;
+  doc.text(`Profissão: ${data.profession || '_________________'}`, 20, y);
+  doc.text(`Indicação: ${data.referral || '_________________'}`, pageWidth / 2, y);
   y += 10;
 
-  // 2. HISTÓRICO DE SAÚDE
-  doc.setFillColor(240, 240, 240);
-  doc.rect(15, y, pageWidth - 30, 8, 'F');
+  // 2. HISTÓRICO DE SAÚDE (2 columns to match paper)
+  doc.setFillColor(30, 30, 30);
+  doc.rect(15, y, pageWidth - 30, 7, 'F');
   doc.setFont('helvetica', 'bold');
-  doc.text('2. HISTÓRICO DE SAÚDE', 20, y + 5.5);
+  doc.setTextColor(255, 255, 255);
+  doc.text('2. HISTÓRICO DE SAÚDE', 20, y + 5);
   y += 12;
 
+  doc.setTextColor(0, 0, 0);
   doc.setFont('helvetica', 'normal');
   const historyItems = Object.entries(HISTORY_LABELS);
-  let col = 0;
-  let startY = y;
-  historyItems.forEach(([key, label], index) => {
-    const isChecked = data.history[key];
-    const x = col === 0 ? 25 : col === 1 ? 70 : col === 2 ? 115 : 160;
-    
-    doc.rect(x - 5, y - 3, 3, 3); // Checkbox box
-    if (isChecked) {
-      doc.text('X', x - 4.5, y - 0.5);
-    }
-    doc.text(label, x, y);
+  const midPoint = Math.ceil(historyItems.length / 2);
+  const col1 = historyItems.slice(0, midPoint);
+  const col2 = historyItems.slice(midPoint);
 
-    if ((index + 1) % 4 === 0) {
-      y += 6;
-      col = 0;
-    } else {
-      col++;
-    }
+  let tempY = y;
+  col1.forEach(([key, label]) => {
+    const isChecked = data.history[key];
+    doc.rect(20, tempY - 3, 3, 3);
+    if (isChecked) doc.text('X', 20.5, tempY - 0.5);
+    doc.text(label, 26, tempY);
+    tempY += 6;
   });
-  y += 10;
+
+  tempY = y;
+  col2.forEach(([key, label]) => {
+    const isChecked = data.history[key];
+    doc.rect(pageWidth / 2, tempY - 3, 3, 3);
+    if (isChecked) doc.text('X', pageWidth / 2 + 0.5, tempY - 0.5);
+    doc.text(label, pageWidth / 2 + 6, tempY);
+    tempY += 6;
+  });
+  y = tempY + 5;
 
   // 3. INFORMAÇÕES ADICIONAIS
-  doc.setFillColor(240, 240, 240);
-  doc.rect(15, y, pageWidth - 30, 8, 'F');
+  doc.setFillColor(30, 30, 30);
+  doc.rect(15, y, pageWidth - 30, 7, 'F');
   doc.setFont('helvetica', 'bold');
-  doc.text('3. INFORMAÇÕES ADICIONAIS', 20, y + 5.5);
+  doc.setTextColor(255, 255, 255);
+  doc.text('3. INFORMAÇÕES ADICIONAIS', 20, y + 5);
   y += 12;
 
+  doc.setTextColor(0, 0, 0);
   doc.setFont('helvetica', 'normal');
-  doc.text(`Tipo de calçado: ${data.shoeType || 'N/A'}`, 20, y); y += 6;
-  doc.text(`Alergias: ${data.allergies || 'Nenhum'}`, 20, y); y += 6;
-  doc.text(`Medicamentos: ${data.medications || 'Nenhum'}`, 20, y); y += 6;
-  doc.text(`Cirurgias Recentes: ${data.recentSurgeries || 'N/A'}`, 20, y); y += 10;
-
-  // 4. AVALIAÇÃO TÉCNICA
-  if (y > 230) { doc.addPage(); y = 20; }
-  doc.setFillColor(240, 240, 240);
-  doc.rect(15, y, pageWidth - 30, 8, 'F');
+  doc.text(`Tipo de calçado que mais usa: ${data.shoeType || '_________________'}`, 20, y); y += 7;
+  doc.text(`Postura preponderante: ${data.workPosture === 'sitting' ? '[X] Sentado [ ] Em pé' : data.workPosture === 'standing' ? '[ ] Sentado [X] Em pé' : '[ ] Sentado [ ] Em pé'}`, 20, y); y += 7;
+  
   doc.setFont('helvetica', 'bold');
-  doc.text('4. AVALIAÇÃO TÉCNICA', 20, y + 5.5);
+  doc.text('Algum problema que seja necessário informar antes do procedimento? Especifique:', 20, y); y += 6;
+  doc.setFont('helvetica', 'normal');
+  const preProcLines = doc.splitTextToSize(data.preProcedureNotes || 'Nenhuma observação informada.', pageWidth - 40);
+  doc.text(preProcLines, 20, y);
+  y += (preProcLines.length * 5) + 10;
+
+  // 4. AVALIAÇÃO TÉCNICA (Back of the paper)
+  if (y > 200) { doc.addPage(); y = 20; }
+  doc.setFillColor(30, 30, 30);
+  doc.rect(15, y, pageWidth - 30, 7, 'F');
+  doc.setFont('helvetica', 'bold');
+  doc.setTextColor(255, 255, 255);
+  doc.text('4. AVALIAÇÃO TÉCNICA', 20, y + 5);
   y += 12;
 
-  doc.text(`Tipo de Unha: ${data.nailType || 'N/A'}`, 20, y);
-  y += 8;
+  doc.setTextColor(0, 0, 0);
+  doc.text(`TIPO DA UNHA: ${data.nailType || 'Normal'}`, 20, y);
+  y += 10;
 
   const evalItems = Object.entries(EVAL_LABELS);
-  col = 0;
-  evalItems.forEach(([key, label], index) => {
-    const isChecked = data.evalConditions[key];
-    const x = col === 0 ? 25 : col === 1 ? 85 : 145;
-    
-    doc.rect(x - 5, y - 3, 3, 3);
-    if (isChecked) doc.text('X', x - 4.5, y - 0.5);
-    doc.text(label, x, y);
+  const evalMid = Math.ceil(evalItems.length / 2);
+  const evalCol1 = evalItems.slice(0, evalMid);
+  const evalCol2 = evalItems.slice(evalMid);
 
-    if ((index + 1) % 3 === 0) {
-      y += 6;
-      col = 0;
-    } else {
-      col++;
-    }
+  startY = y;
+  evalCol1.forEach(([key, label]) => {
+    const isChecked = data.evalConditions[key];
+    doc.rect(20, y - 3, 3, 3);
+    if (isChecked) doc.text('X', 20.5, y - 0.5);
+    doc.text(label, 26, y);
+    y += 6;
   });
-  y += 10;
+
+  tempY = startY;
+  evalCol2.forEach(([key, label]) => {
+    const isChecked = data.evalConditions[key];
+    doc.rect(pageWidth / 2, tempY - 3, 3, 3);
+    if (isChecked) doc.text('X', pageWidth / 2 + 0.5, tempY - 0.5);
+    doc.text(label, pageWidth / 2 + 6, tempY);
+    tempY += 6;
+  });
+  y = Math.max(y, tempY) + 10;
 
   // FOOT MAP
   if (data.footMarks) {
-    if (y > 200) { doc.addPage(); y = 20; }
+    if (y > 180) { doc.addPage(); y = 20; }
     doc.setFont('helvetica', 'bold');
     doc.text('MAPEAMENTO VISUAL (PD/PE):', 20, y);
-    y += 5;
+    y += 8;
     try {
-      doc.addImage(data.footMarks, 'PNG', 40, y, 120, 90);
-      y += 95;
+      doc.addImage(data.footMarks, 'PNG', 45, y, pageWidth - 90, 80);
+      y += 90;
     } catch (e) {
-      console.error('Error adding footmarks to PDF:', e);
+      console.error('Error adding footmarks:', e);
     }
   }
 
-  // OBSERVATIONS
-  if (y > 250) { doc.addPage(); y = 20; }
+  // PROFESSIONAL OBS
+  if (y > 230) { doc.addPage(); y = 20; }
   doc.setFont('helvetica', 'bold');
   doc.text('OBSERVAÇÕES DO PROFISSIONAL:', 20, y);
-  y += 6;
+  y += 7;
   doc.setFont('helvetica', 'normal');
   const obsLines = doc.splitTextToSize(data.professionalObservations || 'Sem observações adicionais.', pageWidth - 40);
   doc.text(obsLines, 20, y);
-  y += (obsLines.length * 5) + 15;
+  y += (obsLines.length * 5) + 25;
 
   // SIGNATURES
-  if (y > 240) { doc.addPage(); y = 20; }
-  
-  // Patient Sig
+  if (y > 250) { doc.addPage(); y = 20; }
+  doc.setFont('helvetica', 'normal');
+  doc.setFontSize(8);
   doc.line(20, y, 90, y);
   doc.text('Assinatura do Paciente', 55, y + 5, { align: 'center' });
-  if (data.patientSignatureUrl) {
-    doc.addImage(data.patientSignatureUrl, 'PNG', 25, y - 25, 60, 20);
-  }
+  if (data.patientSignatureUrl) doc.addImage(data.patientSignatureUrl, 'PNG', 25, y - 20, 60, 18);
 
-  // Professional Sig
-  doc.line(120, y, 190, y);
-  doc.text('Assinatura do Profissional', 155, y + 5, { align: 'center' });
-  if (data.professionalSignatureUrl) {
-    doc.addImage(data.professionalSignatureUrl, 'PNG', 125, y - 25, 60, 20);
-  }
+  doc.line( pageWidth - 90, y, pageWidth - 20, y);
+  doc.text('Assinatura do Profissional', pageWidth - 55, y + 5, { align: 'center' });
+  if (data.professionalSignatureUrl) doc.addImage(data.professionalSignatureUrl, 'PNG', pageWidth - 85, y - 20, 60, 18);
 
   const fileName = `Anamnese_${data.clientName.replace(/\s+/g, '_')}_${data.date.replace(/\//g, '-')}.pdf`;
   doc.save(fileName);

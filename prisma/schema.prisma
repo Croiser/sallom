@@ -389,6 +389,8 @@ model PodologyAnamnesis {
   shoeType              String?
   rg                    String?
   cpf                   String?
+  workPosture           String? // 'sitting' | 'standing'
+  preProcedureNotes     String? @db.Text
   
   // History Checkboxes
   hypertension          Boolean  @default(false)

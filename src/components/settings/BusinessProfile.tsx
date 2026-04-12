@@ -7,7 +7,8 @@ import {
   Smartphone as SmartphoneIcon, 
   Star as StarIcon, 
   Facebook as FacebookIcon, 
-  Music2 as MusicIcon 
+  Music2 as MusicIcon,
+  Link as LinkIcon 
 } from 'lucide-react';
 import { ShopSettings } from '../../types';
 
@@ -56,6 +57,21 @@ export default function BusinessProfile({ settings, setSettings, onSave }: Busin
               />
               <span className="absolute right-5 top-1/2 -translate-y-1/2 text-zinc-300 text-[10px] font-black uppercase tracking-tighter">.dodile.com.br</span>
             </div>
+          </div>
+
+          <div className="space-y-3 md:col-span-2">
+            <label className="text-xs font-black text-zinc-400 uppercase tracking-widest ml-1">URL do Logotipo da Clínica</label>
+            <div className="relative group">
+              <LinkIcon className="absolute left-4 top-1/2 -translate-y-1/2 text-zinc-400 group-focus-within:text-brand-500 transition-colors" size={20} />
+              <input
+                type="text"
+                value={settings?.logoUrl || ''}
+                onChange={e => setSettings(s => s ? {...s, logoUrl: e.target.value} : null)}
+                className="input-premium pl-12"
+                placeholder="https://exemplo.com/logo.png"
+              />
+            </div>
+            <p className="text-[10px] text-zinc-500 ml-1">Dica: Use um link de imagem (PNG ou JPG) para aparecer nos seus relatórios de podologia.</p>
           </div>
           <div className="space-y-3">
             <label className="text-xs font-black text-zinc-400 uppercase tracking-widest ml-1">CNPJ (Opcional)</label>

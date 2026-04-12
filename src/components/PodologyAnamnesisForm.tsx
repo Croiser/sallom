@@ -1,4 +1,4 @@
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { X, ChevronRight, ChevronLeft, Save, FileText, User, ClipboardList, PenTool, ShieldCheck } from 'lucide-react';
 import SignatureCanvas from 'react-signature-canvas';
 import { api } from '../services/api';
@@ -61,6 +61,19 @@ export default function PodologyAnamnesisForm({ clientId, clientName, onClose, o
   const [loading, setLoading] = useState(false);
   const sigPadPatient = useRef<any>(null);
   const sigPadProf = useRef<any>(null);
+  const [settings, setSettings] = useState<any>(null);
+
+  useEffect(() => {
+    const fetchSettings = async () => {
+      try {
+        const data = await api.get('/settings');
+        setSettings(data);
+      } catch (err) {
+        console.error('Error fetching settings:', err);
+      }
+    };
+    fetchSettings();
+  }, []);
 
   const [formData, setFormData] = useState<any>({
     profession: '',
@@ -75,6 +88,8 @@ export default function PodologyAnamnesisForm({ clientId, clientName, onClose, o
     professionalObservations: '',
     nailType: '',
     footMarks: '',
+    workPosture: 'sitting',
+    preProcedureNotes: '',
     disclaimerAccepted: false
   });
 
@@ -129,6 +144,7 @@ export default function PodologyAnamnesisForm({ clientId, clientName, onClose, o
       history,
       evalConditions,
       date: new Date().toLocaleDateString('pt-BR'),
+      logoUrl: settings?.logoUrl,
       patientSignatureUrl: sigPadPatient.current?.isEmpty() ? null : sigPadPatient.current?.getTrimmedCanvas().toDataURL('image/png'),
       professionalSignatureUrl: sigPadProf.current?.isEmpty() ? null : sigPadProf.current?.getTrimmedCanvas().toDataURL('image/png'),
     });
@@ -259,9 +275,28 @@ export default function PodologyAnamnesisForm({ clientId, clientName, onClose, o
               </div>
               
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6 bg-white p-8 rounded-[2rem] border border-zinc-100 shadow-premium">
-                <div className="md:col-span-2">
+                <div className="md:col-span-1">
                   <label className="block text-xs font-black text-zinc-500 uppercase tracking-widest mb-3 ml-1">Tipo de calçado que mais usa</label>
                   <input type="text" name="shoeType" value={formData.shoeType} onChange={handleChange} className="w-full px-5 py-4 bg-zinc-50 border border-zinc-200 rounded-2xl focus:ring-4 focus:ring-emerald-500/10 focus:border-emerald-500 transition-all font-medium text-zinc-900" />
+                </div>
+                <div className="md:col-span-1">
+                  <label className="block text-xs font-black text-zinc-500 uppercase tracking-widest mb-3 ml-1">Postura Predominante</label>
+                  <div className="flex gap-3">
+                    <button 
+                      type="button"
+                      onClick={() => setFormData(p => ({...p, workPosture: 'sitting'}))}
+                      className={`flex-1 py-3 px-4 rounded-xl border-2 transition-all font-bold text-xs uppercase ${formData.workPosture === 'sitting' ? 'bg-emerald-500 border-emerald-500 text-white' : 'bg-white border-zinc-100 text-zinc-400'}`}
+                    >
+                      Sentado
+                    </button>
+                    <button 
+                      type="button"
+                      onClick={() => setFormData(p => ({...p, workPosture: 'standing'}))}
+                      className={`flex-1 py-3 px-4 rounded-xl border-2 transition-all font-bold text-xs uppercase ${formData.workPosture === 'standing' ? 'bg-emerald-500 border-emerald-500 text-white' : 'bg-white border-zinc-100 text-zinc-400'}`}
+                    >
+                      Em Pé
+                    </button>
+                  </div>
                 </div>
                 <div>
                   <label className="block text-xs font-black text-zinc-500 uppercase tracking-widest mb-3 ml-1">Alergias</label>
@@ -276,8 +311,15 @@ export default function PodologyAnamnesisForm({ clientId, clientName, onClose, o
                   <input type="text" name="recentSurgeries" value={formData.recentSurgeries} onChange={handleChange} className="w-full px-5 py-4 bg-zinc-50 border border-zinc-200 rounded-2xl focus:ring-4 focus:ring-emerald-500/10 focus:border-emerald-500 transition-all font-medium text-zinc-900" />
                 </div>
                 <div className="md:col-span-2">
-                  <label className="block text-xs font-black text-zinc-500 uppercase tracking-widest mb-3 ml-1">Necessidade de informar antes do procedimento</label>
-                  <textarea name="specialNotes" value={formData.specialNotes} onChange={handleChange} placeholder="Especifique qualquer condição relevante..." className="w-full px-5 py-4 bg-zinc-50 border border-zinc-200 rounded-2xl focus:ring-4 focus:ring-emerald-500/10 focus:border-emerald-500 transition-all font-medium text-zinc-900" rows={3} />
+                  <label className="block text-xs font-black text-zinc-500 uppercase tracking-widest mb-3 ml-1">Algum problema que seja necessário informar antes do procedimento?</label>
+                  <textarea 
+                    name="preProcedureNotes" 
+                    value={formData.preProcedureNotes} 
+                    onChange={handleChange} 
+                    placeholder="Especifique qualquer condição relevante (ex: alergias específicas, cirurgias, etc)..." 
+                    className="w-full px-5 py-4 bg-zinc-50 border border-zinc-200 rounded-2xl focus:ring-4 focus:ring-emerald-500/10 focus:border-emerald-500 transition-all font-medium text-zinc-900" 
+                    rows={4} 
+                  />
                 </div>
               </div>
             </div>
