@@ -29,10 +29,6 @@ import Pricing from './Pricing';
 import { api } from '../services/api';
 
 export default function LandingPage({ onAuthClick }: { onAuthClick: (view?: 'login' | 'register') => void }) {
-  const [heroImage, setHeroImage] = useState<string | null>(null);
-  const [logoImage, setLogoImage] = useState<string | null>(null);
-  const [loadingImage, setLoadingImage] = useState(false);
-  const [loadingLogo, setLoadingLogo] = useState(false);
   const [quickReg, setQuickReg] = useState({ name: '', shopName: '', whatsapp: '' });
 
   const handleQuickRegister = (e: React.FormEvent) => {
@@ -42,44 +38,7 @@ export default function LandingPage({ onAuthClick }: { onAuthClick: (view?: 'log
     onAuthClick('register');
   };
 
-  useEffect(() => {
-    async function generateAssets() {
-      setLoadingImage(true);
-      setLoadingLogo(true);
-      try {
-        // Generate Hero Image
-        const heroPrompt = `A high-quality, professional photography of a modern beauty salon. In the foreground, a middle-aged female salon owner sits at a cluttered reception desk, looking exhausted and overwhelmed with her hands on her head. The desk is covered in messy paper planners, notebooks, a ringing telephone, and a tablet displaying numerous notifications. In the background, the salon is bustling with activity, showing hairdressers working and clients in styling chairs. The lighting is dramatic and natural, highlighting the owner's stressed expression. In the center of the composition, there is a clean, empty space for text, featuring a prominent, elegant hot pink button that clearly says 'CADASTRE-SE AGORA' in bold white letters. The overall mood captures the contrast between professional success and administrative chaos.`;
 
-        const heroResponse = await api.post('/ai/generate-assets', { 
-          prompt: heroPrompt,
-          aspectRatio: "16:9"
-        });
-
-        if (heroResponse.data) {
-          setHeroImage(`data:image/png;base64,${heroResponse.data}`);
-        }
-
-        // Generate Logo
-        const logoPrompt = `A modern and elegant logo for a women's beauty salon management app named 'SallonProManager'. The logo should feature minimalist and sophisticated elements representing hair styling or aesthetics (like a stylized hair strand or a subtle silhouette). Use a luxury color palette: rose gold, deep charcoal, and soft white. The design must be clean, professional, and suitable for a high-end mobile app icon. Vector style, isolated on a white background.`;
-
-        const logoResponse = await api.post('/ai/generate-assets', {
-          prompt: logoPrompt,
-          aspectRatio: "1:1"
-        });
-
-        if (logoResponse.data) {
-          setLogoImage(`data:image/png;base64,${logoResponse.data}`);
-        }
-      } catch (error) {
-        console.error('Error generating assets:', error);
-      } finally {
-        setLoadingImage(false);
-        setLoadingLogo(false);
-      }
-    }
-
-    generateAssets();
-  }, []);
 
   return (
     <div className="min-h-screen bg-white">
@@ -88,13 +47,7 @@ export default function LandingPage({ onAuthClick }: { onAuthClick: (view?: 'log
         <div className="max-w-7xl mx-auto px-4 h-20 flex items-center justify-between">
           <div className="flex items-center gap-2">
             <div className="w-10 h-10 bg-rose-500 rounded-xl flex items-center justify-center shadow-lg shadow-rose-500/20 overflow-hidden">
-              {loadingLogo ? (
-                <LoaderIcon className="text-white animate-spin" size={20} />
-              ) : logoImage ? (
-                <img src={logoImage} alt="SallonProManager Logo" className="w-full h-full object-cover" referrerPolicy="no-referrer" />
-              ) : (
-                <ScissorsIcon className="text-white" size={24} />
-              )}
+              <ScissorsIcon className="text-white" size={24} />
             </div>
             <span className="text-xl font-bold text-zinc-900 tracking-tight bg-gradient-to-r from-zinc-900 to-rose-600 bg-clip-text text-transparent italic uppercase">SallonProManager</span>
           </div>
@@ -211,23 +164,11 @@ export default function LandingPage({ onAuthClick }: { onAuthClick: (view?: 'log
               className="flex-1 relative"
             >
               <div className="relative z-10 bg-white rounded-[2.5rem] p-4 shadow-2xl border border-zinc-100 min-h-[500px] flex items-center justify-center overflow-hidden">
-                {loadingImage ? (
-                  <div className="flex flex-col items-center gap-4">
-                    <LoaderIcon className="w-12 h-12 text-rose-500 animate-spin" />
-                    <p className="text-zinc-500 font-medium italic">Gerando imagem conceito...</p>
-                  </div>
-                ) : heroImage ? (
-                  <img 
-                    src={heroImage} 
-                    alt="Conceito visual do sistema SallonProManager em um salão de beleza moderno" 
-                    className="rounded-[2rem] w-full h-[500px] object-cover"
-                    referrerPolicy="no-referrer"
-                  />
-                ) : (
-                  <div className="text-center p-8">
-                    <p className="text-zinc-400 italic">Conceito visual do salão</p>
-                  </div>
-                )}
+                <img 
+                  src="https://images.unsplash.com/photo-1560066984-138dadb4c035?auto=format&fit=crop&q=80&w=1200" 
+                  alt="Modern premium beauty salon" 
+                  className="rounded-[2rem] w-full h-[500px] object-cover"
+                />
                 
                 <div className="absolute -bottom-10 -left-10 bg-white p-6 rounded-3xl shadow-xl border border-zinc-100 hidden md:block">
                   <div className="flex items-center gap-4 mb-4">

@@ -26,7 +26,6 @@ import { UserProfile } from '../types';
 import { motion, AnimatePresence } from 'motion/react';
 import { useAuth } from '../contexts/AuthContext';
 import { useSubscription } from '../hooks/useSubscription';
-import { GoogleGenAI } from "@google/genai";
 
 interface LayoutProps {
   children: React.ReactNode;
@@ -38,36 +37,8 @@ export default function Layout({ children, activeTab, setActiveTab }: LayoutProp
   const { user: userProfile, logout } = useAuth();
   const { plan } = useSubscription();
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
-  const [logoImage, setLogoImage] = useState<string | null>(null);
-  const [loadingLogo, setLoadingLogo] = useState(false);
 
-  useEffect(() => {
-    async function generateLogo() {
-      setLoadingLogo(true);
-      try {
-        const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
-        const logoPrompt = `A modern and elegant logo for a women's beauty salon management app named 'SallonProManager'. The logo should feature minimalist and sophisticated elements representing hair styling or aesthetics (like a stylized hair strand or a subtle silhouette). Use a luxury color palette: rose gold, deep charcoal, and soft white. The design must be clean, professional, and suitable for a high-end mobile app icon. Vector style, isolated on a white background.`;
 
-        const response = await ai.models.generateContent({
-          model: 'gemini-2.5-flash-image',
-          contents: { parts: [{ text: logoPrompt }] },
-          config: { imageConfig: { aspectRatio: "1:1" } },
-        });
-
-        for (const part of response.candidates[0].content.parts) {
-          if (part.inlineData) {
-            setLogoImage(`data:image/png;base64,${part.inlineData.data}`);
-            break;
-          }
-        }
-      } catch (error) {
-        console.error('Error generating logo:', error);
-      } finally {
-        setLoadingLogo(false);
-      }
-    }
-    generateLogo();
-  }, []);
 
   const menuItems = [
     { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard },
@@ -143,13 +114,7 @@ export default function Layout({ children, activeTab, setActiveTab }: LayoutProp
         <div className="p-8 flex flex-col h-full">
           <div className="flex items-center gap-3 mb-12 group cursor-pointer">
             <div className="w-12 h-12 bg-gradient-to-br from-brand-500 to-brand-700 rounded-2xl flex items-center justify-center shadow-premium overflow-hidden transition-transform group-hover:scale-105 duration-300">
-              {loadingLogo ? (
-                <Flower2 className="text-white animate-spin" size={24} />
-              ) : logoImage ? (
-                <img src={logoImage} alt="SallonProManager Logo" className="w-full h-full object-cover" referrerPolicy="no-referrer" />
-              ) : (
-                <Flower2 className="text-white" size={28} />
-              )}
+              <Flower2 className="text-white" size={28} />
             </div>
             <div className="flex flex-col">
               <h1 className="text-xl font-display font-black tracking-tighter text-white italic leading-none group-hover:text-brand-500 transition-colors">SALLONPRO</h1>
