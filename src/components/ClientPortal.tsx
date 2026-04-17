@@ -241,7 +241,7 @@ export default function ClientPortal({ slug }: ClientPortalProps) {
                 </button>
               </motion.div>
             ) : (
-              // ── Normal Login Form ──
+              // ── Login Buttons (no form — prevents accidental Enter submit) ──
               <motion.div
                 key="form"
                 initial={{ opacity: 0 }}
@@ -249,57 +249,86 @@ export default function ClientPortal({ slug }: ClientPortalProps) {
                 exit={{ opacity: 0 }}
                 className="space-y-4"
               >
-                <form onSubmit={handleLogin} className="space-y-4">
-                  <div className="relative">
-                    <input 
-                      type="tel"
-                      placeholder="(00) 00000-0000"
-                      value={phone}
-                      onChange={e => setPhone(e.target.value)}
-                      className="w-full bg-zinc-900 border border-zinc-800 rounded-2xl px-6 py-5 text-white focus:border-rose-500 outline-none transition-all text-center text-xl font-bold placeholder:text-zinc-700"
-                      required
-                    />
-                  </div>
+                <div className="relative">
+                  <input 
+                    type="tel"
+                    placeholder="(00) 00000-0000"
+                    value={phone}
+                    onChange={e => setPhone(e.target.value)}
+                    onKeyDown={e => {
+                      if (e.key === 'Enter') {
+                        e.preventDefault();
+                        handleSendMagicLink();
+                      }
+                    }}
+                    className="w-full bg-zinc-900 border border-zinc-800 rounded-2xl px-6 py-5 text-white focus:border-rose-500 outline-none transition-all text-center text-xl font-bold placeholder:text-zinc-700"
+                    autoFocus
+                  />
+                </div>
 
-                  {(error || magicLinkError) && (
-                    <p className="text-rose-500 text-sm font-medium">
-                      {error || magicLinkError}
-                    </p>
+                {(error || magicLinkError) && (
+                  <p className="text-rose-500 text-sm font-medium">
+                    {error || magicLinkError}
+                  </p>
+                )}
+
+                {/* Primary: Send Magic Link */}
+                <button
+                  type="button"
+                  onClick={handleSendMagicLink}
+                  disabled={magicLinkSending}
+                  className="w-full bg-rose-500 text-white py-5 rounded-2xl font-bold hover:bg-rose-400 transition-all shadow-lg shadow-rose-500/20 disabled:opacity-50 flex items-center justify-center gap-3"
+                >
+                  {magicLinkSending ? (
+                    <>
+                      <Loader2 size={18} className="animate-spin" />
+                      Enviando link...
+                    </>
+                  ) : (
+                    <>
+                      <Zap size={18} />
+                      Enviar link por WhatsApp
+                    </>
                   )}
+                </button>
 
-                  {/* Primary: Send Magic Link */}
-                  <button
-                    type="button"
-                    onClick={handleSendMagicLink}
-                    disabled={magicLinkSending}
-                    className="w-full bg-rose-500 text-white py-5 rounded-2xl font-bold hover:bg-rose-400 transition-all shadow-lg shadow-rose-500/20 disabled:opacity-50 flex items-center justify-center gap-3"
-                  >
-                    {magicLinkSending ? (
-                      <>
-                        <Loader2 size={18} className="animate-spin" />
-                        Enviando link...
-                      </>
-                    ) : (
-                      <>
-                        <Zap size={18} />
-                        Enviar link por WhatsApp
-                      </>
-                    )}
-                  </button>
+                {/* Divider */}
+                <div className="flex items-center gap-3">
+                  <div className="flex-1 h-px bg-zinc-800" />
+                  <span className="text-zinc-600 text-xs font-medium">ou</span>
+                  <div className="flex-1 h-px bg-zinc-800" />
+                </div>
 
-                  {/* Secondary: Direct login */}
-                  <button
-                    type="submit"
-                    disabled={loading}
-                    className="w-full bg-zinc-800 text-zinc-400 py-4 rounded-2xl font-bold hover:bg-zinc-700 hover:text-white transition-all border border-zinc-700 disabled:opacity-50 flex items-center justify-center gap-2 text-sm"
-                  >
-                    {loading ? (
-                      <><Loader2 size={16} className="animate-spin" /> Acessando...</>
-                    ) : (
-                      <><User size={16} /> Acessar diretamente</>
-                    )}
-                  </button>
-                </form>
+                {/* Secondary: Direct login */}
+                <button
+                  type="button"
+                  onClick={async () => {
+                    const sanitizedPhone = phone.replace(/\D/g, '');
+                    if (sanitizedPhone.length < 10) {
+                      setError('Digite um número de telefone válido.');
+                      return;
+                    }
+                    setLoading(true);
+                    setError(null);
+                    try {
+                      const result = await api.get(`/public/client-portal/${slug}/${sanitizedPhone}`);
+                      setData(result as any);
+                      setIsLoggedIn(true);
+                    } catch {
+                      setError('Cliente não encontrado ou erro ao buscar dados.');
+                    } finally {
+                      setLoading(false);
+                    }
+                  }}
+                  disabled={loading}
+                  className="w-full bg-zinc-800 text-zinc-400 py-4 rounded-2xl font-bold hover:bg-zinc-700 hover:text-white transition-all border border-zinc-700 disabled:opacity-50 flex items-center justify-center gap-2 text-sm"
+                >
+                  {loading ? (
+                    <><Loader2 size={16} className="animate-spin" /> Acessando...</>
+                  ) : (
+                    <><User size={16} /> Acessar diretamente (sem WhatsApp)</>
+                  )}
+                </button>
               </motion.div>
             )}
           </AnimatePresence>
