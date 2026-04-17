@@ -9,7 +9,10 @@ import {
   ChevronLeft,
   CalendarDays,
   History,
-  MessageSquare
+  MessageSquare,
+  Zap,
+  Send,
+  Loader2
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { api } from '../services/api';
@@ -32,6 +35,40 @@ export default function ClientPortal({ slug }: ClientPortalProps) {
   const [showCancelModal, setShowCancelModal] = useState(false);
   const [isProcessingCancel, setIsProcessingCancel] = useState(false);
 
+  // Magic Link states
+  const [magicLinkSending, setMagicLinkSending] = useState(false);
+  const [magicLinkSent, setMagicLinkSent] = useState(false);
+  const [magicLinkError, setMagicLinkError] = useState<string | null>(null);
+  const [tokenLoading, setTokenLoading] = useState(false);
+  const [tokenError, setTokenError] = useState<string | null>(null);
+
+  // Auto-login via Magic Link token in URL
+  useEffect(() => {
+    const urlParams = new URLSearchParams(window.location.search);
+    const token = urlParams.get('token');
+
+    if (token && !isLoggedIn) {
+      setTokenLoading(true);
+      setTokenError(null);
+
+      api.get(`/public/client-portal/${slug}/verify-token?token=${encodeURIComponent(token)}`)
+        .then((result: any) => {
+          setData(result);
+          setIsLoggedIn(true);
+          // Clean the token from the URL without reloading
+          const cleanUrl = window.location.pathname;
+          window.history.replaceState(null, '', cleanUrl);
+        })
+        .catch((err: any) => {
+          const message = err?.response?.data?.error || err?.message || 'Link inválido ou expirado.';
+          setTokenError(message);
+        })
+        .finally(() => {
+          setTokenLoading(false);
+        });
+    }
+  }, [slug]);
+
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
@@ -45,6 +82,27 @@ export default function ClientPortal({ slug }: ClientPortalProps) {
       setError('Cliente não encontrado ou erro ao buscar dados.');
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleSendMagicLink = async () => {
+    const sanitizedPhone = phone.replace(/\D/g, '');
+    if (sanitizedPhone.length < 10) {
+      setMagicLinkError('Digite um número de telefone válido antes de enviar o link.');
+      return;
+    }
+
+    setMagicLinkSending(true);
+    setMagicLinkError(null);
+
+    try {
+      await api.post(`/public/client-portal/${slug}/magic-link`, { phone: sanitizedPhone });
+      setMagicLinkSent(true);
+    } catch (err: any) {
+      const message = err?.response?.data?.error || err?.message || 'Erro ao enviar o link.';
+      setMagicLinkError(message);
+    } finally {
+      setMagicLinkSending(false);
     }
   };
 
@@ -75,7 +133,7 @@ export default function ClientPortal({ slug }: ClientPortalProps) {
       handleLogin({ preventDefault: () => {} } as any);
     } catch (err: any) {
       if (err.response?.data?.error === 'Late cancellation') {
-        // This should be handled by the UI showing the late cancel warning
+        // Handled by UI
       } else {
         alert('Erro ao cancelar agendamento.');
       }
@@ -84,6 +142,58 @@ export default function ClientPortal({ slug }: ClientPortalProps) {
     }
   };
 
+  // ──────────────── TOKEN LOADING SCREEN ────────────────
+  if (tokenLoading) {
+    return (
+      <div className="min-h-screen bg-zinc-950 flex items-center justify-center p-6">
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          className="max-w-md w-full space-y-6 text-center"
+        >
+          <div className="w-20 h-20 bg-rose-500/10 rounded-full flex items-center justify-center mx-auto">
+            <Loader2 className="text-rose-500 animate-spin" size={36} />
+          </div>
+          <div className="space-y-2">
+            <h2 className="text-2xl font-bold text-white">Acessando seu portal...</h2>
+            <p className="text-zinc-500 text-sm">Validando seu link. Aguarde um instante.</p>
+          </div>
+        </motion.div>
+      </div>
+    );
+  }
+
+  // ──────────────── TOKEN ERROR SCREEN ────────────────
+  if (tokenError) {
+    return (
+      <div className="min-h-screen bg-zinc-950 flex items-center justify-center p-6">
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          className="max-w-md w-full space-y-6 text-center"
+        >
+          <div className="w-20 h-20 bg-rose-500/10 rounded-full flex items-center justify-center mx-auto">
+            <XCircle className="text-rose-500" size={36} />
+          </div>
+          <div className="space-y-2">
+            <h2 className="text-2xl font-bold text-white">Link inválido</h2>
+            <p className="text-zinc-400 text-sm">{tokenError}</p>
+          </div>
+          <button
+            onClick={() => {
+              setTokenError(null);
+              window.history.replaceState(null, '', window.location.pathname);
+            }}
+            className="w-full bg-zinc-800 text-white py-4 rounded-2xl font-bold hover:bg-zinc-700 transition-all border border-zinc-700"
+          >
+            Entrar com meu telefone
+          </button>
+        </motion.div>
+      </div>
+    );
+  }
+
+  // ──────────────── LOGIN SCREEN ────────────────
   if (!isLoggedIn) {
     return (
       <div className="min-h-screen bg-zinc-950 flex items-center justify-center p-6">
@@ -97,26 +207,102 @@ export default function ClientPortal({ slug }: ClientPortalProps) {
             <p className="text-zinc-500">Informe seu WhatsApp para acessar sua agenda e histórico.</p>
           </div>
 
-          <form onSubmit={handleLogin} className="space-y-4">
-            <div className="relative">
-              <input 
-                type="tel"
-                placeholder="(00) 00000-0000"
-                value={phone}
-                onChange={e => setPhone(e.target.value)}
-                className="w-full bg-zinc-900 border border-zinc-800 rounded-2xl px-6 py-5 text-white focus:border-rose-500 outline-none transition-all text-center text-xl font-bold placeholder:text-zinc-700"
-                required
-              />
-            </div>
-            {error && <p className="text-rose-500 text-sm font-medium">{error}</p>}
-            <button 
-              type="submit"
-              disabled={loading}
-              className="w-full bg-rose-500 text-white py-5 rounded-2xl font-bold hover:bg-rose-400 transition-all shadow-lg shadow-rose-500/20 disabled:opacity-50"
-            >
-              {loading ? 'Acessando...' : 'Entrar no Portal'}
-            </button>
-          </form>
+          <AnimatePresence mode="wait">
+            {magicLinkSent ? (
+              // ── Magic Link Sent State ──
+              <motion.div
+                key="sent"
+                initial={{ opacity: 0, scale: 0.95 }}
+                animate={{ opacity: 1, scale: 1 }}
+                exit={{ opacity: 0, scale: 0.95 }}
+                className="space-y-6"
+              >
+                <div className="bg-emerald-500/10 border border-emerald-500/20 rounded-3xl p-8 space-y-4">
+                  <div className="w-16 h-16 bg-emerald-500/20 rounded-full flex items-center justify-center mx-auto">
+                    <CheckCircle2 className="text-emerald-400" size={32} />
+                  </div>
+                  <div className="space-y-1">
+                    <h2 className="text-xl font-bold text-white">Link enviado! ✅</h2>
+                    <p className="text-zinc-400 text-sm leading-relaxed">
+                      Verifique seu WhatsApp. Clique no link recebido para acessar seu portal automaticamente.
+                    </p>
+                    <p className="text-zinc-600 text-xs mt-2">O link expira em 15 minutos.</p>
+                  </div>
+                </div>
+
+                <button
+                  onClick={() => {
+                    setMagicLinkSent(false);
+                    setMagicLinkError(null);
+                  }}
+                  className="text-zinc-500 hover:text-zinc-300 text-sm font-medium transition-colors"
+                >
+                  Entrar com número de telefone
+                </button>
+              </motion.div>
+            ) : (
+              // ── Normal Login Form ──
+              <motion.div
+                key="form"
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                exit={{ opacity: 0 }}
+                className="space-y-4"
+              >
+                <form onSubmit={handleLogin} className="space-y-4">
+                  <div className="relative">
+                    <input 
+                      type="tel"
+                      placeholder="(00) 00000-0000"
+                      value={phone}
+                      onChange={e => setPhone(e.target.value)}
+                      className="w-full bg-zinc-900 border border-zinc-800 rounded-2xl px-6 py-5 text-white focus:border-rose-500 outline-none transition-all text-center text-xl font-bold placeholder:text-zinc-700"
+                      required
+                    />
+                  </div>
+
+                  {(error || magicLinkError) && (
+                    <p className="text-rose-500 text-sm font-medium">
+                      {error || magicLinkError}
+                    </p>
+                  )}
+
+                  {/* Primary: Send Magic Link */}
+                  <button
+                    type="button"
+                    onClick={handleSendMagicLink}
+                    disabled={magicLinkSending}
+                    className="w-full bg-rose-500 text-white py-5 rounded-2xl font-bold hover:bg-rose-400 transition-all shadow-lg shadow-rose-500/20 disabled:opacity-50 flex items-center justify-center gap-3"
+                  >
+                    {magicLinkSending ? (
+                      <>
+                        <Loader2 size={18} className="animate-spin" />
+                        Enviando link...
+                      </>
+                    ) : (
+                      <>
+                        <Zap size={18} />
+                        Enviar link por WhatsApp
+                      </>
+                    )}
+                  </button>
+
+                  {/* Secondary: Direct login */}
+                  <button
+                    type="submit"
+                    disabled={loading}
+                    className="w-full bg-zinc-800 text-zinc-400 py-4 rounded-2xl font-bold hover:bg-zinc-700 hover:text-white transition-all border border-zinc-700 disabled:opacity-50 flex items-center justify-center gap-2 text-sm"
+                  >
+                    {loading ? (
+                      <><Loader2 size={16} className="animate-spin" /> Acessando...</>
+                    ) : (
+                      <><User size={16} /> Acessar diretamente</>
+                    )}
+                  </button>
+                </form>
+              </motion.div>
+            )}
+          </AnimatePresence>
 
           <button 
             onClick={() => window.location.href = `/agenda/${slug}`}
@@ -129,6 +315,7 @@ export default function ClientPortal({ slug }: ClientPortalProps) {
     );
   }
 
+  // ──────────────── PORTAL (LOGGED IN) ────────────────
   return (
     <div className="min-h-screen bg-zinc-950 text-zinc-100 pb-10">
       {/* Client Header */}

@@ -93,8 +93,25 @@ model Client {
   anamnesis     Anamnesis[]
   podologyAnamnesis PodologyAnamnesis[]
   sales         Sale[]
+  magicTokens   ClientMagicToken[]
 
   @@map("clients")
+}
+
+model ClientMagicToken {
+  id        String    @id @default(uuid())
+  token     String    @unique
+  clientId  String
+  ownerUid  String
+  expiresAt DateTime
+  usedAt    DateTime?
+  createdAt DateTime  @default(now())
+
+  client    Client    @relation(fields: [clientId], references: [id], onDelete: Cascade)
+
+  @@index([token])
+  @@index([clientId])
+  @@map("client_magic_tokens")
 }
 
 model Appointment {

@@ -2203,6 +2203,157 @@ router.get('/public/client-portal/:slug/:phone', async (req, res) => {
   }
 });
 
+// --- MAGIC LINK ROUTES ---
+
+/**
+ * POST /public/client-portal/:slug/magic-link
+ * Generates a one-time magic link and sends it via WhatsApp (WAHA).
+ */
+router.post('/public/client-portal/:slug/magic-link', async (req, res) => {
+  let { phone } = req.body;
+  const { slug } = req.params;
+
+  if (!phone) return res.status(400).json({ error: 'Phone is required' });
+  phone = String(phone).replace(/\D/g, '');
+
+  try {
+    // Resolve shop owner by slug
+    let user = await prisma.user.findUnique({ where: { slug } });
+    if (!user) {
+      const shop = await prisma.setting.findUnique({ where: { slug } });
+      if (shop) user = await prisma.user.findUnique({ where: { id: shop.uid } });
+    }
+    if (!user) return res.status(404).json({ error: 'Shop not found' });
+
+    // Find client by phone
+    const client = await prisma.client.findFirst({
+      where: { ownerUid: user.id, phone }
+    });
+    if (!client) return res.status(404).json({ error: 'Cliente não encontrado. Verifique o número.' });
+
+    // Rate limit: max 1 token per phone per 60 seconds
+    const recentToken = await (prisma as any).clientMagicToken.findFirst({
+      where: {
+        clientId: client.id,
+        createdAt: { gte: new Date(Date.now() - 60_000) }
+      }
+    });
+    if (recentToken) {
+      return res.status(429).json({ error: 'Aguarde 1 minuto antes de solicitar um novo link.' });
+    }
+
+    // Generate JWT token (15 min expiry)
+    const expiresAt = new Date(Date.now() + 15 * 60 * 1000);
+    const tokenPayload = { clientId: client.id, ownerUid: user.id, type: 'magic_link' };
+    const token = jwt.sign(tokenPayload, JWT_SECRET, { expiresIn: '15m' });
+
+    // Persist token for single-use enforcement
+    await (prisma as any).clientMagicToken.create({
+      data: { token, clientId: client.id, ownerUid: user.id, expiresAt }
+    });
+
+    // Build the magic link
+    const appUrl = process.env.APP_URL || 'http://localhost:3000';
+    const magicLink = `${appUrl}/portal/${slug}?token=${token}`;
+
+    // Send via WAHA
+    const wahaSettings = await prisma.whatsappSettings.findUnique({ where: { uid: user.id } });
+    let formattedPhone = phone.startsWith('55') ? phone : `55${phone}`;
+    const chatId = `${formattedPhone}@c.us`;
+
+    const shopName = user.shopName || 'nosso salão';
+    const message = `Olá, ${client.name}! 👋\n\nAcesse sua área exclusiva em *${shopName}* clicando no link abaixo:\n\n🔗 ${magicLink}\n\n_Este link é válido por 15 minutos e é de uso único._`;
+
+    if (wahaSettings?.enabled && wahaSettings.status === 'connected') {
+      const waha = new WAHAService(WAHA_API_URL);
+      await waha.sendTextMessage(wahaSettings.wahaInstanceName || 'default', chatId, message).catch(err => {
+        console.error('[Magic Link] WAHA send failed:', err.message);
+      });
+    } else {
+      // Log for dev/debug when WhatsApp is not connected
+      console.log(`[Magic Link] Link for ${client.name} (${phone}): ${magicLink}`);
+    }
+
+    res.json({ success: true, message: 'Link enviado via WhatsApp! Verifique suas mensagens.' });
+  } catch (err: any) {
+    console.error('[Magic Link] Error:', err.message);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+/**
+ * GET /public/client-portal/:slug/verify-token?token=
+ * Validates a magic link token and returns client + appointments data.
+ * Invalidates the token after first use.
+ */
+router.get('/public/client-portal/:slug/verify-token', async (req, res) => {
+  const { slug } = req.params;
+  const { token } = req.query as { token: string };
+
+  if (!token) return res.status(400).json({ error: 'Token is required' });
+
+  try {
+    // Verify JWT signature and expiry
+    let payload: any;
+    try {
+      payload = jwt.verify(token, JWT_SECRET);
+    } catch {
+      return res.status(401).json({ error: 'Link inválido ou expirado.' });
+    }
+
+    if (payload.type !== 'magic_link') {
+      return res.status(401).json({ error: 'Token inválido.' });
+    }
+
+    // Fetch the persisted token record
+    const tokenRecord = await (prisma as any).clientMagicToken.findUnique({
+      where: { token }
+    });
+
+    if (!tokenRecord) return res.status(401).json({ error: 'Link não encontrado.' });
+    if (tokenRecord.usedAt) return res.status(401).json({ error: 'Este link já foi utilizado. Solicite um novo.' });
+    if (new Date() > tokenRecord.expiresAt) return res.status(401).json({ error: 'Link expirado. Solicite um novo.' });
+
+    // Validate slug matches ownerUid
+    let user = await prisma.user.findUnique({ where: { slug } });
+    if (!user) {
+      const shop = await prisma.setting.findUnique({ where: { slug } });
+      if (shop) user = await prisma.user.findUnique({ where: { id: shop.uid } });
+    }
+    if (!user || user.id !== tokenRecord.ownerUid) {
+      return res.status(401).json({ error: 'Token inválido para este salão.' });
+    }
+
+    // Mark token as used (single-use)
+    await (prisma as any).clientMagicToken.update({
+      where: { token },
+      data: { usedAt: new Date() }
+    });
+
+    // Fetch client + appointments
+    const client = await prisma.client.findUnique({
+      where: { id: tokenRecord.clientId },
+      include: {
+        appointments: { orderBy: { date: 'desc' } }
+      }
+    });
+
+    if (!client) return res.status(404).json({ error: 'Cliente não encontrado.' });
+
+    res.json({
+      client: {
+        id: client.id,
+        name: client.name,
+        pendingDebt: (client as any).pendingDebt || 0
+      },
+      appointments: (client as any).appointments
+    });
+  } catch (err: any) {
+    console.error('[Magic Link Verify] Error:', err.message);
+    res.status(500).json({ error: err.message });
+  }
+});
+
 // SuperAdmin Routes
 router.get('/superadmin/stats', authenticateToken, isSuperAdmin, async (req: AuthRequest, res) => {
   try {
