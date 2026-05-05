@@ -2558,46 +2558,9 @@ router.post('/public/appointments/:id/cancel', async (req, res) => {
   }
 });
 
-router.get('/public/client-portal/:slug/:phone', async (req, res) => {
-  let { slug, phone } = req.params;
-  phone = phone.replace(/\D/g, '');
-  try {
-    // Find the shop owner first
-    let user = await prisma.user.findUnique({ where: { slug } });
-    if (!user) {
-      const shop = await prisma.setting.findUnique({ where: { slug } });
-      if (shop) {
-        user = await prisma.user.findUnique({ where: { id: shop.uid } });
-      }
-    }
-
-    if (!user) return res.status(404).json({ error: 'Shop not found' });
-
-    const client = await prisma.client.findFirst({
-      where: { ownerUid: user.id, phone },
-      include: {
-        appointments: {
-          orderBy: { date: 'desc' }
-        }
-      }
-    });
-
-    if (!client) return res.status(404).json({ error: 'Client not found' });
-
-    res.json({
-      client: {
-        id: client.id,
-        name: client.name,
-        pendingDebt: (client as any).pendingDebt || 0
-      },
-      appointments: client.appointments
-    });
-  } catch (err: any) {
-    res.status(500).json({ error: err.message });
-  }
-});
 
 // --- MAGIC LINK ROUTES ---
+
 
 /**
  * POST /public/client-portal/:slug/magic-link
@@ -2757,6 +2720,44 @@ router.get('/public/client-portal/:slug/verify-token', async (req, res) => {
     });
   } catch (err: any) {
     console.error('[Magic Link Verify] Error:', err.message);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+/**
+ * GET /public/client-portal/:slug/:phone
+ * Alternative login via direct phone lookup.
+ */
+router.get('/public/client-portal/:slug/:phone', async (req, res) => {
+  let { slug, phone } = req.params;
+  phone = phone.replace(/\D/g, '');
+  try {
+    // Find the shop owner first
+    let user = await prisma.user.findUnique({ where: { slug } });
+    if (!user) {
+      const shop = await prisma.setting.findUnique({ where: { slug } });
+      if (shop) user = await prisma.user.findUnique({ where: { id: shop.uid } });
+    }
+    if (!user) return res.status(404).json({ error: 'Shop not found' });
+
+    const client = await prisma.client.findFirst({
+      where: { ownerUid: user.id, phone },
+      include: {
+        appointments: { orderBy: { date: 'desc' } }
+      }
+    });
+
+    if (!client) return res.status(404).json({ error: 'Client not found' });
+
+    res.json({
+      client: {
+        id: client.id,
+        name: client.name,
+        pendingDebt: (client as any).pendingDebt || 0
+      },
+      appointments: client.appointments
+    });
+  } catch (err: any) {
     res.status(500).json({ error: err.message });
   }
 });
