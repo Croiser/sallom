@@ -55,7 +55,7 @@ export default function WhatsAppConnection() {
     return () => clearInterval(interval);
   }, []);
 
-  const isConnected = status?.status === 'CONNECTED';
+  const isConnected = status?.status === 'WORKING' || status?.status === 'CONNECTED';
   const needsScan = status?.status === 'SCAN_QR_CODE' || (!isConnected && qr);
 
   return (

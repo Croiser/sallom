@@ -56,7 +56,7 @@ export default function Layout({ children, activeTab, setActiveTab }: LayoutProp
     }
   }, [userProfile, plan]);
 
-  const isWAConnected = whatsappStatus?.status === 'CONNECTED';
+  const isWAConnected = whatsappStatus?.status === 'WORKING' || whatsappStatus?.status === 'CONNECTED';
   const showWAWarning = plan?.features?.whatsapp && !isWAConnected && activeTab !== 'whatsapp-connection';
 
 
