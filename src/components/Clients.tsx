@@ -41,6 +41,7 @@ export default function Clients() {
   const [phone, setPhone] = useState('');
   const [email, setEmail] = useState('');
   const [notes, setNotes] = useState('');
+  const [birthDate, setBirthDate] = useState('');
 
   const fetchData = async () => {
     try {
@@ -69,7 +70,8 @@ export default function Clients() {
         name,
         phone,
         email,
-        notes
+        notes,
+        birthDate: birthDate || null
       });
 
       // Trigger WhatsApp Welcome
@@ -90,6 +92,7 @@ export default function Clients() {
       setPhone('');
       setEmail('');
       setNotes('');
+      setBirthDate('');
       fetchData();
       setToast({ message: 'Cliente cadastrado com sucesso!', type: 'success' });
       setTimeout(() => setToast(null), 3000);
@@ -241,6 +244,14 @@ export default function Clients() {
                 <MailIcon size={18} className="text-zinc-400" />
                 <span className="text-sm truncate">{client.email || 'Sem e-mail'}</span>
               </div>
+              {client.birthDate && (
+                <div className="flex items-center gap-3 text-zinc-600">
+                  <GiftIcon size={18} className="text-rose-500/50" />
+                  <span className="text-sm">
+                    Nascimento: {new Date(client.birthDate).toLocaleDateString('pt-BR')}
+                  </span>
+                </div>
+              )}
             </div>
 
             <div className="mt-4 grid grid-cols-2 gap-2">
@@ -493,6 +504,15 @@ export default function Clients() {
                   onChange={(e) => setEmail(e.target.value)}
                   className="w-full bg-zinc-50 border border-zinc-200 px-4 py-3 rounded-xl focus:outline-none focus:ring-2 focus:ring-rose-500/20 focus:border-rose-500"
                   placeholder="cliente@email.com"
+                />
+              </div>
+              <div className="space-y-2">
+                <label className="text-sm font-medium text-zinc-700">Data de Nascimento</label>
+                <input
+                  type="date"
+                  value={birthDate}
+                  onChange={(e) => setBirthDate(e.target.value)}
+                  className="w-full bg-zinc-50 border border-zinc-200 px-4 py-3 rounded-xl focus:outline-none focus:ring-2 focus:ring-rose-500/20 focus:border-rose-500"
                 />
               </div>
               <div className="space-y-2">

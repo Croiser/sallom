@@ -29,6 +29,7 @@ import {
   Cell
 } from 'recharts';
 import OnboardingChecklist from './OnboardingChecklist';
+import IntelligenceInsights from './IntelligenceInsights';
 import { useAuth } from '../contexts/AuthContext';
 import { api } from '../services/api';
 
@@ -188,6 +189,9 @@ export default function Dashboard({ onNavigate }: DashboardProps) {
           <h3 className="text-3xl font-display font-black text-surface-900 leading-none">{stats.activeClients}</h3>
         </motion.div>
       </div>
+
+      {/* Intelligence & Predictive Insights */}
+      <IntelligenceInsights />
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-10">
         {/* Revenue Chart */}

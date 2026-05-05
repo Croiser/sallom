@@ -375,7 +375,7 @@ export default function PodologyAnamnesisForm({ clientId, clientName, onClose, o
                     <p className="text-xs font-black text-zinc-400 uppercase tracking-widest mb-4 border-b border-zinc-50 pb-2">Mapeamento dos Pés (PD / PE)</p>
                     <FootCanvas 
                       initialData={formData.footMarks}
-                      onChange={(data) => handleCheckbox('footMarks', data)}
+                      onChange={(data) => setFormData((prev: any) => ({ ...prev, footMarks: data }))}
                     />
                   </div>
                 </div>

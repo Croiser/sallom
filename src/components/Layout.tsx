@@ -26,6 +26,7 @@ import { UserProfile } from '../types';
 import { motion, AnimatePresence } from 'motion/react';
 import { useAuth } from '../contexts/AuthContext';
 import { useSubscription } from '../hooks/useSubscription';
+import { api } from '../services/api';
 
 interface LayoutProps {
   children: React.ReactNode;
@@ -37,6 +38,26 @@ export default function Layout({ children, activeTab, setActiveTab }: LayoutProp
   const { user: userProfile, logout } = useAuth();
   const { plan } = useSubscription();
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
+  const [whatsappStatus, setWhatsappStatus] = useState<any>(null);
+
+  useEffect(() => {
+    if (userProfile && plan?.features?.whatsapp) {
+      const checkStatus = async () => {
+        try {
+          const data = await api.get('/whatsapp/waha/status');
+          setWhatsappStatus(data);
+        } catch (err) {
+          console.error('Failed to check WA status:', err);
+        }
+      };
+      checkStatus();
+      const interval = setInterval(checkStatus, 30000); // Check every 30s
+      return () => clearInterval(interval);
+    }
+  }, [userProfile, plan]);
+
+  const isWAConnected = whatsappStatus?.status === 'CONNECTED';
+  const showWAWarning = plan?.features?.whatsapp && !isWAConnected && activeTab !== 'whatsapp-connection';
 
 
 
@@ -213,6 +234,33 @@ export default function Layout({ children, activeTab, setActiveTab }: LayoutProp
 
         {/* Content Area */}
         <div className="flex-1 overflow-y-auto p-8 lg:p-12 bg-surface-50 custom-scrollbar">
+          <AnimatePresence>
+            {showWAWarning && (
+              <motion.div
+                initial={{ opacity: 0, y: -20 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: -20 }}
+                className="mb-8 bg-amber-50 border border-amber-200 p-4 rounded-3xl flex items-center justify-between gap-4 shadow-sm"
+              >
+                <div className="flex items-center gap-4">
+                  <div className="w-10 h-10 bg-amber-500 rounded-2xl flex items-center justify-center text-white shadow-lg shadow-amber-500/20">
+                    <QrCode size={20} />
+                  </div>
+                  <div>
+                    <h4 className="text-sm font-bold text-amber-900">WhatsApp Desconectado! ⚠️</h4>
+                    <p className="text-xs text-amber-700">Seu salão não está enviando lembretes automáticos no momento.</p>
+                  </div>
+                </div>
+                <button
+                  onClick={() => setActiveTab('whatsapp-connection')}
+                  className="px-6 py-2.5 bg-amber-500 hover:bg-amber-600 text-white text-xs font-black rounded-xl transition-all shadow-md shadow-amber-500/10 uppercase tracking-widest"
+                >
+                  Conectar Agora
+                </button>
+              </motion.div>
+            )}
+          </AnimatePresence>
+
           <motion.div
             key={activeTab}
             initial={{ opacity: 0, y: 20 }}

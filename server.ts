@@ -7,6 +7,7 @@ import { createServer as createViteServer } from 'vite';
 import { initDb } from './server/db.js';
 import prisma from './server/db.js';
 import apiRoutes from './server/routes.js';
+import { initReminderCron } from './server/services/reminderCron.js';
 
 async function startServer() {
   const app = express();
@@ -34,6 +35,11 @@ async function startServer() {
   // API Routes
   app.use('/api', apiRoutes);
 
+  // Initialize background jobs
+  if (process.env.NODE_ENV === 'production') {
+    initReminderCron();
+  }
+
   app.get('/api/diag', async (req, res) => {
     try {
       const plans = await (prisma as any).plan.findMany();
@@ -43,7 +49,7 @@ async function startServer() {
       res.status(500).json({ error: err.message });
     }
   });
-  
+
   app.get('/api/health', (req, res) => {
     res.json({ status: 'ok', message: 'Salão Pro Manager API is running' });
   });
@@ -81,7 +87,7 @@ async function startServer() {
   // The error handler must be registered before any other error middleware and after all controllers
   Sentry.setupExpressErrorHandler(app);
 
-app.listen(PORT, '0.0.0.0', () => {
+  app.listen(PORT, '0.0.0.0', () => {
     console.log(`Server running on http://localhost:${PORT}`);
   });
 }

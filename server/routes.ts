@@ -12,6 +12,7 @@ import { emailService } from './email.js';
 import { GoogleGenAI } from "@google/genai";
 import { appointmentGuard } from './middleware/appointmentGuard.js';
 import { validateRecurrenceSeries, calculateComboDuration } from './services/recurrenceService.js';
+import { IntelligenceService } from './services/IntelligenceService.js';
 
 const router = express.Router();
 
@@ -121,13 +122,13 @@ router.post('/auth/forgot-password', async (req, res) => {
     });
 
     console.log(`[PASSWORD RESET] Token for ${email}: ${token}`);
-    
+
     // Disparo real do e-mail na produção
     await emailService.sendPasswordResetEmail(email, token);
 
-    res.json({ 
-      success: true, 
-      message: 'Token de recuperação gerado enviado para o seu e-mail', 
+    res.json({
+      success: true,
+      message: 'Token de recuperação gerado enviado para o seu e-mail',
       token: token // Remova o envio do token no payload em produção verdadeira, mas para mock/teste mantemos
     });
   } catch (err: any) {
@@ -205,10 +206,10 @@ router.get('/plans', async (req, res) => {
 router.get('/subscription', authenticateToken, async (req: AuthRequest, res) => {
   try {
     const uid = req.user?.id as string;
-    
+
     const user = await prisma.user.findUnique({
       where: { id: uid },
-      include: { 
+      include: {
         subscription: {
           include: { plan: true }
         }
@@ -237,12 +238,46 @@ router.get('/subscription', authenticateToken, async (req: AuthRequest, res) => 
   }
 });
 
+// Alias for plural /subscriptions/me used by frontend
+router.get('/subscriptions/me', authenticateToken, async (req: AuthRequest, res) => {
+  try {
+    const uid = req.user?.id as string;
+    const user = await prisma.user.findUnique({
+      where: { id: uid },
+      include: {
+        subscription: {
+          include: { plan: true }
+        }
+      }
+    });
+
+    if (!user) return res.status(404).json({ error: 'User not found' });
+
+    if (user.subscription) {
+      const plan = user.subscription.plan as any;
+      if (plan && typeof plan.features === 'string') {
+        plan.features = JSON.parse(plan.features);
+      }
+      return res.json({ ...user.subscription, plan });
+    } else {
+      const planId = user.planId || 'plan_bronze';
+      const plan = await prisma.plan.findUnique({ where: { id: planId } }) as any;
+      if (plan && typeof plan.features === 'string') {
+        plan.features = JSON.parse(plan.features);
+      }
+      return res.json({ planId, status: 'inactive', plan });
+    }
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
 router.post('/subscription', authenticateToken, async (req: AuthRequest, res) => {
   const { planId, billingCycle } = req.body;
   const uid = req.user?.id as string;
-  
+
   const currentPeriodEnd = new Date(Date.now() + (billingCycle === 'monthly' ? 30 : 365) * 24 * 60 * 60 * 1000);
-  
+
   try {
     const targetPlanId = (planId as string).toLowerCase();
     const endDate = currentPeriodEnd;
@@ -320,9 +355,9 @@ router.post('/asaas/card', authenticateToken, async (req: AuthRequest, res) => {
     if (payment.status === 'CONFIRMED' || payment.status === 'RECEIVED') {
       const currentPeriodEnd = new Date(Date.now() + (billingCycle === 'monthly' ? 30 : 365) * 24 * 60 * 60 * 1000);
       const endDate = currentPeriodEnd;
-      
+
       const targetPlanId = (planId as string).toLowerCase();
-      
+
       // Update Prisma
       await prisma.subscription.upsert({
         where: { uid },
@@ -376,12 +411,12 @@ router.post('/asaas/webhook', async (req, res) => {
       const { externalReference } = payment;
       if (externalReference) {
         const { uid, planId, billingCycle } = JSON.parse(externalReference) as { uid: string, planId: string, billingCycle: string };
-        
+
         const currentPeriodEnd = new Date(Date.now() + (billingCycle === 'monthly' ? 30 : 365) * 24 * 60 * 60 * 1000);
         const endDate = currentPeriodEnd;
-        
+
         const targetPlanId = planId.toLowerCase();
-        
+
         // Update Prisma
         await prisma.subscription.upsert({
           where: { uid },
@@ -407,7 +442,7 @@ router.post('/asaas/webhook', async (req, res) => {
           where: { id: uid },
           data: { planId }
         });
-        
+
         console.log(`Subscription activated via Webhook for user ${uid}`);
 
         // Enviar E-mail de Confirmação de Pagamento
@@ -440,15 +475,15 @@ router.get('/settings', authenticateToken, async (req: AuthRequest, res) => {
     if (!user) return res.status(404).json({ error: 'User not found' });
 
     // For professionals, we need to fetch the owner's settings
-    const targetUid = (role === 'professional' && (user as any).ownerId) 
-      ? (user as any).ownerId 
+    const targetUid = (role === 'professional' && (user as any).ownerId)
+      ? (user as any).ownerId
       : userId;
 
     const settings = await prisma.setting.findUnique({ where: { uid: targetUid } }) as any;
     const ownerUser = await prisma.user.findUnique({ where: { id: targetUid }, select: { shopName: true } });
-    
+
     let result: any = settings ? { ...settings } : { uid: targetUid };
-    
+
     if (settings) {
       result.businessHours = settings.businessHours ? JSON.parse(settings.businessHours) : [];
       result.whatsappConfig = settings.whatsappConfig ? JSON.parse(settings.whatsappConfig) : null;
@@ -462,10 +497,10 @@ router.get('/settings', authenticateToken, async (req: AuthRequest, res) => {
       result.holidays = [];
       result.fidelityConfig = null;
     }
-    
+
     // Add shopName from target owner model as 'name'
     result.name = ownerUser?.shopName || '';
-    
+
     res.json(result);
   } catch (err: any) {
     res.status(500).json({ error: err.message });
@@ -473,7 +508,7 @@ router.get('/settings', authenticateToken, async (req: AuthRequest, res) => {
 });
 
 router.put('/settings', authenticateToken, async (req: AuthRequest, res) => {
-  const { 
+  const {
     name, slug, address, addressNumber, neighborhood, city, state, zipCode, cnpj,
     description, phone, instagram, facebook, tiktok,
     businessHours, whatsappConfig, holidays, fidelityConfig,
@@ -565,10 +600,10 @@ router.post('/staff', authenticateToken, async (req: AuthRequest, res) => {
     // 1. Create the Staff record
     const staff = await (prisma.staff as any).create({
       data: {
-        name, 
-        phone, 
-        commissionPercentage: Number(commissionPercentage || 0), 
-        active: active !== undefined ? active : true, 
+        name,
+        phone,
+        commissionPercentage: Number(commissionPercentage || 0),
+        active: active !== undefined ? active : true,
         portfolio: portfolio ? JSON.stringify(portfolio) : "[]",
         ownerUid
       }
@@ -704,7 +739,7 @@ router.post('/whatsapp/test', authenticateToken, async (req: AuthRequest, res) =
   try {
     const { number, templateName, languageCode, components } = req.body;
     const uid = req.user?.id as string;
-    
+
     const settings = await prisma.whatsappSettings.findUnique({ where: { uid } });
     if (!settings || !settings.apiKey || !settings.phoneNumberId) {
       return res.status(400).json({ error: 'WhatsApp Meta configuration missing' });
@@ -712,7 +747,7 @@ router.post('/whatsapp/test', authenticateToken, async (req: AuthRequest, res) =
 
     const metaService = new WhatsAppMetaService(settings.apiKey, settings.phoneNumberId);
     const result = await metaService.sendTemplateMessage(number, templateName, languageCode, components);
-    
+
     res.json(result);
   } catch (err: any) {
     res.status(500).json({ error: err.message });
@@ -772,7 +807,7 @@ router.post('/whatsapp/trigger', authenticateToken, async (req: AuthRequest, res
   try {
     const { recipientNumber, recipientName, type, variables } = req.body;
     const uid = req.user?.id as string;
-    
+
     const settings = await prisma.whatsappSettings.findUnique({ where: { uid } }) as any;
     if (!settings || !settings.enabled) {
       return res.json({ success: false, reason: 'WhatsApp not enabled for this tenant' });
@@ -858,7 +893,7 @@ router.post('/webhooks/waha', async (req, res) => {
             const user = appointment.owner;
             const settings = user.whatsappSettings!;
             const wallet = user.wallet[0]; // Wallet is linked to user
-            
+
             // Check Balance
             if (!wallet || !wallet.isActive || wallet.balance < 0.10) {
               console.log(`Wallet error: Insufficient balance for user ${user.id}`);
@@ -866,7 +901,7 @@ router.post('/webhooks/waha', async (req, res) => {
             }
 
             const waha = new WAHAService(WAHA_API_URL);
-            
+
             // Send Confirmation Voucher
             const templates = settings.templates ? JSON.parse(settings.templates as string) : {};
             const baseText = templates.confirmation || "✅ Seu agendamento foi confirmado!";
@@ -875,9 +910,9 @@ router.post('/webhooks/waha', async (req, res) => {
               .replace('{shop_name}', user.shopName || user.name || 'Barbearia')
               .replace('{data}', appointment.date.toLocaleDateString('pt-BR'))
               .replace('{hora}', appointment.date.toLocaleDateString('pt-BR', { hour: '2-digit', minute: '2-digit' }).split(' ')[1] || '');
-            
+
             await waha.sendTextMessage(settings.wahaInstanceName || 'default', from, voucherText);
-            
+
             // DEBIT WALLET
             await prisma.wallet.update({
               where: { id: wallet.id },
@@ -907,7 +942,7 @@ router.post('/whatsapp/trigger', authenticateToken, async (req: AuthRequest, res
   try {
     const { type, recipientNumber, recipientName, variables } = req.body;
     const uid = req.user?.id as string;
-    
+
     const settings = await prisma.whatsappSettings.findUnique({ where: { uid } });
     if (!settings || !settings.enabled) {
       return res.status(400).json({ error: 'WhatsApp configuration missing or disabled' });
@@ -919,9 +954,9 @@ router.post('/whatsapp/trigger', authenticateToken, async (req: AuthRequest, res
     // Check if WAHA is connected
     if (settings.status === 'connected') {
       const waha = new WAHAService(WAHA_API_URL);
-      
+
       const templates = settings.templates ? JSON.parse(settings.templates as string) : {};
-      
+
       let baseText = '';
       if (type === 'welcome') baseText = templates.welcome || "Olá, {nome_cliente}! Bem-vindo(a) ao {shop_name}.";
       if (type === 'reminder') baseText = templates.reminder || "Olá, {nome_cliente}! Lembrando do seu horário: {data} às {hora}.";
@@ -959,7 +994,7 @@ router.post('/whatsapp/trigger', authenticateToken, async (req: AuthRequest, res
     } else if (settings.apiKey && settings.phoneNumberId) {
       // Fallback to Meta API if configured but WAHA is not connected
       const metaService = new WhatsAppMetaService(settings.apiKey, settings.phoneNumberId);
-      
+
       // Mapping internal types to Meta Template Names
       let templateName = 'hello_world'; // fallback
       if (type === 'welcome') templateName = 'welcome_message_v1';
@@ -978,7 +1013,7 @@ router.post('/whatsapp/trigger', authenticateToken, async (req: AuthRequest, res
 
       result_final = await metaService.sendTemplateMessage(recipientNumber, templateName, 'pt_BR', components);
       templateNameUsed = `Meta Template: ${templateName} (${type})`;
-      
+
       // Debit Wallet if enabled (Meta also costs)
       try {
         const wallet = await prisma.wallet.findUnique({ where: { ownerUid: uid } });
@@ -1001,7 +1036,7 @@ router.post('/whatsapp/trigger', authenticateToken, async (req: AuthRequest, res
     } else {
       return res.status(400).json({ error: 'Nenhuma integração do WhatsApp configurada (QR Code ou Meta).' });
     }
-    
+
     // Log message
     await prisma.whatsappMessage.create({
       data: {
@@ -1088,12 +1123,12 @@ router.post('/wallet/toggle', authenticateToken, async (req: AuthRequest, res) =
   try {
     const ownerUid = req.user?.id as string;
     const { isActive } = req.body;
-    
+
     let wallet = await prisma.wallet.findUnique({ where: { ownerUid } });
     if (!wallet) {
-       wallet = await prisma.wallet.create({
+      wallet = await prisma.wallet.create({
         data: { ownerUid, balance: 0, isActive: false }
-       });
+      });
     }
 
     if (isActive && Number(wallet.balance) <= 0) {
@@ -1121,9 +1156,16 @@ router.get('/clients', authenticateToken, async (req: AuthRequest, res) => {
 });
 
 router.post('/clients', authenticateToken, async (req: AuthRequest, res) => {
-  const { name, phone, email, notes } = req.body;
+  const { name, phone, email, notes, birthDate } = req.body;
   const client = await prisma.client.create({
-    data: { name, phone, email, notes, ownerUid: req.user?.id as string }
+    data: {
+      name,
+      phone,
+      email,
+      notes,
+      birthDate: birthDate ? new Date(birthDate) : null,
+      ownerUid: req.user?.id as string
+    }
   });
   res.json(client);
 });
@@ -1136,15 +1178,16 @@ router.delete('/clients/:id', authenticateToken, async (req: AuthRequest, res) =
 });
 
 router.put('/clients/:id', authenticateToken, async (req: AuthRequest, res) => {
-  const { name, phone, email, notes, loyaltyPoints, loyaltyVisits, pendingDebt } = req.body;
+  const { name, phone, email, notes, birthDate, loyaltyPoints, loyaltyVisits, pendingDebt } = req.body;
   await prisma.client.update({
     where: { id: req.params.id },
-    data: { 
-      name, 
-      phone, 
-      email, 
-      notes, 
-      loyaltyPoints: loyaltyPoints !== undefined ? loyaltyPoints : undefined, 
+    data: {
+      name,
+      phone,
+      email,
+      notes,
+      birthDate: birthDate ? new Date(birthDate) : undefined,
+      loyaltyPoints: loyaltyPoints !== undefined ? loyaltyPoints : undefined,
       loyaltyVisits: loyaltyVisits !== undefined ? loyaltyVisits : undefined,
       pendingDebt: pendingDebt !== undefined ? pendingDebt : undefined
     } as any
@@ -1200,22 +1243,69 @@ router.post('/clients/:id/redeem', authenticateToken, async (req: AuthRequest, r
   }
 });
 
-// Appointments
+// --- REPORTS ROUTES ---
+router.get('/reports/debtors', authenticateToken, async (req: AuthRequest, res) => {
+  const ownerUid = req.user?.id as string;
+  const { searchTerm, minAmount, maxAmount, startDate, endDate, minPoints } = req.query as any;
+
+  try {
+    const where: any = {
+      ownerUid,
+      pendingDebt: { gt: 0 }
+    };
+
+    if (searchTerm) {
+      where.OR = [
+        { name: { contains: searchTerm, mode: 'insensitive' } },
+        { phone: { contains: searchTerm } }
+      ];
+    }
+
+    if (minAmount || maxAmount) {
+      where.pendingDebt = {
+        gt: 0,
+        ...(minAmount ? { gte: parseFloat(minAmount) } : {}),
+        ...(maxAmount ? { lte: parseFloat(maxAmount) } : {})
+      };
+    }
+
+    if (startDate || endDate) {
+      where.createdAt = {
+        ...(startDate ? { gte: new Date(startDate) } : {}),
+        ...(endDate ? { lte: new Date(endDate) } : {})
+      };
+    }
+
+    if (minPoints) {
+      where.loyaltyPoints = { gte: parseInt(minPoints) };
+    }
+
+    const debtors = await prisma.client.findMany({
+      where,
+      orderBy: { pendingDebt: 'desc' }
+    });
+
+    res.json(debtors);
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
 router.get('/appointments', authenticateToken, async (req: AuthRequest, res) => {
   const userId = req.user?.id;
   const role = req.user?.role;
-  
+
   try {
     const user = await prisma.user.findUnique({ where: { id: userId } });
     if (!user) return res.status(404).json({ error: 'User not found' });
 
     let where: any = { ownerUid: user.id };
-    
+
     // Check if it's a professional and their visibility permissions
     if (role === 'professional' && ((user as any).staffId || (user as any).ownerId)) {
       const ownerUid = (user as any).ownerId || user.id;
       const settings = await prisma.setting.findUnique({ where: { uid: ownerUid } });
-      
+
       if (settings?.allowProfessionalViewAllAgendas) {
         // If owner allows viewing all, only filter by ownerUid
         where = { ownerUid };
@@ -1237,7 +1327,7 @@ router.get('/appointments', authenticateToken, async (req: AuthRequest, res) => 
 
 router.post('/appointments', authenticateToken, async (req: AuthRequest, res) => {
   const { clientId, clientName, phone, serviceId, serviceName, barberId, barberName, staffId, staffName, date, price, isFitIn } = req.body;
-  
+
   const appointment = await prisma.appointment.create({
     data: {
       ownerUid: req.user?.id as string,
@@ -1249,7 +1339,7 @@ router.post('/appointments', authenticateToken, async (req: AuthRequest, res) =>
   try {
     const ownerUid = req.user?.id as string;
     const wallet = await prisma.wallet.findUnique({ where: { ownerUid } });
-    
+
     if (wallet && wallet.isActive && Number(wallet.balance) >= 0.10) {
       // Simulate debit for WhatsApp automation
       await prisma.wallet.update({
@@ -1268,9 +1358,9 @@ router.post('/appointments', authenticateToken, async (req: AuthRequest, res) =>
           description: `Débito automação WhatsApp (Agendamento #${appointment.id})`
         }
       });
-      
+
       console.log(`[WALLET] Debited R$ 0,10 from ${ownerUid} for appointment ${appointment.id}`);
-      
+
       // Integration with Meta API (Future)
       // triggerMessage('confirmation', phone, clientName, { shop_name: user?.shopName, data: date, hora: time });
     }
@@ -1295,7 +1385,7 @@ router.put('/appointments/:id/status', authenticateToken, async (req: AuthReques
     if (!appointment) return res.status(404).json({ error: 'Appointment not found' });
 
     const oldStatus = appointment.status;
-    
+
     await prisma.appointment.update({
       where: { id: appointmentId },
       data: { status }
@@ -1360,11 +1450,11 @@ router.post('/appointments/:id/no-show', authenticateToken, async (req: AuthRequ
     });
 
     if (!appointment) return res.status(404).json({ error: 'Appointment not found' });
-    
+
     // Update appointment
     await prisma.appointment.update({
       where: { id: appointmentId },
-      data: { 
+      data: {
         status: 'no_show',
         noShow: true
       } as any
@@ -1410,7 +1500,7 @@ router.post('/appointments/:id/check-in', authenticateToken, async (req: AuthReq
   try {
     const appointment = await prisma.appointment.update({
       where: { id: req.params.id },
-      data: { 
+      data: {
         checkInAt: new Date(),
         status: 'in_progress'
       } as any
@@ -1425,12 +1515,12 @@ router.post('/appointments/:id/finish', authenticateToken, async (req: AuthReque
   try {
     const appointment = await (prisma as any).appointment.update({
       where: { id: req.params.id },
-      data: { 
+      data: {
         finishedAt: new Date(),
         status: 'completed'
       }
     });
-    
+
     const ownerUid = appointment.ownerUid;
     await prisma.transaction.create({
       data: {
@@ -1478,10 +1568,10 @@ router.get('/professional/earnings', authenticateToken, async (req: AuthRequest,
 
     const startOfMonth = new Date();
     startOfMonth.setDate(1);
-    startOfMonth.setHours(0,0,0,0);
-    
+    startOfMonth.setHours(0, 0, 0, 0);
+
     const startOfToday = new Date();
-    startOfToday.setHours(0,0,0,0);
+    startOfToday.setHours(0, 0, 0, 0);
 
     const appointments = await prisma.appointment.findMany({
       where: {
@@ -1544,14 +1634,58 @@ router.get('/transactions', authenticateToken, async (req: AuthRequest, res) => 
 });
 
 router.post('/transactions', authenticateToken, async (req: AuthRequest, res) => {
-  const { type, amount, description, date, category } = req.body;
+  const { type, amount, description, date, category, status, dueDate, paymentDate } = req.body;
   const transaction = await prisma.transaction.create({
     data: {
       ownerUid: req.user?.id as string,
-      type, amount, description, date: new Date(date), category
+      type,
+      amount,
+      description,
+      date: date ? new Date(date) : new Date(),
+      category,
+      status: status || 'completed',
+      dueDate: dueDate ? new Date(dueDate) : null,
+      paymentDate: paymentDate ? new Date(paymentDate) : (status === 'completed' ? new Date() : null)
     }
   });
   res.json(transaction);
+});
+
+router.put('/transactions/:id/status', authenticateToken, async (req: AuthRequest, res) => {
+  try {
+    const { status } = req.body;
+    const transaction = await prisma.transaction.update({
+      where: { id: req.params.id, ownerUid: req.user?.id },
+      data: {
+        status,
+        paymentDate: status === 'completed' ? new Date() : null
+      }
+    });
+    res.json(transaction);
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+router.put('/transactions/:id', authenticateToken, async (req: AuthRequest, res) => {
+  const { amount, description, dueDate, status } = req.body;
+  const ownerUid = req.user?.id as string;
+  const id = req.params.id;
+
+  try {
+    const transaction = await prisma.transaction.update({
+      where: { id, ownerUid },
+      data: {
+        amount,
+        description,
+        dueDate: dueDate ? new Date(dueDate) : undefined,
+        status: status || undefined
+      }
+    });
+    res.json(transaction);
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
 });
 
 router.delete('/transactions/:id', authenticateToken, async (req: AuthRequest, res) => {
@@ -1599,12 +1733,12 @@ router.delete('/products/:id', authenticateToken, async (req: AuthRequest, res) 
 // Dashboard Stats
 router.get('/dashboard/stats', authenticateToken, async (req: AuthRequest, res) => {
   const ownerUid = req.user?.id;
-  
+
   const todayStart = new Date();
-  todayStart.setHours(0,0,0,0);
+  todayStart.setHours(0, 0, 0, 0);
   const todayEnd = new Date();
-  todayEnd.setHours(23,59,59,999);
-  
+  todayEnd.setHours(23, 59, 59, 999);
+
   const appointmentsCount = await prisma.appointment.count({
     where: {
       ownerUid,
@@ -1614,15 +1748,15 @@ router.get('/dashboard/stats', authenticateToken, async (req: AuthRequest, res) 
       }
     }
   });
-  
+
   const clientsCount = await prisma.client.count({
     where: { ownerUid }
   });
-  
+
   const monthStart = new Date();
   monthStart.setDate(1);
-  monthStart.setHours(0,0,0,0);
-  
+  monthStart.setHours(0, 0, 0, 0);
+
   const transactions = await prisma.transaction.aggregate({
     _sum: { amount: true },
     where: {
@@ -1656,7 +1790,7 @@ const isSuperAdmin = (req: AuthRequest, res: any, next: any) => {
 router.get('/superadmin/stats', authenticateToken, isSuperAdmin, async (req: AuthRequest, res) => {
   const totalUsers = await prisma.user.count();
   const activeSubscriptions = await prisma.subscription.count({ where: { status: "active" } });
-  
+
   res.json({
     totalUsers,
     activeSubscriptions,
@@ -1677,17 +1811,17 @@ router.get('/superadmin/plans', authenticateToken, isSuperAdmin, async (req: Aut
 router.put('/superadmin/plans/:id', authenticateToken, isSuperAdmin, async (req: AuthRequest, res) => {
   const { name, priceMonthly, priceYearly, features } = req.body;
   const { id } = req.params;
-  
+
   console.log(`[SUPERADMIN] Plan Update: ${id}`, { name, priceMonthly, priceYearly, features });
 
   try {
     await prisma.plan.update({
       where: { id },
-      data: { 
-        name, 
-        priceMonthly: isNaN(Number(priceMonthly)) ? 0 : Number(priceMonthly), 
-        priceYearly: isNaN(Number(priceYearly)) ? 0 : Number(priceYearly), 
-        features: typeof features === 'string' ? features : JSON.stringify(features) 
+      data: {
+        name,
+        priceMonthly: isNaN(Number(priceMonthly)) ? 0 : Number(priceMonthly),
+        priceYearly: isNaN(Number(priceYearly)) ? 0 : Number(priceYearly),
+        features: typeof features === 'string' ? features : JSON.stringify(features)
       }
     });
     res.json({ success: true });
@@ -1698,15 +1832,15 @@ router.put('/superadmin/plans/:id', authenticateToken, isSuperAdmin, async (req:
 });
 
 router.get('/superadmin/tenants', authenticateToken, isSuperAdmin, async (req: AuthRequest, res) => {
-  const users = await prisma.user.findMany({ 
-    select: { 
-      id: true, 
-      email: true, 
-      shopName: true, 
-      status: true, 
+  const users = await prisma.user.findMany({
+    select: {
+      id: true,
+      email: true,
+      shopName: true,
+      status: true,
       createdAt: true,
       planId: true
-    } 
+    }
   });
   res.json(users);
 });
@@ -1715,7 +1849,7 @@ router.put('/superadmin/tenants/:id', authenticateToken, isSuperAdmin, async (re
   const { planId, ...otherData } = req.body;
   const userId = req.params.id;
   console.log(`[ADMIN] Update request: User=${userId}, Plan=${planId || 'N/A'}`);
-  
+
   try {
     // Diagnostic: Check if user exists
     const userExists = await prisma.user.findUnique({ where: { id: userId } });
@@ -1738,7 +1872,7 @@ router.put('/superadmin/tenants/:id', authenticateToken, isSuperAdmin, async (re
     // If planId was provided, also update/create Subscription
     if (planId) {
       const targetPlanId = planId.toLowerCase();
-      
+
       // Calculate dates
       const currentPeriodEnd = new Date();
       currentPeriodEnd.setFullYear(currentPeriodEnd.getFullYear() + 1);
@@ -1746,18 +1880,18 @@ router.put('/superadmin/tenants/:id', authenticateToken, isSuperAdmin, async (re
 
       await (prisma.subscription as any).upsert({
         where: { uid: userId },
-        update: { 
-          planId: targetPlanId, 
-          status: 'active', 
-          currentPeriodEnd, 
-          endDate 
+        update: {
+          planId: targetPlanId,
+          status: 'active',
+          currentPeriodEnd,
+          endDate
         },
-        create: { 
-          uid: userId, 
-          planId: targetPlanId, 
-          status: 'active', 
-          currentPeriodEnd, 
-          endDate 
+        create: {
+          uid: userId,
+          planId: targetPlanId,
+          status: 'active',
+          currentPeriodEnd,
+          endDate
         }
       });
       console.log(`[ADMIN] Updated subscription for ${userId} to ${targetPlanId}`);
@@ -1837,37 +1971,80 @@ router.get('/whatsapp/webhook', (req, res) => {
 
 router.post('/whatsapp/webhook', async (req, res) => {
   const { object, entry } = req.body;
-  
+
   if (object === 'whatsapp_business_account') {
     for (const item of entry) {
       for (const change of item.changes) {
         if (change.field === 'messages') {
-            const status = change.value.statuses?.[0];
-            if (status) {
-                const messageId = status.id;
-                const statusType = status.status; // delivered, read, sent, failed
+          const status = change.value.statuses?.[0];
+          if (status) {
+            const messageId = status.id;
+            const statusType = status.status; // delivered, read, sent, failed
 
-                let newStatus = 'Enviada';
-                if (statusType === 'delivered') newStatus = 'Entregue';
-                if (statusType === 'read') newStatus = 'Lida';
-                if (statusType === 'failed') newStatus = 'Falha';
+            let newStatus = 'Enviada';
+            if (statusType === 'delivered') newStatus = 'Entregue';
+            if (statusType === 'read') newStatus = 'Lida';
+            if (statusType === 'failed') newStatus = 'Falha';
 
-                try {
-                    await prisma.whatsappMessage.updateMany({
-                        where: { externalId: messageId },
-                        data: { status: newStatus }
-                    });
-                    console.log(`Meta Webhook: Message ${messageId} status updated to ${newStatus}`);
-                } catch (err) {
-                    console.error('Error updating message status from Meta webhook:', err);
-                }
+            try {
+              await prisma.whatsappMessage.updateMany({
+                where: { externalId: messageId },
+                data: { status: newStatus }
+              });
+              console.log(`Meta Webhook: Message ${messageId} status updated to ${newStatus}`);
+            } catch (err) {
+              console.error('Error updating message status from Meta webhook:', err);
             }
+          }
         }
       }
     }
   }
-  
+
   res.json({ success: true });
+});
+
+// Payment Machines
+router.get('/payment-machines', authenticateToken, async (req: AuthRequest, res) => {
+  try {
+    const machines = await prisma.paymentMachine.findMany({
+      where: { ownerUid: req.user?.id },
+      orderBy: { createdAt: 'desc' }
+    });
+    res.json(machines);
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+router.post('/payment-machines', authenticateToken, async (req: AuthRequest, res) => {
+  const { name, fee } = req.body;
+  try {
+    const machine = await prisma.paymentMachine.create({
+      data: {
+        ownerUid: req.user?.id as string,
+        name,
+        fee: parseFloat(fee)
+      }
+    });
+    res.json(machine);
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+router.delete('/payment-machines/:id', authenticateToken, async (req: AuthRequest, res) => {
+  try {
+    await prisma.paymentMachine.delete({
+      where: {
+        id: req.params.id,
+        ownerUid: req.user?.id
+      }
+    });
+    res.json({ success: true });
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
 });
 
 // Sales & PDV
@@ -1875,16 +2052,7 @@ router.get('/sales', authenticateToken, async (req: AuthRequest, res) => {
   try {
     const sales = await prisma.sale.findMany({
       where: { ownerUid: req.user?.id },
-      include: {
-        items: {
-          include: {
-            product: true,
-            service: true
-          }
-        },
-        client: true,
-        staff: true
-      },
+      include: { items: true, client: true, staff: true },
       orderBy: { createdAt: 'desc' }
     });
     res.json(sales);
@@ -1894,19 +2062,34 @@ router.get('/sales', authenticateToken, async (req: AuthRequest, res) => {
 });
 
 router.post('/sales', authenticateToken, async (req: AuthRequest, res) => {
-  const { clientId, staffId, paymentMethod, items, includeDebt } = req.body;
+  const {
+    clientId,
+    staffId,
+    paymentMethod, // legacy or hybrid
+    paymentMethodServices, // 'money' | 'card' | 'pix'
+    paymentMethodProducts, // 'money' | 'card' | 'pix' | 'on_account'
+    items,
+    includeDebt,
+    appointmentId
+  } = req.body;
   const ownerUid = req.user?.id as string;
 
   try {
     const result = await prisma.$transaction(async (tx) => {
-      // 1. Calculate total
-      let totalAmount = 0;
+      // 1. Calculate subtotals
+      let totalServices = 0;
+      let totalProducts = 0;
       const saleItemsData = [];
 
       for (const item of items) {
         const lineTotal = item.quantity * item.unitPrice;
-        totalAmount += lineTotal;
-        
+
+        if (item.serviceId) {
+          totalServices += lineTotal;
+        } else {
+          totalProducts += lineTotal;
+        }
+
         saleItemsData.push({
           productId: item.productId || null,
           serviceId: item.serviceId || null,
@@ -1924,11 +2107,25 @@ router.post('/sales', authenticateToken, async (req: AuthRequest, res) => {
         }
       }
 
-      // 3. Handle Debt payment if requested
+      // 3. Validation: Services MUST be paid immediately
+      if (totalServices > 0 && paymentMethodProducts === 'on_account' && !paymentMethodServices) {
+        // Se o usuário selecionou "Na Conta" globalmente ou para produtos e não definiu o de serviços
+        // vamos assumir que ele está tentando colocar tudo na conta.
+        throw new Error('Serviços devem ser pagos obrigatoriamente no ato da finalização.');
+      }
+
+      if (paymentMethodServices === 'on_account') {
+        throw new Error('Regra de Negócio: Serviços não permitem parcelamento ou lançamento na conta da casa.');
+      }
+
+      const totalAmount = totalServices + totalProducts;
+
+      // 4. Handle Debt payment if requested (Existing feature)
+      let debtPaid = 0;
       if (includeDebt && clientId) {
         const client = await tx.client.findUnique({ where: { id: clientId } });
         if (client && (client as any).pendingDebt > 0) {
-          totalAmount += (client as any).pendingDebt;
+          debtPaid = (client as any).pendingDebt;
           await tx.client.update({
             where: { id: clientId },
             data: { pendingDebt: 0 } as any
@@ -1936,14 +2133,36 @@ router.post('/sales', authenticateToken, async (req: AuthRequest, res) => {
         }
       }
 
-      // 4. Create Sale
+      // 5. Handle "On Account" for products
+      if (paymentMethodProducts === 'on_account' && clientId) {
+        await tx.client.update({
+          where: { id: clientId },
+          data: { pendingDebt: { increment: totalProducts } } as any
+        });
+      }
+
+      // 6. Handle Appointment Completion
+      if (appointmentId) {
+        await tx.appointment.update({
+          where: { id: appointmentId },
+          data: {
+            status: 'completed',
+            finishedAt: new Date()
+          }
+        });
+      }
+
+      // 7. Create Sale
       const sale = await tx.sale.create({
         data: {
           ownerUid,
           clientId: clientId || null,
           staffId: staffId || null,
-          totalAmount,
-          paymentMethod,
+          appointmentId: appointmentId || null,
+          totalAmount: totalAmount + debtPaid,
+          paymentMethod: paymentMethod || 'hybrid',
+          paymentMethodServices: paymentMethodServices || paymentMethod,
+          paymentMethodProducts: paymentMethodProducts || paymentMethod,
           items: {
             create: saleItemsData
           }
@@ -1951,17 +2170,181 @@ router.post('/sales', authenticateToken, async (req: AuthRequest, res) => {
         include: { items: true }
       });
 
-      // 4. Create Financial Transaction
-      await tx.transaction.create({
-        data: {
-          ownerUid,
-          type: 'income',
-          amount: totalAmount,
-          description: `Venda PDV #${sale.id.split('-')[0]}`,
-          date: new Date(),
-          category: 'Venda de Produtos/Serviços'
+      // 8. Create Financial Transactions
+      const installmentsCount = parseInt(req.body.installments) || 1;
+      const cardFeePercentage = parseFloat(req.body.cardFeePercentage) || 0;
+
+      // Part 1: Services + Debt (Always 1x)
+      const serviceAmountTotal = totalServices + debtPaid;
+      if (serviceAmountTotal > 0) {
+        const feeAmount = paymentMethodServices === 'card' ? (serviceAmountTotal * (cardFeePercentage / 100)) : 0;
+        const netAmount = serviceAmountTotal - feeAmount;
+
+        await tx.transaction.create({
+          data: {
+            ownerUid,
+            parentId: sale.id,
+            type: 'income',
+            amount: serviceAmountTotal,
+            description: `Venda #${sale.id.slice(-4)} - Serviços / Dívida`,
+            category: 'Serviços',
+            date: new Date(),
+            status: 'completed',
+            paymentMethod: paymentMethodServices || 'money',
+            feeAmount,
+            netAmount
+          }
+        });
+
+        // Register card fee as expense if applicable
+        if (feeAmount > 0) {
+          await tx.transaction.create({
+            data: {
+              ownerUid,
+              parentId: sale.id,
+              type: 'expense',
+              amount: feeAmount,
+              description: `Taxa Cartão - Venda #${sale.id.slice(-4)} (Serviços)`,
+              category: 'Taxas Administrativas',
+              date: new Date(),
+              status: 'completed'
+            }
+          });
         }
-      });
+      }
+
+      // Part 2: Products
+      if (totalProducts > 0 && paymentMethodProducts !== 'on_account') {
+        const entryAmount = parseFloat(req.body.entryAmount) || 0;
+        const entryPaymentMethod = req.body.entryPaymentMethod || 'money';
+        const nextPaymentDateStr = req.body.nextPaymentDate;
+        
+        const balanceToInstall = totalProducts - entryAmount;
+
+        // 2.1 Register Entry if exists
+        if (entryAmount > 0) {
+          await tx.transaction.create({
+            data: {
+              ownerUid,
+              parentId: sale.id,
+              type: 'income',
+              amount: entryAmount,
+              description: `Venda #${sale.id.slice(-4)} - Entrada de Produtos`,
+              category: 'Produtos',
+              date: new Date(),
+              status: 'completed',
+              paymentMethod: entryPaymentMethod,
+              installment: 0,
+              totalInstallments: installmentsCount
+            }
+          });
+        }
+
+        // 2.2 Register Installments for the balance
+        if (installmentsCount > 0 && balanceToInstall > 0) {
+          const installmentAmount = balanceToInstall / installmentsCount;
+          for (let i = 1; i <= installmentsCount; i++) {
+            const dueDate = nextPaymentDateStr ? new Date(nextPaymentDateStr) : new Date();
+            if (nextPaymentDateStr) {
+              dueDate.setMonth(dueDate.getMonth() + (i - 1));
+            } else {
+              dueDate.setMonth(dueDate.getMonth() + i);
+            }
+
+            const feeAmount = paymentMethodProducts === 'card' ? (installmentAmount * (cardFeePercentage / 100)) : 0;
+            const netAmount = installmentAmount - feeAmount;
+
+            await tx.transaction.create({
+              data: {
+                ownerUid,
+                parentId: sale.id,
+                type: 'income',
+                amount: installmentAmount,
+                description: `Venda #${sale.id.slice(-4)} - Produto (Parc ${i}/${installmentsCount})`,
+                category: 'Produtos',
+                date: new Date(),
+                dueDate: dueDate,
+                status: paymentMethodProducts === 'card' ? 'completed' : 'pending',
+                paymentMethod: paymentMethodProducts as any,
+                installment: i,
+                totalInstallments: installmentsCount,
+                feeAmount,
+                netAmount
+              }
+            });
+
+            // Card fees as expenses
+            if (feeAmount > 0) {
+              await tx.transaction.create({
+                data: {
+                  ownerUid,
+                  parentId: sale.id,
+                  type: 'expense',
+                  amount: feeAmount,
+                  description: `Taxa Cartão - Venda #${sale.id.slice(-4)} (Parc ${i})`,
+                  category: 'Taxas Administrativas',
+                  date: new Date(),
+                  status: 'completed'
+                }
+              });
+            }
+          }
+        } else if (balanceToInstall > 0) {
+           // Case for single payment (can be the total or just the balance)
+           await tx.transaction.create({
+            data: {
+              ownerUid,
+              parentId: sale.id,
+              type: 'income',
+              amount: balanceToInstall,
+              description: `Venda #${sale.id.slice(-4)} - Produtos`,
+              category: 'Produtos',
+              date: new Date(),
+              status: 'completed',
+              paymentMethod: paymentMethodProducts
+            }
+          });
+        }
+      }
+
+      // Transaction for On Account (Future Income) - "Pendura"
+      if (paymentMethodProducts === 'on_account' && totalProducts > 0) {
+        await tx.transaction.create({
+          data: {
+            ownerUid,
+            type: 'income',
+            amount: totalProducts,
+            description: `Venda PDV #${sale.id.split('-')[0]} (Lançado na Conta do Cliente)`,
+            date: new Date(),
+            category: 'Venda - Contas a Receber',
+            status: 'pending',
+            dueDate: new Date(),
+            paymentMethod: 'on_account'
+          }
+        });
+      }
+
+      // 9. Update Client Loyalty Points based on total sale
+      if (clientId) {
+        const settings = await tx.setting.findUnique({ where: { uid: ownerUid } }) as any;
+        const fidelityConfig = settings?.fidelityConfig ? JSON.parse(settings.fidelityConfig) : null;
+
+        if (fidelityConfig?.enabled) {
+          let pointsToAdd = 0;
+          pointsToAdd += (fidelityConfig.pointsPerVisit || 0);
+          pointsToAdd += Math.floor((totalAmount + debtPaid) * (fidelityConfig.pointsPerCurrency || 0));
+
+          if (pointsToAdd > 0) {
+            await tx.client.update({
+              where: { id: clientId },
+              data: {
+                loyaltyPoints: { increment: pointsToAdd },
+                loyaltyVisits: { increment: 1 }
+              }
+            });
+          }
+        }
+      }
 
       return sale;
     });
@@ -1969,7 +2352,7 @@ router.post('/sales', authenticateToken, async (req: AuthRequest, res) => {
     res.json(result);
   } catch (err: any) {
     console.error('[SALES_ERROR]', err);
-    res.status(500).json({ error: err.message });
+    res.status(400).json({ error: err.message });
   }
 });
 
@@ -1989,7 +2372,7 @@ router.get('/public/shop/:slug', async (req, res) => {
   try {
     // 1. Try finding by User slug (primary tenant ID)
     let user = await prisma.user.findFirst({
-      where: { 
+      where: {
         OR: [
           { slug: slug },
           { slug: slug.toLowerCase() }
@@ -2004,15 +2387,15 @@ router.get('/public/shop/:slug', async (req, res) => {
       settings = await prisma.setting.findUnique({ where: { uid: user.id } }) as any;
     } else {
       console.log(`[PublicShop] User not found by slug, trying Setting slug...`);
-      settings = await prisma.setting.findFirst({ 
-        where: { 
+      settings = await prisma.setting.findFirst({
+        where: {
           OR: [
             { slug: slug },
             { slug: slug.toLowerCase() }
           ]
-        } 
+        }
       }) as any;
-      
+
       if (settings) {
         console.log(`[PublicShop] Found setting by slug, finding owner: ${settings.uid}`);
         user = await prisma.user.findUnique({
@@ -2049,9 +2432,9 @@ router.get('/public/shop/:slug', async (req, res) => {
 
     const bh = typeof settings.businessHours === 'string' ? JSON.parse(settings.businessHours) : settings.businessHours;
     console.log(`[PublicShop] Successfully returning shop data for ${user.shopName}`);
-    res.json({ 
-      shop: { ...settings, businessHours: bh, uid: user.id }, 
-      owner: { name: user.name, shopName: user.shopName, id: user.id } 
+    res.json({
+      shop: { ...settings, businessHours: bh, uid: user.id },
+      owner: { name: user.name, shopName: user.shopName, id: user.id }
     });
   } catch (err: any) {
     console.error('[PublicShop] Critical Error:', err);
@@ -2072,30 +2455,41 @@ router.get('/public/staff/:uid', async (req, res) => {
     where: { ownerUid: req.params.uid, active: true },
     select: { id: true, name: true, portfolio: true }
   });
-  
+
   const staff = staffData.map(s => ({
     ...s,
     portfolio: s.portfolio ? JSON.parse(s.portfolio) : []
   }));
-  
+
   res.json(staff);
 });
 
 router.post('/public/appointments', async (req, res) => {
-  let { ownerUid, clientName, phone, serviceId, serviceName, staffId, staffName, date, price } = req.body;
-  
+  let { ownerUid, clientName, phone, serviceId, serviceName, staffId, staffName, date, price, birthDate } = req.body;
+
   // Sanitize phone (keep only digits)
   phone = phone.replace(/\D/g, '');
-  
+
   try {
     // Find or create client
     let client = await prisma.client.findFirst({
       where: { ownerUid, phone }
     });
-    
+
     if (!client) {
       client = await prisma.client.create({
-        data: { ownerUid, name: clientName, phone }
+        data: {
+          ownerUid,
+          name: clientName,
+          phone,
+          birthDate: birthDate ? new Date(birthDate) : null
+        }
+      });
+    } else if (birthDate && !client.birthDate) {
+      // Update birthDate if not present
+      await prisma.client.update({
+        where: { id: client.id },
+        data: { birthDate: new Date(birthDate) }
       });
     }
 
@@ -2104,7 +2498,7 @@ router.post('/public/appointments', async (req, res) => {
         ownerUid, clientId: client.id, clientName, phone, serviceId, serviceName, barberId: staffId, barberName: staffName, date: new Date(date), price
       }
     });
-    
+
     res.json({ success: true, appointmentId: appointment.id });
   } catch (err: any) {
     res.status(500).json({ error: err.message, success: false });
@@ -2129,18 +2523,18 @@ router.post('/public/appointments/:id/cancel', async (req, res) => {
 
     // If < 24h and not yet confirmed as late cancellation
     if (diffInHours < 24 && !confirmLateCancellation) {
-      return res.status(400).json({ 
-        error: 'Late cancellation', 
+      return res.status(400).json({
+        error: 'Late cancellation',
         message: 'Atenção: Cancelamentos a menos de 24h geram uma taxa de 50%. Deseja prosseguir?',
         penaltyAmount: appointment.price * 0.5
       });
     }
 
     const finalStatus = diffInHours < 24 ? 'cancelled_late' : 'cancelled_on_time';
-    
+
     await prisma.appointment.update({
       where: { id },
-      data: { 
+      data: {
         status: finalStatus,
         cancellationReason: reason || 'Cancelado via Portal',
         cancellationDate: now
@@ -2361,8 +2755,8 @@ router.get('/superadmin/stats', authenticateToken, isSuperAdmin, async (req: Aut
     const totalUsers = await prisma.user.count();
     const activeSubscriptions = await prisma.subscription.count({ where: { status: 'active' } });
     // This is a mock for now, in a real app you'd sum up payments
-    const monthlyRevenue = 12450.00; 
-    
+    const monthlyRevenue = 12450.00;
+
     res.json({ totalUsers, activeSubscriptions, monthlyRevenue, churnRate: 2.4 });
   } catch (error) {
     res.status(500).json({ error: 'Failed to fetch stats' });
@@ -2398,7 +2792,7 @@ router.get('/superadmin/tenant-usage/:userId', authenticateToken, isSuperAdmin, 
     const { userId } = req.params;
     const appointments = await prisma.appointment.count({ where: { ownerUid: userId } });
     const staff = await prisma.staff.count({ where: { ownerUid: userId } });
-    
+
     // Get wallet info too
     const wallet = await prisma.wallet.findUnique({
       where: { ownerUid: userId },
@@ -2409,7 +2803,7 @@ router.get('/superadmin/tenant-usage/:userId', authenticateToken, isSuperAdmin, 
     const whatsapp = await prisma.whatsappSettings.findUnique({
       where: { uid: userId }
     });
-    
+
     res.json({ appointments, staff, wallet, whatsapp });
   } catch (error) {
     res.status(500).json({ error: 'Failed to fetch usage' });
@@ -2417,36 +2811,36 @@ router.get('/superadmin/tenant-usage/:userId', authenticateToken, isSuperAdmin, 
 });
 
 router.post('/superadmin/tenants/:userId/wallet/recharge', authenticateToken, isSuperAdmin, async (req: AuthRequest, res) => {
-    try {
-        const { userId } = req.params;
-        const { amount, description } = req.body;
+  try {
+    const { userId } = req.params;
+    const { amount, description } = req.body;
 
-        const wallet = await prisma.wallet.upsert({
-            where: { ownerUid: userId },
-            update: {
-                balance: { increment: Number(amount) }
-            },
-            create: {
-                ownerUid: userId,
-                balance: Number(amount),
-                isActive: true
-            }
-        });
+    const wallet = await prisma.wallet.upsert({
+      where: { ownerUid: userId },
+      update: {
+        balance: { increment: Number(amount) }
+      },
+      create: {
+        ownerUid: userId,
+        balance: Number(amount),
+        isActive: true
+      }
+    });
 
-        await prisma.walletTransaction.create({
-            data: {
-                walletId: wallet.id,
-                amount: Number(amount),
-                type: 'credit',
-                category: 'recharge',
-                description: description || 'Recarga manual via Admin'
-            }
-        });
+    await prisma.walletTransaction.create({
+      data: {
+        walletId: wallet.id,
+        amount: Number(amount),
+        type: 'credit',
+        category: 'recharge',
+        description: description || 'Recarga manual via Admin'
+      }
+    });
 
-        res.json(wallet);
-    } catch (error: any) {
-        res.status(500).json({ error: error.message });
-    }
+    res.json(wallet);
+  } catch (error: any) {
+    res.status(500).json({ error: error.message });
+  }
 });
 
 // End of consolidated routes
@@ -2458,8 +2852,8 @@ router.put('/superadmin/plans/:planId', authenticateToken, isSuperAdmin, async (
     const updated = await prisma.plan.update({
       where: { id: planId },
       data: {
-          ...data,
-          features: typeof data.features === 'object' ? JSON.stringify(data.features) : data.features
+        ...data,
+        features: typeof data.features === 'object' ? JSON.stringify(data.features) : data.features
       }
     });
     res.json(updated);
@@ -2469,34 +2863,34 @@ router.put('/superadmin/plans/:planId', authenticateToken, isSuperAdmin, async (
 });
 
 router.post('/superadmin/plans', authenticateToken, isSuperAdmin, async (req: AuthRequest, res) => {
-    try {
-        const { id, name, slug, priceMonthly, priceYearly, features } = req.body;
-        const plan = await prisma.plan.create({
-            data: {
-                id: id || `plan_${slug || Math.random().toString(36).substring(2, 9)}`,
-                name,
-                slug: slug || name.toLowerCase().replace(/\s+/g, '-'),
-                priceMonthly: Number(priceMonthly),
-                priceYearly: Number(priceYearly),
-                features: typeof features === 'string' ? features : JSON.stringify(features)
-            }
-        });
-        res.json(plan);
-    } catch (error: any) {
-        res.status(500).json({ error: error.message });
-    }
+  try {
+    const { id, name, slug, priceMonthly, priceYearly, features } = req.body;
+    const plan = await prisma.plan.create({
+      data: {
+        id: id || `plan_${slug || Math.random().toString(36).substring(2, 9)}`,
+        name,
+        slug: slug || name.toLowerCase().replace(/\s+/g, '-'),
+        priceMonthly: Number(priceMonthly),
+        priceYearly: Number(priceYearly),
+        features: typeof features === 'string' ? features : JSON.stringify(features)
+      }
+    });
+    res.json(plan);
+  } catch (error: any) {
+    res.status(500).json({ error: error.message });
+  }
 });
 
 router.delete('/superadmin/plans/:planId', authenticateToken, isSuperAdmin, async (req: AuthRequest, res) => {
-    try {
-        const { planId } = req.params;
-        await prisma.plan.delete({
-            where: { id: planId }
-        });
-        res.json({ success: true });
-    } catch (error: any) {
-        res.status(500).json({ error: error.message });
-    }
+  try {
+    const { planId } = req.params;
+    await prisma.plan.delete({
+      where: { id: planId }
+    });
+    res.json({ success: true });
+  } catch (error: any) {
+    res.status(500).json({ error: error.message });
+  }
 });
 
 // Subscription Routes
@@ -2591,11 +2985,24 @@ router.get('/clients/:id/podology-anamnesis', authenticateToken, async (req: Aut
   }
 });
 
+// Alias for frontend
+router.get('/podology-anamnesis/client/:id', authenticateToken, async (req: AuthRequest, res) => {
+  try {
+    const records = await (prisma as any).podologyAnamnesis.findMany({
+      where: { clientId: req.params.id, ownerUid: req.user?.id },
+      orderBy: { createdAt: 'desc' }
+    });
+    res.json(records);
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
 router.post('/podology-anamnesis', authenticateToken, async (req: AuthRequest, res) => {
   try {
     const ownerUid = req.user?.id as string;
     const { clientId, ...rest } = req.body;
-    
+
     const record = await (prisma as any).podologyAnamnesis.create({
       data: {
         ...rest,
@@ -2623,38 +3030,38 @@ router.post('/podology-anamnesis', authenticateToken, async (req: AuthRequest, r
 
 // AI & Assets
 router.post('/ai/generate-assets', async (req, res) => {
-    try {
-        const { prompt, aspectRatio } = req.body;
-        const apiKey = process.env.GEMINI_API_KEY;
+  try {
+    const { prompt, aspectRatio } = req.body;
+    const apiKey = process.env.GEMINI_API_KEY;
 
-        if (!apiKey) {
-            return res.status(500).json({ error: 'AI API Key not configured' });
-        }
-
-        const genAI = new GoogleGenAI({ apiKey });
-        
-        const result = await (genAI as any).models.generateContent({
-            model: 'gemini-1.5-flash',
-            contents: { parts: [{ text: prompt }] },
-            config: { imageConfig: { aspectRatio: aspectRatio || "16:9" } }
-        });
-
-        const response = result;
-        // In the original frontend code, it expected inlineData (base64)
-        // Since we are moving the logic, we'll return the same structure
-        const imagePart = response.candidates?.[0]?.content?.parts?.find((p: any) => p.inlineData);
-        
-        if (imagePart) {
-            res.json({ data: imagePart.inlineData.data });
-        } else {
-            // If it's just text (because gemini-2.0-flash is text/multimodal but not always image gen)
-            // We'll return the text for now or handle the error
-            res.json({ text: response.text() });
-        }
-    } catch (error: any) {
-        console.error('AI Error:', error);
-        res.status(500).json({ error: error.message });
+    if (!apiKey) {
+      return res.status(500).json({ error: 'AI API Key not configured' });
     }
+
+    const genAI = new GoogleGenAI({ apiKey });
+
+    const result = await (genAI as any).models.generateContent({
+      model: 'gemini-1.5-flash',
+      contents: { parts: [{ text: prompt }] },
+      config: { imageConfig: { aspectRatio: aspectRatio || "16:9" } }
+    });
+
+    const response = result;
+    // In the original frontend code, it expected inlineData (base64)
+    // Since we are moving the logic, we'll return the same structure
+    const imagePart = response.candidates?.[0]?.content?.parts?.find((p: any) => p.inlineData);
+
+    if (imagePart) {
+      res.json({ data: imagePart.inlineData.data });
+    } else {
+      // If it's just text (because gemini-2.0-flash is text/multimodal but not always image gen)
+      // We'll return the text for now or handle the error
+      res.json({ text: response.text() });
+    }
+  } catch (error: any) {
+    console.error('AI Error:', error);
+    res.status(500).json({ error: error.message });
+  }
 });
 
 // ===========================================================
@@ -2992,6 +3399,91 @@ router.get('/appointments/recurring/:groupId', authenticateToken, async (req: Au
       orderBy: { startTime: 'asc' }
     });
     res.json(appointments);
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+router.get('/intelligence/churn', authenticateToken, async (req: AuthRequest, res) => {
+  const ownerUid = req.user?.id as string;
+  try {
+    const riskClients = await IntelligenceService.getChurnRisk(ownerUid);
+    res.json(riskClients);
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+router.get('/intelligence/cash-flow', authenticateToken, async (req: AuthRequest, res) => {
+  const ownerUid = req.user?.id as string;
+  try {
+    const projection = await IntelligenceService.getCashFlowProjection(ownerUid);
+    res.json(projection);
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+router.get('/intelligence/upsell/:clientId', authenticateToken, async (req: AuthRequest, res) => {
+  const ownerUid = req.user?.id as string;
+  const { clientId } = req.params;
+  try {
+    const suggestions = await IntelligenceService.getUpsellSuggestions(ownerUid, clientId);
+    res.json(suggestions);
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+
+// --- SERVICE PACKAGE ROUTES ---
+
+router.get('/service-packages', authenticateToken, async (req: AuthRequest, res) => {
+  const ownerUid = req.user?.id as string;
+  try {
+    const packages = await prisma.servicePackage.findMany({
+      where: { ownerUid },
+      include: { service: true }
+    });
+    res.json(packages);
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+router.post('/service-packages', authenticateToken, async (req: AuthRequest, res) => {
+  const ownerUid = req.user?.id as string;
+  const { name, description, price, sessions, validityDays, serviceId } = req.body;
+  try {
+    const pkg = await prisma.servicePackage.create({
+      data: { ownerUid, name, description, price, sessions, validityDays, serviceId }
+    });
+    res.json(pkg);
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+router.delete('/service-packages/:id', authenticateToken, async (req: AuthRequest, res) => {
+  const ownerUid = req.user?.id as string;
+  try {
+    await prisma.servicePackage.delete({
+      where: { id: req.params.id, ownerUid }
+    });
+    res.json({ success: true });
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+router.get('/client-packages/:clientId', authenticateToken, async (req: AuthRequest, res) => {
+  const ownerUid = req.user?.id as string;
+  try {
+    const packages = await prisma.clientPackage.findMany({
+      where: { ownerUid, clientId: req.params.clientId },
+      include: { package: true }
+    });
+    res.json(packages);
   } catch (err: any) {
     res.status(500).json({ error: err.message });
   }

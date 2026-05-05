@@ -1,6 +1,8 @@
 import React, { useRef, useEffect, useState } from 'react';
 import { Trash2, Edit3, Circle } from 'lucide-react';
 
+import feetMap from '../assets/podology_feet_map.png';
+
 interface FootCanvasProps {
   initialData?: string; // base64 string
   onChange: (data: string) => void;
@@ -138,7 +140,7 @@ export default function FootCanvas({ initialData, onChange }: FootCanvasProps) {
       <div className="relative border-2 border-zinc-200 rounded-[2rem] overflow-hidden bg-white shadow-inner aspect-[4/3] max-w-[600px] mx-auto w-full">
         {/* Background Feet Image */}
         <img
-          src="/src/assets/podology_feet_map.png"
+          src={feetMap}
           alt="Feet Map"
           className="absolute inset-0 w-full h-full object-contain p-4 opacity-40 select-none pointer-events-none"
         />

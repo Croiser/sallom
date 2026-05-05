@@ -10,6 +10,8 @@ import { authenticateToken } from './middleware.js';
 import { asaas } from './asaas.js';
 import { emailService } from './email.js';
 import { GoogleGenAI } from "@google/genai";
+import { validateRecurrenceSeries, calculateComboDuration } from './services/recurrenceService.js';
+import { IntelligenceService } from './services/IntelligenceService.js';
 const router = express.Router();
 // --- AUTH ROUTES ---
 router.post('/auth/register', async (req, res) => {
@@ -221,6 +223,40 @@ router.get('/subscription', authenticateToken, async (req, res) => {
         res.status(500).json({ error: err.message });
     }
 });
+// Alias for plural /subscriptions/me used by frontend
+router.get('/subscriptions/me', authenticateToken, async (req, res) => {
+    try {
+        const uid = req.user?.id;
+        const user = await prisma.user.findUnique({
+            where: { id: uid },
+            include: {
+                subscription: {
+                    include: { plan: true }
+                }
+            }
+        });
+        if (!user)
+            return res.status(404).json({ error: 'User not found' });
+        if (user.subscription) {
+            const plan = user.subscription.plan;
+            if (plan && typeof plan.features === 'string') {
+                plan.features = JSON.parse(plan.features);
+            }
+            return res.json({ ...user.subscription, plan });
+        }
+        else {
+            const planId = user.planId || 'plan_bronze';
+            const plan = await prisma.plan.findUnique({ where: { id: planId } });
+            if (plan && typeof plan.features === 'string') {
+                plan.features = JSON.parse(plan.features);
+            }
+            return res.json({ planId, status: 'inactive', plan });
+        }
+    }
+    catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
 router.post('/subscription', authenticateToken, async (req, res) => {
     const { planId, billingCycle } = req.body;
     const uid = req.user?.id;
@@ -383,22 +419,53 @@ router.post('/asaas/webhook', async (req, res) => {
 });
 // Settings
 router.get('/settings', authenticateToken, async (req, res) => {
-    const settings = await prisma.setting.findUnique({ where: { uid: req.user?.id } });
-    if (settings) {
-        settings.businessHours = settings.businessHours ? JSON.parse(settings.businessHours) : [];
-        settings.whatsappConfig = settings.whatsappConfig ? JSON.parse(settings.whatsappConfig) : null;
-        settings.holidays = settings.holidays ? JSON.parse(settings.holidays) : [];
-        settings.fidelityConfig = settings.fidelityConfig ? JSON.parse(settings.fidelityConfig) : null;
+    const userId = req.user?.id;
+    const role = req.user?.role;
+    try {
+        const user = await prisma.user.findUnique({ where: { id: userId } });
+        if (!user)
+            return res.status(404).json({ error: 'User not found' });
+        // For professionals, we need to fetch the owner's settings
+        const targetUid = (role === 'professional' && user.ownerId)
+            ? user.ownerId
+            : userId;
+        const settings = await prisma.setting.findUnique({ where: { uid: targetUid } });
+        const ownerUser = await prisma.user.findUnique({ where: { id: targetUid }, select: { shopName: true } });
+        let result = settings ? { ...settings } : { uid: targetUid };
+        if (settings) {
+            result.businessHours = settings.businessHours ? JSON.parse(settings.businessHours) : [];
+            result.whatsappConfig = settings.whatsappConfig ? JSON.parse(settings.whatsappConfig) : null;
+            result.holidays = settings.holidays ? JSON.parse(settings.holidays) : [];
+            result.fidelityConfig = settings.fidelityConfig ? JSON.parse(settings.fidelityConfig) : null;
+            result.allowProfessionalViewAllAgendas = settings.allowProfessionalViewAllAgendas;
+        }
+        else {
+            // Ensure defaults if no settings found
+            result.businessHours = [];
+            result.whatsappConfig = null;
+            result.holidays = [];
+            result.fidelityConfig = null;
+        }
+        // Add shopName from target owner model as 'name'
+        result.name = ownerUser?.shopName || '';
+        res.json(result);
     }
-    res.json(settings);
+    catch (err) {
+        res.status(500).json({ error: err.message });
+    }
 });
 router.put('/settings', authenticateToken, async (req, res) => {
-    const { slug, address, addressNumber, neighborhood, city, state, zipCode, cnpj, description, phone, instagram, facebook, tiktok, businessHours, whatsappConfig, holidays, fidelityConfig } = req.body;
-    // Update slug in User model as well to keep them in sync
-    if (slug) {
+    const { name, slug, address, addressNumber, neighborhood, city, state, zipCode, cnpj, description, phone, instagram, facebook, tiktok, businessHours, whatsappConfig, holidays, fidelityConfig, allowProfessionalViewAllAgendas, podologyAnamnesisActive, logoUrl } = req.body;
+    // Update shopName and slug in User model to keep them in sync
+    const userUpdateData = {};
+    if (name !== undefined)
+        userUpdateData.shopName = name;
+    if (slug !== undefined)
+        userUpdateData.slug = slug;
+    if (Object.keys(userUpdateData).length > 0) {
         await prisma.user.update({
             where: { id: req.user?.id },
-            data: { slug }
+            data: userUpdateData
         });
     }
     await prisma.setting.upsert({
@@ -409,7 +476,10 @@ router.put('/settings', authenticateToken, async (req, res) => {
             businessHours: JSON.stringify(businessHours),
             whatsappConfig: JSON.stringify(whatsappConfig),
             holidays: JSON.stringify(holidays),
-            fidelityConfig: JSON.stringify(fidelityConfig)
+            fidelityConfig: JSON.stringify(fidelityConfig),
+            allowProfessionalViewAllAgendas,
+            podologyAnamnesisActive,
+            logoUrl
         },
         create: {
             uid: req.user?.id,
@@ -418,7 +488,10 @@ router.put('/settings', authenticateToken, async (req, res) => {
             businessHours: JSON.stringify(businessHours),
             whatsappConfig: JSON.stringify(whatsappConfig),
             holidays: JSON.stringify(holidays),
-            fidelityConfig: JSON.stringify(fidelityConfig)
+            fidelityConfig: JSON.stringify(fidelityConfig),
+            allowProfessionalViewAllAgendas,
+            podologyAnamnesisActive,
+            logoUrl
         }
     });
     res.json({ success: true });
@@ -456,8 +529,10 @@ router.get('/staff', authenticateToken, async (req, res) => {
     }
 });
 router.post('/staff', authenticateToken, async (req, res) => {
-    const { name, phone, commissionPercentage, active, portfolio } = req.body;
+    const { name, phone, commissionPercentage, active, portfolio, email, password } = req.body;
+    const ownerUid = req.user?.id;
     try {
+        // 1. Create the Staff record
         const staff = await prisma.staff.create({
             data: {
                 name,
@@ -465,9 +540,29 @@ router.post('/staff', authenticateToken, async (req, res) => {
                 commissionPercentage: Number(commissionPercentage || 0),
                 active: active !== undefined ? active : true,
                 portfolio: portfolio ? JSON.stringify(portfolio) : "[]",
-                ownerUid: req.user?.id
+                ownerUid
             }
         });
+        // 2. If email/password provided, create a User record for login
+        if (email && password) {
+            const existingUser = await prisma.user.findUnique({ where: { email } });
+            if (existingUser) {
+                return res.status(400).json({ error: 'Este e-mail já está sendo usado por outro usuário.' });
+            }
+            const hashedPassword = await bcrypt.hash(password, 10);
+            await prisma.user.create({
+                data: {
+                    name,
+                    email,
+                    password: hashedPassword,
+                    role: 'professional',
+                    staffId: staff.id,
+                    ownerId: ownerUid,
+                    shopName: `Profissional: ${name}`,
+                    slug: `prof-${staff.id.slice(-6)}`
+                }
+            });
+        }
         res.json(staff);
     }
     catch (err) {
@@ -631,6 +726,43 @@ router.post('/whatsapp/waha/send', authenticateToken, async (req, res) => {
         res.status(500).json({ error: err.message });
     }
 });
+router.post('/whatsapp/trigger', authenticateToken, async (req, res) => {
+    try {
+        const { recipientNumber, recipientName, type, variables } = req.body;
+        const uid = req.user?.id;
+        const settings = await prisma.whatsappSettings.findUnique({ where: { uid } });
+        if (!settings || !settings.enabled) {
+            return res.json({ success: false, reason: 'WhatsApp not enabled for this tenant' });
+        }
+        const templates = settings.templates ? JSON.parse(settings.templates) : {};
+        let templateStr = templates[type];
+        if (!templateStr) {
+            return res.json({ success: false, reason: `Template not found for type: ${type}` });
+        }
+        // Process template variables e.g. {nome_cliente} -> variables['nome_cliente']
+        let text = templateStr;
+        Object.keys(variables || {}).forEach(key => {
+            // WAHA template keys might be wrapped in {key}
+            const regex = new RegExp(`{${key}}`, 'g');
+            text = text.replace(regex, variables[key]);
+        });
+        // Format phone number to international WAHA format (e.g. 5545999959186@c.us)
+        let formattedNumber = recipientNumber.replace(/\D/g, '');
+        if (!formattedNumber.startsWith('55'))
+            formattedNumber = '55' + formattedNumber;
+        const chatId = `${formattedNumber}@c.us`;
+        const waha = new WAHAService(WAHA_API_URL);
+        const result = await waha.sendTextMessage('default', chatId, text).catch(err => {
+            console.error('Failed to dispatch to WAHA:', err.message);
+            throw err;
+        });
+        res.json({ success: true, data: result });
+    }
+    catch (err) {
+        console.error('Trigger Error:', err.message);
+        res.status(500).json({ error: err.message });
+    }
+});
 router.get('/whatsapp/chats', authenticateToken, async (req, res) => {
     try {
         const waha = new WAHAService(WAHA_API_URL);
@@ -721,68 +853,113 @@ router.post('/whatsapp/trigger', authenticateToken, async (req, res) => {
         const { type, recipientNumber, recipientName, variables } = req.body;
         const uid = req.user?.id;
         const settings = await prisma.whatsappSettings.findUnique({ where: { uid } });
-        if (!settings || !settings.enabled || !settings.apiKey || !settings.phoneNumberId) {
+        if (!settings || !settings.enabled) {
             return res.status(400).json({ error: 'WhatsApp configuration missing or disabled' });
         }
-        const metaService = new WhatsAppMetaService(settings.apiKey, settings.phoneNumberId);
-        // Mapping internal types to Meta Template Names
-        // Default names - User should have these approved in Meta
-        let templateName = 'hello_world'; // fallback
-        if (type === 'welcome')
-            templateName = 'welcome_message_v1';
-        if (type === 'reminder')
-            templateName = 'appointment_reminder_v1';
-        if (type === 'confirmation')
-            templateName = 'appointment_confirmation_v1';
-        // Meta templates use positional parameters {{1}}, {{2}}...
-        // We map our variables to components. This is a simplified version.
-        // Real implementation would depend on the template structure at Meta.
-        const components = [
-            {
-                type: 'body',
-                parameters: Object.entries(variables).map(([key, value]) => ({
-                    type: 'text',
-                    text: String(value)
-                }))
+        let result_final = null;
+        let templateNameUsed = type;
+        // Check if WAHA is connected
+        if (settings.status === 'connected') {
+            const waha = new WAHAService(WAHA_API_URL);
+            const templates = settings.templates ? JSON.parse(settings.templates) : {};
+            let baseText = '';
+            if (type === 'welcome')
+                baseText = templates.welcome || "Olá, {nome_cliente}! Bem-vindo(a) ao {shop_name}.";
+            if (type === 'reminder')
+                baseText = templates.reminder || "Olá, {nome_cliente}! Lembrando do seu horário: {data} às {hora}.";
+            if (type === 'confirmation')
+                baseText = templates.confirmation || "✅ Seu agendamento foi confirmado para {data} às {hora} em {shop_name}!";
+            const voucherText = WAHAService.applySpintax(baseText)
+                .replace(/{nome_cliente}/g, recipientName || 'Cliente')
+                .replace(/{shop_name}/g, variables.shop_name || 'Nosso Salão')
+                .replace(/{data}/g, variables.data || '')
+                .replace(/{hora}/g, variables.hora || '');
+            result_final = await waha.sendTextMessage(settings.wahaInstanceName || 'default', recipientNumber, voucherText);
+            templateNameUsed = `WAHA (${type})`;
+            // Debit Wallet for WAHA usage
+            try {
+                const wallet = await prisma.wallet.findUnique({ where: { ownerUid: uid } });
+                if (wallet && wallet.isActive && Number(wallet.balance) >= 0.10) {
+                    await prisma.wallet.update({
+                        where: { id: wallet.id },
+                        data: { balance: { decrement: 0.10 } }
+                    });
+                    await prisma.walletTransaction.create({
+                        data: {
+                            walletId: wallet.id,
+                            type: 'debit',
+                            category: 'automation_usage',
+                            amount: 0.10,
+                            description: `WhatsApp (WAHA): ${type}`
+                        }
+                    });
+                }
             }
-        ];
-        const result = await metaService.sendTemplateMessage(recipientNumber, templateName, 'pt_BR', components);
-        // Debit Wallet if enabled (Meta also costs)
-        try {
-            const wallet = await prisma.wallet.findUnique({ where: { ownerUid: uid } });
-            if (wallet && wallet.isActive && Number(wallet.balance) >= 0.10) {
-                await prisma.wallet.update({
-                    where: { id: wallet.id },
-                    data: { balance: { decrement: 0.10 } }
-                });
-                await prisma.walletTransaction.create({
-                    data: {
-                        walletId: wallet.id,
-                        type: 'debit',
-                        category: 'automation_usage',
-                        amount: 0.10,
-                        description: `WhatsApp (Meta): ${type}`
-                    }
-                });
+            catch (e) {
+                console.error('Wallet debit failed (WAHA):', e);
             }
         }
-        catch (e) {
-            console.error('Wallet debit failed:', e);
+        else if (settings.apiKey && settings.phoneNumberId) {
+            // Fallback to Meta API if configured but WAHA is not connected
+            const metaService = new WhatsAppMetaService(settings.apiKey, settings.phoneNumberId);
+            // Mapping internal types to Meta Template Names
+            let templateName = 'hello_world'; // fallback
+            if (type === 'welcome')
+                templateName = 'welcome_message_v1';
+            if (type === 'reminder')
+                templateName = 'appointment_reminder_v1';
+            if (type === 'confirmation')
+                templateName = 'appointment_confirmation_v1';
+            const components = [
+                {
+                    type: 'body',
+                    parameters: Object.entries(variables).map(([key, value]) => ({
+                        type: 'text',
+                        text: String(value)
+                    }))
+                }
+            ];
+            result_final = await metaService.sendTemplateMessage(recipientNumber, templateName, 'pt_BR', components);
+            templateNameUsed = `Meta Template: ${templateName} (${type})`;
+            // Debit Wallet if enabled (Meta also costs)
+            try {
+                const wallet = await prisma.wallet.findUnique({ where: { ownerUid: uid } });
+                if (wallet && wallet.isActive && Number(wallet.balance) >= 0.10) {
+                    await prisma.wallet.update({
+                        where: { id: wallet.id },
+                        data: { balance: { decrement: 0.10 } }
+                    });
+                    await prisma.walletTransaction.create({
+                        data: {
+                            walletId: wallet.id,
+                            type: 'debit',
+                            category: 'automation_usage',
+                            amount: 0.10,
+                            description: `WhatsApp (Meta): ${type}`
+                        }
+                    });
+                }
+            }
+            catch (e) {
+                console.error('Wallet debit failed (Meta):', e);
+            }
         }
-        const result_final = result;
+        else {
+            return res.status(400).json({ error: 'Nenhuma integração do WhatsApp configurada (QR Code ou Meta).' });
+        }
         // Log message
         await prisma.whatsappMessage.create({
             data: {
                 ownerUid: uid,
                 recipientNumber,
                 recipientName,
-                content: `Template: ${templateName} (${type})`,
-                type,
-                status: 'Enviada',
-                externalId: result.messages?.[0]?.id
+                content: templateNameUsed,
+                type: 'template',
+                status: 'sent',
+                externalId: result_final?.messages?.[0]?.id || result_final?.messageId || 'unknown'
             }
         });
-        res.json({ success: true, result });
+        res.json(result_final);
     }
     catch (err) {
         console.error('WhatsApp trigger error:', err.response?.data || err.message);
@@ -881,9 +1058,16 @@ router.get('/clients', authenticateToken, async (req, res) => {
     res.json(clients);
 });
 router.post('/clients', authenticateToken, async (req, res) => {
-    const { name, phone, email, notes } = req.body;
+    const { name, phone, email, notes, birthDate } = req.body;
     const client = await prisma.client.create({
-        data: { name, phone, email, notes, ownerUid: req.user?.id }
+        data: {
+            name,
+            phone,
+            email,
+            notes,
+            birthDate: birthDate ? new Date(birthDate) : null,
+            ownerUid: req.user?.id
+        }
     });
     res.json(client);
 });
@@ -894,7 +1078,7 @@ router.delete('/clients/:id', authenticateToken, async (req, res) => {
     res.json({ success: true });
 });
 router.put('/clients/:id', authenticateToken, async (req, res) => {
-    const { name, phone, email, notes, loyaltyPoints, loyaltyVisits } = req.body;
+    const { name, phone, email, notes, birthDate, loyaltyPoints, loyaltyVisits, pendingDebt } = req.body;
     await prisma.client.update({
         where: { id: req.params.id },
         data: {
@@ -902,8 +1086,10 @@ router.put('/clients/:id', authenticateToken, async (req, res) => {
             phone,
             email,
             notes,
+            birthDate: birthDate ? new Date(birthDate) : undefined,
             loyaltyPoints: loyaltyPoints !== undefined ? loyaltyPoints : undefined,
-            loyaltyVisits: loyaltyVisits !== undefined ? loyaltyVisits : undefined
+            loyaltyVisits: loyaltyVisits !== undefined ? loyaltyVisits : undefined,
+            pendingDebt: pendingDebt !== undefined ? pendingDebt : undefined
         }
     });
     res.json({ success: true });
@@ -949,7 +1135,47 @@ router.post('/clients/:id/redeem', authenticateToken, async (req, res) => {
         res.status(500).json({ error: err.message });
     }
 });
-// Appointments
+// --- REPORTS ROUTES ---
+router.get('/reports/debtors', authenticateToken, async (req, res) => {
+    const ownerUid = req.user?.id;
+    const { searchTerm, minAmount, maxAmount, startDate, endDate, minPoints } = req.query;
+    try {
+        const where = {
+            ownerUid,
+            pendingDebt: { gt: 0 }
+        };
+        if (searchTerm) {
+            where.OR = [
+                { name: { contains: searchTerm, mode: 'insensitive' } },
+                { phone: { contains: searchTerm } }
+            ];
+        }
+        if (minAmount || maxAmount) {
+            where.pendingDebt = {
+                gt: 0,
+                ...(minAmount ? { gte: parseFloat(minAmount) } : {}),
+                ...(maxAmount ? { lte: parseFloat(maxAmount) } : {})
+            };
+        }
+        if (startDate || endDate) {
+            where.createdAt = {
+                ...(startDate ? { gte: new Date(startDate) } : {}),
+                ...(endDate ? { lte: new Date(endDate) } : {})
+            };
+        }
+        if (minPoints) {
+            where.loyaltyPoints = { gte: parseInt(minPoints) };
+        }
+        const debtors = await prisma.client.findMany({
+            where,
+            orderBy: { pendingDebt: 'desc' }
+        });
+        res.json(debtors);
+    }
+    catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
 router.get('/appointments', authenticateToken, async (req, res) => {
     const userId = req.user?.id;
     const role = req.user?.role;
@@ -958,20 +1184,22 @@ router.get('/appointments', authenticateToken, async (req, res) => {
         if (!user)
             return res.status(404).json({ error: 'User not found' });
         let where = { ownerUid: user.id };
-        // If Professional, filter only their appointments
-        if (role === 'professional' && user.staffId) {
-            where = { staffId: user.staffId };
-        }
-        else if (role === 'professional' && user.ownerId) {
-            // If it's a professional but ownerId exists (sub-account)
-            where = {
-                ownerUid: user.ownerId,
-                staffId: user.staffId
-            };
+        // Check if it's a professional and their visibility permissions
+        if (role === 'professional' && (user.staffId || user.ownerId)) {
+            const ownerUid = user.ownerId || user.id;
+            const settings = await prisma.setting.findUnique({ where: { uid: ownerUid } });
+            if (settings?.allowProfessionalViewAllAgendas) {
+                // If owner allows viewing all, only filter by ownerUid
+                where = { ownerUid };
+            }
+            else {
+                // Default: filter by staffId only
+                where = { staffId: user.staffId };
+            }
         }
         const appointments = await prisma.appointment.findMany({
             where,
-            orderBy: { date: 'desc' }
+            orderBy: { date: 'asc' } // Changed to asc for better daily view flow
         });
         res.json(appointments);
     }
@@ -1077,6 +1305,7 @@ router.delete('/appointments/:id', authenticateToken, async (req, res) => {
     });
     res.json({ success: true });
 });
+// No-Show Handler (Manual mark by staff)
 router.post('/appointments/:id/no-show', authenticateToken, async (req, res) => {
     const ownerUid = req.user?.id;
     const appointmentId = req.params.id;
@@ -1213,8 +1442,33 @@ router.get('/professional/earnings', authenticateToken, async (req, res) => {
             totalCommission,
             totalRevenueToday,
             commissionPercentage: staff?.commissionPercentage,
-            count: appointments.length
+            count: appointments.length,
+            todayCount: todayApps.length
         });
+    }
+    catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
+router.get('/professional/clients/:id', authenticateToken, async (req, res) => {
+    try {
+        const client = await prisma.client.findUnique({
+            where: { id: req.params.id }
+        });
+        res.json(client);
+    }
+    catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
+router.put('/professional/clients/:id/notes', authenticateToken, async (req, res) => {
+    try {
+        const { notes } = req.body;
+        await prisma.client.update({
+            where: { id: req.params.id },
+            data: { notes }
+        });
+        res.json({ success: true });
     }
     catch (err) {
         res.status(500).json({ error: err.message });
@@ -1229,14 +1483,37 @@ router.get('/transactions', authenticateToken, async (req, res) => {
     res.json(transactions);
 });
 router.post('/transactions', authenticateToken, async (req, res) => {
-    const { type, amount, description, date, category } = req.body;
+    const { type, amount, description, date, category, status, dueDate, paymentDate } = req.body;
     const transaction = await prisma.transaction.create({
         data: {
             ownerUid: req.user?.id,
-            type, amount, description, date: new Date(date), category
+            type,
+            amount,
+            description,
+            date: date ? new Date(date) : new Date(),
+            category,
+            status: status || 'completed',
+            dueDate: dueDate ? new Date(dueDate) : null,
+            paymentDate: paymentDate ? new Date(paymentDate) : (status === 'completed' ? new Date() : null)
         }
     });
     res.json(transaction);
+});
+router.put('/transactions/:id/status', authenticateToken, async (req, res) => {
+    try {
+        const { status } = req.body;
+        const transaction = await prisma.transaction.update({
+            where: { id: req.params.id, ownerUid: req.user?.id },
+            data: {
+                status,
+                paymentDate: status === 'completed' ? new Date() : null
+            }
+        });
+        res.json(transaction);
+    }
+    catch (err) {
+        res.status(500).json({ error: err.message });
+    }
 });
 router.delete('/transactions/:id', authenticateToken, async (req, res) => {
     await prisma.transaction.deleteMany({
@@ -1523,6 +1800,317 @@ router.post('/whatsapp/webhook', async (req, res) => {
     }
     res.json({ success: true });
 });
+// Payment Machines
+router.get('/payment-machines', authenticateToken, async (req, res) => {
+    try {
+        const machines = await prisma.paymentMachine.findMany({
+            where: { ownerUid: req.user?.id },
+            orderBy: { createdAt: 'desc' }
+        });
+        res.json(machines);
+    }
+    catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
+router.post('/payment-machines', authenticateToken, async (req, res) => {
+    const { name, fee } = req.body;
+    try {
+        const machine = await prisma.paymentMachine.create({
+            data: {
+                ownerUid: req.user?.id,
+                name,
+                fee: parseFloat(fee)
+            }
+        });
+        res.json(machine);
+    }
+    catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
+router.delete('/payment-machines/:id', authenticateToken, async (req, res) => {
+    try {
+        await prisma.paymentMachine.delete({
+            where: {
+                id: req.params.id,
+                ownerUid: req.user?.id
+            }
+        });
+        res.json({ success: true });
+    }
+    catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
+// Sales & PDV
+router.get('/sales', authenticateToken, async (req, res) => {
+    try {
+        const sales = await prisma.sale.findMany({
+            where: { ownerUid: req.user?.id },
+            include: { items: true, client: true, staff: true },
+            orderBy: { createdAt: 'desc' }
+        });
+        res.json(sales);
+    }
+    catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
+router.post('/sales', authenticateToken, async (req, res) => {
+    const { clientId, staffId, paymentMethod, // legacy or hybrid
+    paymentMethodServices, // 'money' | 'card' | 'pix'
+    paymentMethodProducts, // 'money' | 'card' | 'pix' | 'on_account'
+    items, includeDebt, appointmentId } = req.body;
+    const ownerUid = req.user?.id;
+    try {
+        const result = await prisma.$transaction(async (tx) => {
+            // 1. Calculate subtotals
+            let totalServices = 0;
+            let totalProducts = 0;
+            const saleItemsData = [];
+            for (const item of items) {
+                const lineTotal = item.quantity * item.unitPrice;
+                if (item.serviceId) {
+                    totalServices += lineTotal;
+                }
+                else {
+                    totalProducts += lineTotal;
+                }
+                saleItemsData.push({
+                    productId: item.productId || null,
+                    serviceId: item.serviceId || null,
+                    quantity: item.quantity,
+                    unitPrice: item.unitPrice,
+                    totalPrice: lineTotal
+                });
+                // 2. Decrement stock if it's a product
+                if (item.productId) {
+                    await tx.product.update({
+                        where: { id: item.productId },
+                        data: { stock: { decrement: item.quantity } }
+                    });
+                }
+            }
+            // 3. Validation: Services MUST be paid immediately
+            if (totalServices > 0 && paymentMethodProducts === 'on_account' && !paymentMethodServices) {
+                // Se o usuário selecionou "Na Conta" globalmente ou para produtos e não definiu o de serviços
+                // vamos assumir que ele está tentando colocar tudo na conta.
+                throw new Error('Serviços devem ser pagos obrigatoriamente no ato da finalização.');
+            }
+            if (paymentMethodServices === 'on_account') {
+                throw new Error('Regra de Negócio: Serviços não permitem parcelamento ou lançamento na conta da casa.');
+            }
+            const totalAmount = totalServices + totalProducts;
+            // 4. Handle Debt payment if requested (Existing feature)
+            let debtPaid = 0;
+            if (includeDebt && clientId) {
+                const client = await tx.client.findUnique({ where: { id: clientId } });
+                if (client && client.pendingDebt > 0) {
+                    debtPaid = client.pendingDebt;
+                    await tx.client.update({
+                        where: { id: clientId },
+                        data: { pendingDebt: 0 }
+                    });
+                }
+            }
+            // 5. Handle "On Account" for products
+            if (paymentMethodProducts === 'on_account' && clientId) {
+                await tx.client.update({
+                    where: { id: clientId },
+                    data: { pendingDebt: { increment: totalProducts } }
+                });
+            }
+            // 6. Handle Appointment Completion
+            if (appointmentId) {
+                await tx.appointment.update({
+                    where: { id: appointmentId },
+                    data: {
+                        status: 'completed',
+                        finishedAt: new Date()
+                    }
+                });
+            }
+            // 7. Create Sale
+            const sale = await tx.sale.create({
+                data: {
+                    ownerUid,
+                    clientId: clientId || null,
+                    staffId: staffId || null,
+                    appointmentId: appointmentId || null,
+                    totalAmount: totalAmount + debtPaid,
+                    paymentMethod: paymentMethod || 'hybrid',
+                    paymentMethodServices: paymentMethodServices || paymentMethod,
+                    paymentMethodProducts: paymentMethodProducts || paymentMethod,
+                    items: {
+                        create: saleItemsData
+                    }
+                },
+                include: { items: true }
+            });
+            // 8. Create Financial Transactions
+            const installmentsCount = parseInt(req.body.installments) || 1;
+            const cardFeePercentage = parseFloat(req.body.cardFeePercentage) || 0;
+            // Part 1: Services + Debt (Always 1x)
+            const serviceAmountTotal = totalServices + debtPaid;
+            if (serviceAmountTotal > 0) {
+                const feeAmount = paymentMethodServices === 'card' ? (serviceAmountTotal * (cardFeePercentage / 100)) : 0;
+                const netAmount = serviceAmountTotal - feeAmount;
+                await tx.transaction.create({
+                    data: {
+                        ownerUid,
+                        parentId: sale.id,
+                        type: 'income',
+                        amount: serviceAmountTotal,
+                        description: `Venda #${sale.id.slice(-4)} - Serviços / Dívida`,
+                        category: 'Serviços',
+                        date: new Date(),
+                        status: 'completed',
+                        paymentMethod: paymentMethodServices || 'money',
+                        feeAmount,
+                        netAmount
+                    }
+                });
+                // Register card fee as expense if applicable
+                if (feeAmount > 0) {
+                    await tx.transaction.create({
+                        data: {
+                            ownerUid,
+                            parentId: sale.id,
+                            type: 'expense',
+                            amount: feeAmount,
+                            description: `Taxa Cartão - Venda #${sale.id.slice(-4)} (Serviços)`,
+                            category: 'Taxas Administrativas',
+                            date: new Date(),
+                            status: 'completed'
+                        }
+                    });
+                }
+            }
+            // Part 2: Products
+            if (totalProducts > 0 && paymentMethodProducts !== 'on_account') {
+                if (installmentsCount > 1) {
+                    const installmentAmount = totalProducts / installmentsCount;
+                    for (let i = 1; i <= installmentsCount; i++) {
+                        const dueDate = new Date();
+                        dueDate.setMonth(dueDate.getMonth() + (i - 1));
+                        const feeAmount = paymentMethodProducts === 'card' ? (installmentAmount * (cardFeePercentage / 100)) : 0;
+                        const netAmount = installmentAmount - feeAmount;
+                        await tx.transaction.create({
+                            data: {
+                                ownerUid,
+                                parentId: sale.id,
+                                type: 'income',
+                                amount: installmentAmount,
+                                description: `Venda #${sale.id.slice(-4)} - Produtos (${i}/${installmentsCount})`,
+                                category: 'Produtos',
+                                date: new Date(),
+                                dueDate: i === 1 ? null : dueDate,
+                                paymentDate: i === 1 ? new Date() : null,
+                                status: i === 1 ? 'completed' : 'pending',
+                                paymentMethod: paymentMethodProducts,
+                                installment: i,
+                                totalInstallments: installmentsCount,
+                                feeAmount,
+                                netAmount
+                            }
+                        });
+                        // Register card fee as expense if applicable
+                        if (feeAmount > 0) {
+                            await tx.transaction.create({
+                                data: {
+                                    ownerUid,
+                                    parentId: sale.id,
+                                    type: 'expense',
+                                    amount: feeAmount,
+                                    description: `Taxa Cartão - Venda #${sale.id.slice(-4)} (Produto Parcela ${i})`,
+                                    category: 'Taxas Administrativas',
+                                    date: new Date(),
+                                    status: i === 1 ? 'completed' : 'pending'
+                                }
+                            });
+                        }
+                    }
+                }
+                else {
+                    // 1x Product Payment
+                    const feeAmount = paymentMethodProducts === 'card' ? (totalProducts * (cardFeePercentage / 100)) : 0;
+                    const netAmount = totalProducts - feeAmount;
+                    await tx.transaction.create({
+                        data: {
+                            ownerUid,
+                            parentId: sale.id,
+                            type: 'income',
+                            amount: totalProducts,
+                            description: `Venda #${sale.id.slice(-4)} - Produtos`,
+                            category: 'Produtos',
+                            date: new Date(),
+                            status: 'completed',
+                            paymentMethod: paymentMethodProducts,
+                            feeAmount,
+                            netAmount
+                        }
+                    });
+                    if (feeAmount > 0) {
+                        await tx.transaction.create({
+                            data: {
+                                ownerUid,
+                                parentId: sale.id,
+                                type: 'expense',
+                                amount: feeAmount,
+                                description: `Taxa Cartão - Venda #${sale.id.slice(-4)} (Produtos)`,
+                                category: 'Taxas Administrativas',
+                                date: new Date(),
+                                status: 'completed'
+                            }
+                        });
+                    }
+                }
+            }
+            // Transaction for On Account (Future Income) - "Pendura"
+            if (paymentMethodProducts === 'on_account' && totalProducts > 0) {
+                await tx.transaction.create({
+                    data: {
+                        ownerUid,
+                        type: 'income',
+                        amount: totalProducts,
+                        description: `Venda PDV #${sale.id.split('-')[0]} (Lançado na Conta do Cliente)`,
+                        date: new Date(),
+                        category: 'Venda - Contas a Receber',
+                        status: 'pending',
+                        dueDate: new Date(),
+                        paymentMethod: 'on_account'
+                    }
+                });
+            }
+            // 9. Update Client Loyalty Points based on total sale
+            if (clientId) {
+                const settings = await tx.setting.findUnique({ where: { uid: ownerUid } });
+                const fidelityConfig = settings?.fidelityConfig ? JSON.parse(settings.fidelityConfig) : null;
+                if (fidelityConfig?.enabled) {
+                    let pointsToAdd = 0;
+                    pointsToAdd += (fidelityConfig.pointsPerVisit || 0);
+                    pointsToAdd += Math.floor((totalAmount + debtPaid) * (fidelityConfig.pointsPerCurrency || 0));
+                    if (pointsToAdd > 0) {
+                        await tx.client.update({
+                            where: { id: clientId },
+                            data: {
+                                loyaltyPoints: { increment: pointsToAdd },
+                                loyaltyVisits: { increment: 1 }
+                            }
+                        });
+                    }
+                }
+            }
+            return sale;
+        });
+        res.json(result);
+    }
+    catch (err) {
+        console.error('[SALES_ERROR]', err);
+        res.status(400).json({ error: err.message });
+    }
+});
 // --- PUBLIC ROUTES (For Booking Page) ---
 router.get('/public/plans', async (req, res) => {
     const plansData = await prisma.plan.findMany();
@@ -1533,15 +2121,76 @@ router.get('/public/plans', async (req, res) => {
     res.json(plans);
 });
 router.get('/public/shop/:slug', async (req, res) => {
-    const settings = await prisma.setting.findUnique({ where: { slug: req.params.slug } });
-    if (!settings)
-        return res.status(404).json({ error: 'Shop not found' });
-    const owner = await prisma.user.findUnique({
-        where: { id: settings.uid },
-        select: { name: true, shopName: true }
-    });
-    settings.businessHours = settings.businessHours ? JSON.parse(settings.businessHours) : [];
-    res.json({ shop: settings, owner });
+    const { slug } = req.params;
+    console.log(`[PublicShop] Searching for slug: "${slug}"`);
+    try {
+        // 1. Try finding by User slug (primary tenant ID)
+        let user = await prisma.user.findFirst({
+            where: {
+                OR: [
+                    { slug: slug },
+                    { slug: slug.toLowerCase() }
+                ]
+            },
+            select: { id: true, name: true, shopName: true, status: true, slug: true }
+        });
+        let settings;
+        if (user) {
+            console.log(`[PublicShop] Found user by slug: ${user.id}`);
+            settings = await prisma.setting.findUnique({ where: { uid: user.id } });
+        }
+        else {
+            console.log(`[PublicShop] User not found by slug, trying Setting slug...`);
+            settings = await prisma.setting.findFirst({
+                where: {
+                    OR: [
+                        { slug: slug },
+                        { slug: slug.toLowerCase() }
+                    ]
+                }
+            });
+            if (settings) {
+                console.log(`[PublicShop] Found setting by slug, finding owner: ${settings.uid}`);
+                user = await prisma.user.findUnique({
+                    where: { id: settings.uid },
+                    select: { id: true, name: true, shopName: true, status: true, slug: true }
+                });
+            }
+        }
+        if (!user) {
+            console.log(`[PublicShop] No user found for slug "${slug}". Returning 404.`);
+            return res.status(404).json({ error: 'Shop not found' });
+        }
+        // Ensure settings exists (create default if missing)
+        if (!settings) {
+            console.log(`[PublicShop] Settings missing for user ${user.id}, creating defaults...`);
+            settings = await prisma.setting.create({
+                data: {
+                    uid: user.id,
+                    slug: user.slug || slug,
+                    businessHours: JSON.stringify([
+                        { day: 'Segunda-feira', open: '09:00', close: '18:00', closed: false },
+                        { day: 'Terça-feira', open: '09:00', close: '18:00', closed: false },
+                        { day: 'Quarta-feira', open: '09:00', close: '18:00', closed: false },
+                        { day: 'Quinta-feira', open: '09:00', close: '18:00', closed: false },
+                        { day: 'Sexta-feira', open: '09:00', close: '18:00', closed: false },
+                        { day: 'Sábado', open: '09:00', close: '14:00', closed: false },
+                        { day: 'Domingo', open: '00:00', close: '00:00', closed: true }
+                    ])
+                }
+            });
+        }
+        const bh = typeof settings.businessHours === 'string' ? JSON.parse(settings.businessHours) : settings.businessHours;
+        console.log(`[PublicShop] Successfully returning shop data for ${user.shopName}`);
+        res.json({
+            shop: { ...settings, businessHours: bh, uid: user.id },
+            owner: { name: user.name, shopName: user.shopName, id: user.id }
+        });
+    }
+    catch (err) {
+        console.error('[PublicShop] Critical Error:', err);
+        res.status(500).json({ error: err.message });
+    }
 });
 router.get('/public/services/:uid', async (req, res) => {
     const services = await prisma.service.findMany({
@@ -1562,7 +2211,9 @@ router.get('/public/staff/:uid', async (req, res) => {
     res.json(staff);
 });
 router.post('/public/appointments', async (req, res) => {
-    const { ownerUid, clientName, phone, serviceId, serviceName, staffId, staffName, date, price } = req.body;
+    let { ownerUid, clientName, phone, serviceId, serviceName, staffId, staffName, date, price, birthDate } = req.body;
+    // Sanitize phone (keep only digits)
+    phone = phone.replace(/\D/g, '');
     try {
         // Find or create client
         let client = await prisma.client.findFirst({
@@ -1570,7 +2221,19 @@ router.post('/public/appointments', async (req, res) => {
         });
         if (!client) {
             client = await prisma.client.create({
-                data: { ownerUid, name: clientName, phone }
+                data: {
+                    ownerUid,
+                    name: clientName,
+                    phone,
+                    birthDate: birthDate ? new Date(birthDate) : null
+                }
+            });
+        }
+        else if (birthDate && !client.birthDate) {
+            // Update birthDate if not present
+            await prisma.client.update({
+                where: { id: client.id },
+                data: { birthDate: new Date(birthDate) }
             });
         }
         const appointment = await prisma.appointment.create({
@@ -1584,84 +2247,228 @@ router.post('/public/appointments', async (req, res) => {
         res.status(500).json({ error: err.message, success: false });
     }
 });
-router.get('/public/client-info/:slug/:phone', async (req, res) => {
-    const { slug, phone } = req.params;
+router.post('/public/appointments/:id/cancel', async (req, res) => {
+    const { id } = req.params;
+    const { reason, confirmLateCancellation } = req.body;
     try {
-        const shop = await prisma.setting.findUnique({ where: { slug } });
-        if (!shop)
-            return res.status(404).json({ error: 'Shop not found' });
-        const client = await prisma.client.findFirst({
-            where: { ownerUid: shop.uid, phone }
+        const appointment = await prisma.appointment.findUnique({
+            where: { id },
+            include: { client: true }
         });
-        if (!client)
-            return res.status(404).json({ error: 'Client not found' });
-        res.json({
-            name: client.name,
-            pendingDebt: client.pendingDebt
+        if (!appointment)
+            return res.status(404).json({ error: 'Agendamento não encontrado' });
+        const now = new Date();
+        const appDate = new Date(appointment.date);
+        const diffInHours = (appDate.getTime() - now.getTime()) / (1000 * 60 * 60);
+        // If < 24h and not yet confirmed as late cancellation
+        if (diffInHours < 24 && !confirmLateCancellation) {
+            return res.status(400).json({
+                error: 'Late cancellation',
+                message: 'Atenção: Cancelamentos a menos de 24h geram uma taxa de 50%. Deseja prosseguir?',
+                penaltyAmount: appointment.price * 0.5
+            });
+        }
+        const finalStatus = diffInHours < 24 ? 'cancelled_late' : 'cancelled_on_time';
+        await prisma.appointment.update({
+            where: { id },
+            data: {
+                status: finalStatus,
+                cancellationReason: reason || 'Cancelado via Portal',
+                cancellationDate: now
+            }
         });
+        // Apply debt if late
+        if (diffInHours < 24) {
+            const penalty = appointment.price * 0.5;
+            await prisma.client.update({
+                where: { id: appointment.clientId },
+                data: {
+                    pendingDebt: { increment: penalty }
+                }
+            });
+        }
+        res.json({ success: true, status: finalStatus });
     }
     catch (err) {
         res.status(500).json({ error: err.message });
     }
 });
 router.get('/public/client-portal/:slug/:phone', async (req, res) => {
-    const { slug, phone } = req.params;
+    let { slug, phone } = req.params;
+    phone = phone.replace(/\D/g, '');
     try {
-        const shop = await prisma.setting.findUnique({ where: { slug } });
-        if (!shop)
+        // Find the shop owner first
+        let user = await prisma.user.findUnique({ where: { slug } });
+        if (!user) {
+            const shop = await prisma.setting.findUnique({ where: { slug } });
+            if (shop) {
+                user = await prisma.user.findUnique({ where: { id: shop.uid } });
+            }
+        }
+        if (!user)
             return res.status(404).json({ error: 'Shop not found' });
         const client = await prisma.client.findFirst({
-            where: { ownerUid: shop.uid, phone }
+            where: { ownerUid: user.id, phone },
+            include: {
+                appointments: {
+                    orderBy: { date: 'desc' }
+                }
+            }
         });
         if (!client)
             return res.status(404).json({ error: 'Client not found' });
-        const appointments = await prisma.appointment.findMany({
-            where: { clientId: client.id },
-            orderBy: { date: 'desc' }
-        });
         res.json({
             client: {
+                id: client.id,
                 name: client.name,
-                pendingDebt: client.pendingDebt
+                pendingDebt: client.pendingDebt || 0
             },
-            appointments
+            appointments: client.appointments
         });
     }
     catch (err) {
         res.status(500).json({ error: err.message });
     }
 });
-router.post('/public/appointments/:id/cancel', async (req, res) => {
-    const { id } = req.params;
-    const { reason } = req.body;
+// --- MAGIC LINK ROUTES ---
+/**
+ * POST /public/client-portal/:slug/magic-link
+ * Generates a one-time magic link and sends it via WhatsApp (WAHA).
+ */
+router.post('/public/client-portal/:slug/magic-link', async (req, res) => {
+    let { phone } = req.body;
+    const { slug } = req.params;
+    if (!phone)
+        return res.status(400).json({ error: 'Phone is required' });
+    phone = String(phone).replace(/\D/g, '');
     try {
-        const appointment = await prisma.appointment.findUnique({
-            where: { id }
-        });
-        if (!appointment)
-            return res.status(404).json({ error: 'Appointment not found' });
-        if (appointment.status === 'cancelled')
-            return res.status(400).json({ error: 'Already cancelled' });
-        const now = new Date();
-        const appDate = new Date(appointment.date);
-        const diffInHours = (appDate.getTime() - now.getTime()) / (1000 * 60 * 60);
-        if (diffInHours < 24) {
-            return res.status(400).json({
-                error: 'Cancellations with less than 24h notice must be handled via WhatsApp.',
-                requiresWhatsApp: true
-            });
+        // Resolve shop owner by slug
+        let user = await prisma.user.findUnique({ where: { slug } });
+        if (!user) {
+            const shop = await prisma.setting.findUnique({ where: { slug } });
+            if (shop)
+                user = await prisma.user.findUnique({ where: { id: shop.uid } });
         }
-        await prisma.appointment.update({
-            where: { id },
-            data: {
-                status: 'cancelled',
-                cancellationReason: reason,
-                cancellationDate: now
+        if (!user)
+            return res.status(404).json({ error: 'Shop not found' });
+        // Find client by phone
+        const client = await prisma.client.findFirst({
+            where: { ownerUid: user.id, phone }
+        });
+        if (!client)
+            return res.status(404).json({ error: 'Cliente não encontrado. Verifique o número.' });
+        // Rate limit: max 1 token per phone per 60 seconds
+        const recentToken = await prisma.clientMagicToken.findFirst({
+            where: {
+                clientId: client.id,
+                createdAt: { gte: new Date(Date.now() - 60_000) }
             }
         });
-        res.json({ success: true });
+        if (recentToken) {
+            return res.status(429).json({ error: 'Aguarde 1 minuto antes de solicitar um novo link.' });
+        }
+        // Generate JWT token (15 min expiry)
+        const expiresAt = new Date(Date.now() + 15 * 60 * 1000);
+        const tokenPayload = { clientId: client.id, ownerUid: user.id, type: 'magic_link' };
+        const token = jwt.sign(tokenPayload, JWT_SECRET, { expiresIn: '15m' });
+        // Persist token for single-use enforcement
+        await prisma.clientMagicToken.create({
+            data: { token, clientId: client.id, ownerUid: user.id, expiresAt }
+        });
+        // Build the magic link
+        const appUrl = process.env.APP_URL || 'http://localhost:3000';
+        const magicLink = `${appUrl}/portal/${slug}?token=${token}`;
+        // Send via WAHA
+        const wahaSettings = await prisma.whatsappSettings.findUnique({ where: { uid: user.id } });
+        let formattedPhone = phone.startsWith('55') ? phone : `55${phone}`;
+        const chatId = `${formattedPhone}@c.us`;
+        const shopName = user.shopName || 'nosso salão';
+        const message = `Olá, ${client.name}! 👋\n\nAcesse sua área exclusiva em *${shopName}* clicando no link abaixo:\n\n🔗 ${magicLink}\n\n_Este link é válido por 15 minutos e é de uso único._`;
+        if (wahaSettings?.enabled) {
+            const waha = new WAHAService(WAHA_API_URL);
+            // Try to send regardless of cached status, catch error if instance is actually offline
+            await waha.sendTextMessage(wahaSettings.wahaInstanceName || 'default', chatId, message).catch(err => {
+                console.error('[Magic Link] WAHA send failed:', err.message);
+            });
+        }
+        else {
+            // Log for dev/debug when WhatsApp is not connected
+            console.log(`[Magic Link] Link for ${client.name} (${phone}): ${magicLink}`);
+        }
+        res.json({ success: true, message: 'Link enviado via WhatsApp! Verifique suas mensagens.' });
     }
     catch (err) {
+        console.error('[Magic Link] Error:', err.message);
+        res.status(500).json({ error: err.message });
+    }
+});
+/**
+ * GET /public/client-portal/:slug/verify-token?token=
+ * Validates a magic link token and returns client + appointments data.
+ * Invalidates the token after first use.
+ */
+router.get('/public/client-portal/:slug/verify-token', async (req, res) => {
+    const { slug } = req.params;
+    const { token } = req.query;
+    if (!token)
+        return res.status(400).json({ error: 'Token is required' });
+    try {
+        // Verify JWT signature and expiry
+        let payload;
+        try {
+            payload = jwt.verify(token, JWT_SECRET);
+        }
+        catch {
+            return res.status(401).json({ error: 'Link inválido ou expirado.' });
+        }
+        if (payload.type !== 'magic_link') {
+            return res.status(401).json({ error: 'Token inválido.' });
+        }
+        // Fetch the persisted token record
+        const tokenRecord = await prisma.clientMagicToken.findUnique({
+            where: { token }
+        });
+        if (!tokenRecord)
+            return res.status(401).json({ error: 'Link não encontrado.' });
+        if (tokenRecord.usedAt)
+            return res.status(401).json({ error: 'Este link já foi utilizado. Solicite um novo.' });
+        if (new Date() > tokenRecord.expiresAt)
+            return res.status(401).json({ error: 'Link expirado. Solicite um novo.' });
+        // Validate slug matches ownerUid
+        let user = await prisma.user.findUnique({ where: { slug } });
+        if (!user) {
+            const shop = await prisma.setting.findUnique({ where: { slug } });
+            if (shop)
+                user = await prisma.user.findUnique({ where: { id: shop.uid } });
+        }
+        if (!user || user.id !== tokenRecord.ownerUid) {
+            return res.status(401).json({ error: 'Token inválido para este salão.' });
+        }
+        // Mark token as used (single-use)
+        await prisma.clientMagicToken.update({
+            where: { token },
+            data: { usedAt: new Date() }
+        });
+        // Fetch client + appointments
+        const client = await prisma.client.findUnique({
+            where: { id: tokenRecord.clientId },
+            include: {
+                appointments: { orderBy: { date: 'desc' } }
+            }
+        });
+        if (!client)
+            return res.status(404).json({ error: 'Cliente não encontrado.' });
+        res.json({
+            client: {
+                id: client.id,
+                name: client.name,
+                pendingDebt: client.pendingDebt || 0
+            },
+            appointments: client.appointments
+        });
+    }
+    catch (err) {
+        console.error('[Magic Link Verify] Error:', err.message);
         res.status(500).json({ error: err.message });
     }
 });
@@ -1878,6 +2685,59 @@ router.delete('/anamnesis/:id', authenticateToken, async (req, res) => {
         res.status(500).json({ error: err.message });
     }
 });
+// Podology Specific Anamnesis
+router.get('/clients/:id/podology-anamnesis', authenticateToken, async (req, res) => {
+    try {
+        const records = await prisma.podologyAnamnesis.findMany({
+            where: { clientId: req.params.id, ownerUid: req.user?.id },
+            orderBy: { createdAt: 'desc' }
+        });
+        res.json(records);
+    }
+    catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
+// Alias for frontend
+router.get('/podology-anamnesis/client/:id', authenticateToken, async (req, res) => {
+    try {
+        const records = await prisma.podologyAnamnesis.findMany({
+            where: { clientId: req.params.id, ownerUid: req.user?.id },
+            orderBy: { createdAt: 'desc' }
+        });
+        res.json(records);
+    }
+    catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
+router.post('/podology-anamnesis', authenticateToken, async (req, res) => {
+    try {
+        const ownerUid = req.user?.id;
+        const { clientId, ...rest } = req.body;
+        const record = await prisma.podologyAnamnesis.create({
+            data: {
+                ...rest,
+                clientId,
+                ownerUid
+            }
+        });
+        // Also update RG/CPF on client if provided
+        if (rest.rg || rest.cpf) {
+            await prisma.client.update({
+                where: { id: clientId },
+                data: {
+                    rg: rest.rg || undefined,
+                    cpf: rest.cpf || undefined
+                }
+            });
+        }
+        res.json(record);
+    }
+    catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
 // AI & Assets
 router.post('/ai/generate-assets', async (req, res) => {
     try {
@@ -1908,6 +2768,370 @@ router.post('/ai/generate-assets', async (req, res) => {
     catch (error) {
         console.error('AI Error:', error);
         res.status(500).json({ error: error.message });
+    }
+});
+// ===========================================================
+// --- COMBOS (Service Packages) ---
+// ===========================================================
+router.get('/combos', authenticateToken, async (req, res) => {
+    try {
+        const combos = await prisma.serviceCombo.findMany({
+            where: { ownerUid: req.user?.id },
+            include: {
+                items: {
+                    include: { service: true },
+                    orderBy: { order: 'asc' }
+                }
+            },
+            orderBy: { createdAt: 'desc' }
+        });
+        // Attach computed totalDurationMin to each combo
+        const result = combos.map((combo) => ({
+            ...combo,
+            totalDurationMin: combo.items.reduce((acc, item) => acc + item.service.duration, 0)
+        }));
+        res.json(result);
+    }
+    catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
+router.post('/combos', authenticateToken, async (req, res) => {
+    try {
+        const { name, description, price, services } = req.body;
+        // services = [{ serviceId: string, order: number }]
+        if (!services || services.length === 0) {
+            return res.status(400).json({ error: 'Um combo precisa ter ao menos 1 serviço' });
+        }
+        const combo = await prisma.serviceCombo.create({
+            data: {
+                name,
+                description,
+                price: price ? Number(price) : null,
+                ownerUid: req.user?.id,
+                items: {
+                    create: services.map((s) => ({
+                        serviceId: s.serviceId,
+                        order: s.order
+                    }))
+                }
+            },
+            include: {
+                items: {
+                    include: { service: true },
+                    orderBy: { order: 'asc' }
+                }
+            }
+        });
+        const totalDurationMin = combo.items.reduce((acc, item) => acc + item.service.duration, 0);
+        res.status(201).json({ ...combo, totalDurationMin });
+    }
+    catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
+router.put('/combos/:id', authenticateToken, async (req, res) => {
+    try {
+        const { name, description, price, services } = req.body;
+        const comboId = req.params.id;
+        // Verify ownership
+        const existing = await prisma.serviceCombo.findFirst({
+            where: { id: comboId, ownerUid: req.user?.id }
+        });
+        if (!existing)
+            return res.status(404).json({ error: 'Combo não encontrado' });
+        // Delete old items and recreate
+        await prisma.comboItem.deleteMany({ where: { comboId } });
+        const combo = await prisma.serviceCombo.update({
+            where: { id: comboId },
+            data: {
+                name,
+                description,
+                price: price ? Number(price) : null,
+                items: {
+                    create: services.map((s) => ({
+                        serviceId: s.serviceId,
+                        order: s.order
+                    }))
+                }
+            },
+            include: {
+                items: {
+                    include: { service: true },
+                    orderBy: { order: 'asc' }
+                }
+            }
+        });
+        const totalDurationMin = combo.items.reduce((acc, item) => acc + item.service.duration, 0);
+        res.json({ ...combo, totalDurationMin });
+    }
+    catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
+router.delete('/combos/:id', authenticateToken, async (req, res) => {
+    try {
+        await prisma.serviceCombo.deleteMany({
+            where: { id: req.params.id, ownerUid: req.user?.id }
+        });
+        res.json({ success: true });
+    }
+    catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
+// ===========================================================
+// --- RECURRING APPOINTMENTS ---
+// ===========================================================
+/**
+ * POST /appointments/recurring/validate
+ * Batch-validates a recurring series without saving anything.
+ * Returns a list of conflict dates to display in the conflict modal.
+ */
+router.post('/appointments/recurring/validate', authenticateToken, async (req, res) => {
+    try {
+        const { staffId, serviceId, comboId, startTime, // "HH:MM"
+        dayOfWeek, // 0-6
+        frequency, // "weekly" | "biweekly"
+        seriesStartDate, // "YYYY-MM-DD"
+        seriesEndDate // "YYYY-MM-DD"
+         } = req.body;
+        const ownerUid = req.user?.id;
+        // Determine duration: from combo or from single service
+        let durationMin = 0;
+        if (comboId) {
+            durationMin = await calculateComboDuration(comboId, prisma);
+        }
+        else if (serviceId) {
+            const svc = await prisma.service.findFirst({ where: { id: serviceId, ownerUid } });
+            durationMin = svc?.duration || 60;
+        }
+        else {
+            return res.status(400).json({ error: 'serviceId ou comboId é obrigatório' });
+        }
+        const result = await validateRecurrenceSeries(ownerUid, staffId, startTime, durationMin, Number(dayOfWeek), new Date(seriesStartDate), new Date(seriesEndDate), frequency || 'weekly', prisma);
+        res.json(result);
+    }
+    catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
+/**
+ * POST /appointments/recurring
+ * Persists a validated recurring series.
+ * Expects resolvedDates[] with manual overrides for conflict dates.
+ */
+router.post('/appointments/recurring', authenticateToken, async (req, res) => {
+    try {
+        const { staffId, staffName, clientId, clientName, clientPhone, serviceId, serviceName, comboId, price, frequency, dayOfWeek, seriesStartDate, seriesEndDate, resolvedDates // [{ date: 'YYYY-MM-DD', startTime: 'HH:MM', skipped?: boolean }]
+         } = req.body;
+        const ownerUid = req.user?.id;
+        // Determine duration
+        let durationMin = 0;
+        if (comboId) {
+            durationMin = await calculateComboDuration(comboId, prisma);
+        }
+        else if (serviceId) {
+            const svc = await prisma.service.findFirst({ where: { id: serviceId, ownerUid } });
+            durationMin = svc?.duration || 60;
+        }
+        // Create the parent RecurrenceGroup
+        const group = await prisma.recurrenceGroup.create({
+            data: {
+                ownerUid,
+                staffId,
+                frequency: frequency || 'weekly',
+                dayOfWeek: Number(dayOfWeek),
+                startDate: new Date(seriesStartDate),
+                endDate: new Date(seriesEndDate),
+                startTime: resolvedDates?.[0]?.startTime || '09:00',
+                serviceId: serviceId || null,
+                comboId: comboId || null,
+            }
+        });
+        // Create individual appointments (skipping 'skipped' dates)
+        const appointmentsToCreate = (resolvedDates || [])
+            .filter((d) => !d.skipped)
+            .map((d) => {
+            const [h, m] = (d.startTime || '09:00').split(':').map(Number);
+            const startDt = new Date(`${d.date}T00:00:00`);
+            startDt.setHours(h, m, 0, 0);
+            const endDt = new Date(startDt.getTime() + durationMin * 60_000);
+            return {
+                ownerUid,
+                clientId: clientId || 'guest',
+                clientName,
+                phone: clientPhone || '',
+                serviceId: serviceId || '',
+                serviceName: serviceName || (comboId ? 'Combo' : 'Serviço'),
+                barberId: staffId || ownerUid,
+                barberName: staffName || '',
+                staffId: staffId || null,
+                staffName: staffName || null,
+                date: startDt,
+                startTime: startDt,
+                endTime: endDt,
+                totalDurationMin: durationMin,
+                recurrenceGroupId: group.id,
+                comboId: comboId || null,
+                price: Number(price) || 0,
+                status: 'scheduled'
+            };
+        });
+        if (appointmentsToCreate.length === 0) {
+            return res.status(400).json({ error: 'Nenhuma data válida para criar agendamentos' });
+        }
+        await prisma.appointment.createMany({ data: appointmentsToCreate });
+        res.status(201).json({
+            success: true,
+            recurrenceGroupId: group.id,
+            totalCreated: appointmentsToCreate.length
+        });
+    }
+    catch (err) {
+        console.error('Error creating recurring appointments:', err);
+        res.status(500).json({ error: err.message });
+    }
+});
+/**
+ * DELETE /appointments/recurring/:groupId
+ * Cancels all future appointments for a recurring group.
+ * Pass ?cancelAll=true to cancel the entire series (including past).
+ */
+router.delete('/appointments/recurring/:groupId', authenticateToken, async (req, res) => {
+    try {
+        const { groupId } = req.params;
+        const cancelAll = req.query.cancelAll === 'true';
+        const ownerUid = req.user?.id;
+        // Verify group ownership
+        const group = await prisma.recurrenceGroup.findFirst({
+            where: { id: groupId, ownerUid }
+        });
+        if (!group)
+            return res.status(404).json({ error: 'Série não encontrada' });
+        const dateFilter = cancelAll ? {} : { startTime: { gte: new Date() } };
+        const updated = await prisma.appointment.updateMany({
+            where: {
+                recurrenceGroupId: groupId,
+                ownerUid,
+                status: { not: 'cancelled' },
+                ...dateFilter
+            },
+            data: { status: 'cancelled' }
+        });
+        // If cancelling all, mark the group as cancelled too
+        if (cancelAll) {
+            await prisma.recurrenceGroup.update({
+                where: { id: groupId },
+                data: { status: 'cancelled' }
+            });
+        }
+        res.json({ success: true, cancelledCount: updated.count });
+    }
+    catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
+/**
+ * GET /appointments/recurring/:groupId
+ * Returns all appointments for a recurrence group.
+ */
+router.get('/appointments/recurring/:groupId', authenticateToken, async (req, res) => {
+    try {
+        const appointments = await prisma.appointment.findMany({
+            where: {
+                recurrenceGroupId: req.params.groupId,
+                ownerUid: req.user?.id
+            },
+            orderBy: { startTime: 'asc' }
+        });
+        res.json(appointments);
+    }
+    catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
+router.get('/intelligence/churn', authenticateToken, async (req, res) => {
+    const ownerUid = req.user?.id;
+    try {
+        const riskClients = await IntelligenceService.getChurnRisk(ownerUid);
+        res.json(riskClients);
+    }
+    catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
+router.get('/intelligence/cash-flow', authenticateToken, async (req, res) => {
+    const ownerUid = req.user?.id;
+    try {
+        const projection = await IntelligenceService.getCashFlowProjection(ownerUid);
+        res.json(projection);
+    }
+    catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
+router.get('/intelligence/upsell/:clientId', authenticateToken, async (req, res) => {
+    const ownerUid = req.user?.id;
+    const { clientId } = req.params;
+    try {
+        const suggestions = await IntelligenceService.getUpsellSuggestions(ownerUid, clientId);
+        res.json(suggestions);
+    }
+    catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
+// --- SERVICE PACKAGE ROUTES ---
+router.get('/service-packages', authenticateToken, async (req, res) => {
+    const ownerUid = req.user?.id;
+    try {
+        const packages = await prisma.servicePackage.findMany({
+            where: { ownerUid },
+            include: { service: true }
+        });
+        res.json(packages);
+    }
+    catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
+router.post('/service-packages', authenticateToken, async (req, res) => {
+    const ownerUid = req.user?.id;
+    const { name, description, price, sessions, validityDays, serviceId } = req.body;
+    try {
+        const pkg = await prisma.servicePackage.create({
+            data: { ownerUid, name, description, price, sessions, validityDays, serviceId }
+        });
+        res.json(pkg);
+    }
+    catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
+router.delete('/service-packages/:id', authenticateToken, async (req, res) => {
+    const ownerUid = req.user?.id;
+    try {
+        await prisma.servicePackage.delete({
+            where: { id: req.params.id, ownerUid }
+        });
+        res.json({ success: true });
+    }
+    catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
+router.get('/client-packages/:clientId', authenticateToken, async (req, res) => {
+    const ownerUid = req.user?.id;
+    try {
+        const packages = await prisma.clientPackage.findMany({
+            where: { ownerUid, clientId: req.params.clientId },
+            include: { package: true }
+        });
+        res.json(packages);
+    }
+    catch (err) {
+        res.status(500).json({ error: err.message });
     }
 });
 export default router;

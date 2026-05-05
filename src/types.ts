@@ -19,11 +19,12 @@ export interface Client {
   phone: string;
   email?: string;
   notes?: string;
+  birthDate?: string;
   ownerUid: string;
   createdAt: string;
   loyaltyPoints: number;
   loyaltyVisits: number;
-  pendingDebt?: number; // New: No-show fee
+  pendingDebt: number; // Pending debt from on-account products or no-show fees
 }
 
 export interface Service {
@@ -142,6 +143,22 @@ export interface Transaction {
   date: string;
   category: string;
   ownerUid: string;
+  status: 'pending' | 'completed' | 'cancelled';
+  dueDate?: string;
+  paymentDate?: string;
+  installment?: number;
+  totalInstallments?: number;
+  parentId?: string;
+  paymentMethod?: 'money' | 'card' | 'pix' | 'crediario';
+  feeAmount?: number;
+  netAmount?: number;
+}
+
+export interface PaymentMachine {
+  id: string;
+  name: string;
+  fee: number;
+  createdAt: string;
 }
 
 export interface Staff {
@@ -189,6 +206,13 @@ export interface ShopSettings {
   fidelityConfig?: FidelityConfig;
   allowProfessionalViewAllAgendas?: boolean;
   podologyAnamnesisActive?: boolean;
+  cardFees?: {
+    debit?: number;
+    credit?: number;
+    pix?: number;
+    pixActive?: boolean;
+    cardActive?: boolean;
+  };
 }
 
 export interface FidelityConfig {

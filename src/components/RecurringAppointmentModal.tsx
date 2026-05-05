@@ -59,6 +59,12 @@ export default function RecurringAppointmentModal({
     return d.toISOString().split('T')[0];
   });
 
+  const setEndDatePreset = (months: number) => {
+    const start = new Date(seriesStartDate);
+    start.setMonth(start.getMonth() + months);
+    setSeriesEndDate(start.toISOString().split('T')[0]);
+  };
+
   // Validation state
   const [validating, setValidating] = useState(false);
   const [validationResult, setValidationResult] = useState<RecurrenceValidationResult | null>(null);
@@ -383,6 +389,11 @@ export default function RecurringAppointmentModal({
                         onChange={e => setSeriesEndDate(e.target.value)}
                         className="w-full bg-zinc-50 border border-zinc-200 px-3 py-2.5 rounded-xl focus:outline-none focus:ring-2 focus:ring-rose-500/20 focus:border-rose-500 text-sm"
                       />
+                      <div className="flex gap-2 mt-2">
+                        <button type="button" onClick={() => setEndDatePreset(1)} className="text-[9px] font-black uppercase bg-zinc-100 px-2 py-1 rounded-lg hover:bg-zinc-200 transition-colors">1 Mês</button>
+                        <button type="button" onClick={() => setEndDatePreset(6)} className="text-[9px] font-black uppercase bg-zinc-100 px-2 py-1 rounded-lg hover:bg-zinc-200 transition-colors">Semestre</button>
+                        <button type="button" onClick={() => setEndDatePreset(12)} className="text-[9px] font-black uppercase bg-zinc-100 px-2 py-1 rounded-lg hover:bg-zinc-200 transition-colors">Anual</button>
+                      </div>
                     </div>
                   </div>
                 </div>

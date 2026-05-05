@@ -24,7 +24,7 @@ export default function BookingPage({ slug }: BookingPageProps) {
   const [selectedStaff, setSelectedStaff] = useState<Staff | null>(null);
   const [selectedDate, setSelectedDate] = useState<Date>(startOfToday());
   const [selectedTime, setSelectedTime] = useState<string | null>(null);
-  const [clientInfo, setClientInfo] = useState({ name: '', phone: '' });
+  const [clientInfo, setClientInfo] = useState({ name: '', phone: '', birthDate: '' });
   const [isBooking, setIsBooking] = useState(false);
   const [bookingSuccess, setBookingSuccess] = useState(false);
   const [showCustomAlert, setShowCustomAlert] = useState(false);
@@ -127,6 +127,7 @@ export default function BookingPage({ slug }: BookingPageProps) {
         staffId: selectedStaff.id,
         staffName: selectedStaff.name,
         date: appointmentDate.toISOString(),
+        birthDate: clientInfo.birthDate || null,
         price: selectedService.price,
         status: 'pending'
       });
@@ -552,6 +553,15 @@ export default function BookingPage({ slug }: BookingPageProps) {
                       setClientInfo({ ...clientInfo, phone: val });
                     }}
                     onBlur={() => checkClientDebt(clientInfo.phone)}
+                    className="w-full bg-zinc-900 border border-zinc-800 rounded-2xl px-6 py-4 text-white focus:border-rose-500 outline-none transition-all"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <label className="text-sm font-medium text-zinc-400">Data de Nascimento (Opcional)</label>
+                  <input 
+                    type="date"
+                    value={clientInfo.birthDate}
+                    onChange={e => setClientInfo({ ...clientInfo, birthDate: e.target.value })}
                     className="w-full bg-zinc-900 border border-zinc-800 rounded-2xl px-6 py-4 text-white focus:border-rose-500 outline-none transition-all"
                   />
                 </div>

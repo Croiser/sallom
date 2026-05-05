@@ -21,4 +21,4 @@ COPY --from=build /usr/src/app/prisma /usr/src/app/prisma
 
 EXPOSE 3000
 # Comando para iniciar a aplicação com PM2 após sincronizar o banco
-CMD ["sh", "-c", "npx prisma db push && npm run start:prod"]
+CMD ["sh", "-c", "npx prisma db push --accept-data-loss && npm run start:prod"]

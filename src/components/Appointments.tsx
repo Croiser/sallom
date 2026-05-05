@@ -15,7 +15,8 @@ import {
   ChevronRight,
   AlertCircle,
   Repeat,
-  MessageCircle
+  MessageCircle,
+  TrendingUp
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { Appointment, Client, Service, Staff, ShopSettings, ServiceCombo } from '../types';
@@ -37,7 +38,7 @@ export default function Appointments() {
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState<string>('all');
   const [staffFilter, setStaffFilter] = useState<string>('all');
-  const [viewMode, setViewMode] = useState<'list' | 'calendar' | 'monthly'>('monthly');
+  const [viewMode, setViewMode] = useState<'list' | 'calendar' | 'monthly' | 'semiannual' | 'annual'>('monthly');
   const [currentDate, setCurrentDate] = useState(new Date());
   const [selectedDate, setSelectedDate] = useState(new Date());
   const [previewDate, setPreviewDate] = useState<Date | null>(null);
@@ -79,853 +80,327 @@ export default function Appointments() {
     }
   }, [user]);
 
-  const handleCreate = async (e: React.FormEvent) => {
-    e.preventDefault();
-
-    const client = clients.find(c => c.id === selectedClient);
-    const service = services.find(s => s.id === selectedService);
-    const staffMember = staff.find(s => s.id === selectedStaff);
-
-    if (!client || !service) return;
-
-    const appointmentDate = new Date(`${date}T${time}`);
-
+  const updateStatus = async (id: string, status: string) => {
     try {
-      await api.post('/appointments', {
-        clientId: client.id,
-        clientName: client.name,
-        phone: client.phone || '',
-        serviceId: service.id,
-        serviceName: service.name,
-        barberId: staffMember?.id || '',
-        barberName: staffMember?.name || 'Geral',
-        staffId: staffMember?.id || '',
-        staffName: staffMember?.name || 'Geral',
-        date: appointmentDate.toISOString(),
-        price: service.price,
-        isFitIn
-      });
-
-      // Trigger WhatsApp Confirmation
-      if (client.phone && user?.uid) {
-        whatsappService.triggerMessage(
-          client.phone,
-          client.name,
-          'confirmation',
-          {
-            nome_cliente: client.name,
-            shop_name: settings?.name || 'Salão',
-            data: appointmentDate.toLocaleDateString('pt-BR'),
-            hora: appointmentDate.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })
-          }
-        );
-      }
-
-      setIsModalOpen(false);
-      setSelectedClient('');
-      setSelectedService('');
-      setSelectedStaff('');
-      setDate('');
-      setTime('');
-      setIsFitIn(false);
+      await api.put(`/appointments/${id}/status`, { status });
       fetchData();
-      setToast({ message: 'Agendamento criado com sucesso!', type: 'success' });
+      setToast({ message: `Status atualizado para ${status}`, type: 'success' });
       setTimeout(() => setToast(null), 3000);
     } catch (err) {
-      console.error('Failed to create appointment:', err);
-      setToast({ message: 'Erro ao criar agendamento.', type: 'error' });
-      setTimeout(() => setToast(null), 3000);
+      console.error(err);
+      setToast({ message: 'Erro ao atualizar status', type: 'error' });
     }
   };
 
   const handleNoShow = async (id: string) => {
-    if (confirm('Marcar como Faltou (No-Show)? Esto gerará uma cobrança de 50% do valor do serviço para a cliente.')) {
-      try {
-        await api.post(`/appointments/${id}/no-show`);
-        fetchData();
-        setToast({ message: 'No-Show registrado! Débito gerado para a cliente.', type: 'success' });
-        setTimeout(() => setToast(null), 3000);
-      } catch (err) {
-        console.error('Failed to register No-Show:', err);
-        setToast({ message: 'Erro ao registrar No-Show.', type: 'error' });
-        setTimeout(() => setToast(null), 3000);
-      }
-    }
-  };
-
-  const updateStatus = async (id: string, status: Appointment['status']) => {
     try {
-      await api.put(`/appointments/${id}/status`, { status });
+      await api.post(`/appointments/${id}/no-show`);
       fetchData();
-      
-      if (status === 'completed') {
-        setToast({ message: 'Agendamento concluído! Pontos de fidelidade adicionados.', type: 'success' });
-      } else if (status === 'cancelled') {
-        setToast({ message: 'Agendamento cancelado.', type: 'success' });
-      } else {
-        setToast({ message: 'Status atualizado com sucesso!', type: 'success' });
-      }
-      
+      setToast({ message: 'No-Show registrado', type: 'success' });
       setTimeout(() => setToast(null), 3000);
-    } catch (error) {
-      console.error('Error updating status:', error);
-      setToast({ message: 'Erro ao atualizar status.', type: 'error' });
-      setTimeout(() => setToast(null), 3000);
-    }
+    } catch (err) { console.error(err); }
   };
 
   const handleDelete = async (id: string) => {
-    if (confirm('Deseja realmente excluir este agendamento?')) {
+    if (confirm('Excluir este agendamento?')) {
       try {
         await api.delete(`/appointments/${id}`);
         fetchData();
-        setToast({ message: 'Agendamento excluído com sucesso!', type: 'success' });
-        setTimeout(() => setToast(null), 3000);
-      } catch (err) {
-        console.error('Failed to delete appointment:', err);
-        setToast({ message: 'Erro ao excluir agendamento.', type: 'error' });
-        setTimeout(() => setToast(null), 3000);
-      }
+      } catch (err) { console.error(err); }
     }
   };
 
   const filteredAppointments = appointments.filter(app => {
-    const matchesSearch = (app.clientName?.toLowerCase() || '').includes(searchTerm.toLowerCase()) ||
-                         (app.serviceName?.toLowerCase() || '').includes(searchTerm.toLowerCase());
+    const matchesSearch = app.clientName.toLowerCase().includes(searchTerm.toLowerCase());
     const matchesStatus = statusFilter === 'all' || app.status === statusFilter;
     const matchesStaff = staffFilter === 'all' || app.staffId === staffFilter;
-    
     return matchesSearch && matchesStatus && matchesStaff;
   });
 
-  const toggleGroup = (groupId: string) => {
-    setExpandedGroups(prev => prev.includes(groupId) ? prev.filter(g => g !== groupId) : [...prev, groupId]);
-  };
-
-  const groupedAppointments = filteredAppointments.reduce((acc, app) => {
-    if (app.recurrenceGroupId) {
-      if (!acc.groups[app.recurrenceGroupId]) acc.groups[app.recurrenceGroupId] = [];
-      acc.groups[app.recurrenceGroupId].push(app);
-    } else {
-      acc.singles.push(app);
-    }
-    return acc;
-  }, { groups: {} as Record<string, Appointment[]>, singles: [] as Appointment[] });
-
-  Object.values(groupedAppointments.groups).forEach(group => {
-    group.sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
-  });
-
-  // Calendar Logic
-  const getDaysInWeek = (date: Date) => {
-    const start = new Date(date);
-    start.setDate(date.getDate() - date.getDay());
-    return Array.from({ length: 7 }, (_, i) => {
-      const d = new Date(start);
-      d.setDate(start.getDate() + i);
-      return d;
-    });
-  };
-
-  const weekDays = getDaysInWeek(currentDate);
-  const hours = Array.from({ length: 14 }, (_, i) => i + 8); // 8:00 to 21:00
-
-  const getDaysInMonth = (date: Date) => {
+  const getMonthDays = (date: Date) => {
     const year = date.getFullYear();
     const month = date.getMonth();
     const firstDay = new Date(year, month, 1);
     const lastDay = new Date(year, month + 1, 0);
-    
     const days = [];
-    const startPadding = firstDay.getDay();
-    
-    for (let i = startPadding; i > 0; i--) {
-      days.push(new Date(year, month, 1 - i));
+
+    // Add empty days from previous month
+    for (let i = 0; i < firstDay.getDay(); i++) {
+      days.push(new Date(year, month, -i));
     }
-    
+    days.reverse();
+
+    // Add days of current month
     for (let i = 1; i <= lastDay.getDate(); i++) {
       days.push(new Date(year, month, i));
     }
-    
-    const endPadding = 42 - days.length;
-    for (let i = 1; i <= endPadding; i++) {
+
+    // Add empty days from next month
+    const remainingDays = 42 - days.length;
+    for (let i = 1; i <= remainingDays; i++) {
       days.push(new Date(year, month + 1, i));
     }
-    
+
     return days;
   };
 
-  const monthDays = getDaysInMonth(currentDate);
+  const monthDays = getMonthDays(currentDate);
 
-  const renderMonthlyView = () => {
-    const selectedDayApps = filteredAppointments.filter(app => 
-      new Date(app.date).toDateString() === selectedDate.toDateString()
-    );
+  return (
+    <div className="space-y-10 pb-20">
+      {/* Header & View Switcher */}
+      <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-6 bg-white p-6 rounded-[2.5rem] border border-zinc-100 shadow-sm">
+        <div>
+          <h2 className="text-2xl font-display font-black text-zinc-900 tracking-tight">Agenda Digital</h2>
+          <p className="text-xs text-zinc-400 font-bold uppercase tracking-widest mt-1">Planejamento e Gestão de Fluxo</p>
+        </div>
+        
+        <div className="flex flex-wrap items-center gap-3 bg-zinc-50 p-1.5 rounded-2xl border border-zinc-100">
+          {[
+            { id: 'monthly', label: 'Mês' },
+            { id: 'semiannual', label: 'Semestre' },
+            { id: 'annual', label: 'Anual' },
+            { id: 'list', label: 'Lista' }
+          ].map(mode => (
+            <button
+              key={mode.id}
+              onClick={() => setViewMode(mode.id as any)}
+              className={`px-6 py-2.5 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all ${
+                viewMode === mode.id ? 'bg-zinc-900 text-white shadow-lg' : 'text-zinc-400 hover:text-zinc-600'
+              }`}
+            >
+              {mode.label}
+            </button>
+          ))}
+        </div>
 
-    return (
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        <div className="lg:col-span-2 bg-white rounded-3xl border border-zinc-200 shadow-sm overflow-hidden">
-          <div className="p-6 border-b border-zinc-100 flex items-center justify-between bg-zinc-50/50">
-            <h3 className="font-bold text-zinc-900 text-lg">
-              {currentDate.toLocaleDateString('pt-BR', { month: 'long', year: 'numeric' })}
-            </h3>
-            <div className="flex items-center gap-2">
-              <button 
-                onClick={() => {
-                  const d = new Date(currentDate);
-                  d.setMonth(d.getMonth() - 1);
-                  setCurrentDate(d);
-                }}
-                className="p-2 hover:bg-zinc-200 rounded-xl transition-colors"
-              >
-                <ChevronLeft size={20} />
-              </button>
-              <button 
-                onClick={() => {
-                  const now = new Date();
-                  setCurrentDate(now);
-                  setSelectedDate(now);
-                }}
-                className="text-sm font-bold px-4 py-2 hover:bg-zinc-200 rounded-xl transition-colors"
-              >
-                Hoje
-              </button>
-              <button 
-                onClick={() => {
-                  const d = new Date(currentDate);
-                  d.setMonth(d.getMonth() + 1);
-                  setCurrentDate(d);
-                }}
-                className="p-2 hover:bg-zinc-200 rounded-xl transition-colors"
-              >
-                <ChevronRight size={20} />
-              </button>
-            </div>
-          </div>
-          
-          <div className="p-4">
-            <div className="grid grid-cols-7 mb-2">
-              {['Dom', 'Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb'].map(day => (
-                <div key={day} className="text-center text-xs font-bold text-zinc-400 uppercase py-2">
-                  {day}
+        <div className="flex gap-3">
+          <button
+            onClick={() => setIsRecurringOpen(true)}
+            className="p-4 bg-zinc-100 text-zinc-900 rounded-2xl hover:bg-zinc-200 transition-all active:scale-95 border border-zinc-200"
+            title="Recorrência"
+          >
+            <Repeat size={20} />
+          </button>
+          <button
+            onClick={() => setIsModalOpen(true)}
+            className="bg-brand-500 text-white font-black px-6 py-4 rounded-2xl flex items-center gap-2 hover:bg-brand-600 transition-all shadow-xl shadow-brand-500/10 active:scale-95"
+          >
+            <Plus size={20} />
+            Novo Agendamento
+          </button>
+        </div>
+      </div>
+
+      {/* View Content */}
+      <AnimatePresence mode="wait">
+        {/* Monthly Calendar View */}
+        {viewMode === 'monthly' && (
+          <motion.div 
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -20 }}
+            className="grid grid-cols-1 lg:grid-cols-3 gap-10"
+          >
+            <div className="lg:col-span-2 bg-white p-8 rounded-[2.5rem] border border-zinc-100 shadow-premium">
+              <div className="flex items-center justify-between mb-8">
+                <div className="flex items-center gap-4">
+                  <button onClick={() => setCurrentDate(new Date(currentDate.getFullYear(), currentDate.getMonth() - 1, 1))} className="p-3 bg-zinc-50 rounded-xl hover:bg-zinc-100 text-zinc-400"><ChevronLeft size={20} /></button>
+                  <h3 className="text-xl font-display font-black text-zinc-900 min-w-[200px] text-center capitalize">{currentDate.toLocaleDateString('pt-BR', { month: 'long', year: 'numeric' })}</h3>
+                  <button onClick={() => setCurrentDate(new Date(currentDate.getFullYear(), currentDate.getMonth() + 1, 1))} className="p-3 bg-zinc-50 rounded-xl hover:bg-zinc-100 text-zinc-400"><ChevronRight size={20} /></button>
                 </div>
-              ))}
-            </div>
-            <div className="grid grid-cols-7 gap-1">
-              {monthDays.map((day) => {
-                const isSelected = day.toDateString() === selectedDate.toDateString();
-                const isToday = day.toDateString() === new Date().toDateString();
-                const isCurrentMonth = day.getMonth() === currentDate.getMonth();
-                const dayApps = filteredAppointments.filter(app => 
-                  new Date(app.date).toDateString() === day.toDateString()
-                );
-                const hasApps = dayApps.length > 0;
+              </div>
 
-                return (
-                  <div key={day.toISOString()} className="relative group">
+              <div className="grid grid-cols-7 gap-4 mb-4">
+                {['Dom', 'Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb'].map(day => (
+                  <div key={day} className="text-center text-[10px] font-black text-zinc-400 uppercase tracking-widest">{day}</div>
+                ))}
+              </div>
+
+              <div className="grid grid-cols-7 gap-3">
+                {monthDays.map((day, idx) => {
+                  const isSelected = day.toDateString() === selectedDate.toDateString();
+                  const isToday = day.toDateString() === new Date().toDateString();
+                  const isCurrentMonth = day.getMonth() === currentDate.getMonth();
+                  const dayApps = filteredAppointments.filter(a => new Date(a.date).toDateString() === day.toDateString());
+                  
+                  return (
                     <button
-                      onClick={() => {
-                        setSelectedDate(day);
-                        if (hasApps) {
-                          setPreviewDate(previewDate?.toDateString() === day.toDateString() ? null : day);
-                        } else {
-                          setPreviewDate(null);
-                        }
-                      }}
+                      key={idx}
+                      onClick={() => setSelectedDate(day)}
                       className={`
-                        w-full aspect-square p-2 rounded-2xl flex flex-col items-center justify-center relative transition-all
-                        ${isSelected ? 'bg-rose-500 text-white shadow-lg shadow-rose-500/20' : 
-                          isToday ? 'bg-rose-50 text-rose-600' : 
-                          isCurrentMonth ? 'hover:bg-zinc-50 text-zinc-900' : 'text-zinc-300'}
+                        aspect-square rounded-2xl flex flex-col items-center justify-center relative transition-all group border
+                        ${isSelected ? 'bg-zinc-900 text-white border-zinc-900 shadow-xl' : 
+                          isToday ? 'bg-brand-50 text-brand-500 border-brand-100' : 
+                          isCurrentMonth ? 'bg-white text-zinc-900 border-zinc-100 hover:border-zinc-300' : 'bg-zinc-50/50 text-zinc-300 border-transparent'}
                       `}
                     >
                       <span className="text-sm font-bold">{day.getDate()}</span>
-                      {hasApps && (
-                        <div className={`w-1.5 h-1.5 rounded-full mt-1 ${isSelected ? 'bg-white' : 'bg-rose-500'}`} />
+                      {dayApps.length > 0 && (
+                        <div className={`w-1.5 h-1.5 rounded-full mt-1 ${isSelected ? 'bg-brand-500' : 'bg-brand-500'}`} />
                       )}
                     </button>
-
-                    <AnimatePresence>
-                      {previewDate?.toDateString() === day.toDateString() && hasApps && (
-                        <motion.div
-                          initial={{ opacity: 0, scale: 0.9, y: 10 }}
-                          animate={{ opacity: 1, scale: 1, y: 0 }}
-                          exit={{ opacity: 0, scale: 0.9, y: 10 }}
-                          className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 z-50 w-48 bg-zinc-900 text-white p-3 rounded-2xl shadow-xl pointer-events-none"
-                        >
-                          <div className="space-y-2">
-                            <p className="text-[10px] font-bold text-zinc-400 uppercase tracking-wider mb-1">Preview</p>
-                            {dayApps.slice(0, 2).map(app => (
-                              <div key={app.id} className={`border-l-2 ${app.isFitIn ? 'border-amber-500' : 'border-rose-500'} pl-2 py-0.5`}>
-                                <p className="text-[11px] font-bold truncate">
-                                  {app.clientName} {app.isFitIn && '⚡'}
-                                </p>
-                                <p className="text-[9px] text-zinc-400 truncate">{app.serviceName}</p>
-                              </div>
-                            ))}
-                            {dayApps.length > 2 && (
-                              <p className="text-[9px] text-rose-500 font-medium">+ {dayApps.length - 2} outros</p>
-                            )}
-                          </div>
-                          <div className="absolute top-full left-1/2 -translate-x-1/2 border-8 border-transparent border-t-zinc-900" />
-                        </motion.div>
-                      )}
-                    </AnimatePresence>
-                  </div>
-                );
-              })}
-            </div>
-          </div>
-        </div>
-
-        <div className="bg-white rounded-3xl border border-zinc-200 shadow-sm overflow-hidden flex flex-col">
-          <div className="p-6 border-b border-zinc-100 bg-zinc-50/50">
-            <h3 className="font-bold text-zinc-900">
-              {selectedDate.toLocaleDateString('pt-BR', { weekday: 'long', day: 'numeric', month: 'long' })}
-            </h3>
-            <p className="text-xs text-zinc-500 mt-1">{selectedDayApps.length} agendamentos</p>
-          </div>
-          <div className="flex-1 overflow-y-auto p-4 space-y-3">
-            {selectedDayApps.length > 0 ? selectedDayApps.map(app => (
-              <div key={app.id} className="p-4 rounded-2xl border border-zinc-100 hover:border-rose-200 transition-all group">
-                <div className="flex items-center justify-between mb-2">
-                  <span className="text-xs font-bold text-rose-600 bg-rose-50 px-2 py-1 rounded-lg">
-                    {new Date(app.date).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}
-                  </span>
-                  <span className={`text-[10px] uppercase font-bold px-2 py-0.5 rounded-full ${
-                    app.status === 'scheduled' ? 'bg-zinc-100 text-zinc-600' : 
-                    app.status === 'completed' ? 'bg-emerald-100 text-emerald-700' : 
-                    app.status === 'no_show' ? 'bg-amber-100 text-amber-700' : 'bg-rose-100 text-rose-700'
-                  }`}>
-                    {app.status === 'scheduled' ? 'Agendado' : app.status === 'completed' ? 'Concluído' : app.status === 'no_show' ? 'No-Show' : 'Cancelado'}
-                  </span>
-                </div>
-                <div className="flex items-center justify-between mb-2">
-                  <h4 className="font-bold text-zinc-900 flex items-center gap-2">
-                    {app.clientName}
-                    {app.isFitIn && (
-                      <span className="text-[9px] bg-amber-100 text-amber-700 px-1.5 py-0.5 rounded-md font-bold uppercase">
-                        Encaixe
-                      </span>
-                    )}
-                  </h4>
-                  {app.status === 'scheduled' && (
-                    <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                      <button 
-                        onClick={() => updateStatus(app.id, 'completed')}
-                        className="p-1.5 text-emerald-600 hover:bg-emerald-50 rounded-lg transition-colors"
-                        title="Concluir"
-                      >
-                        <Check size={14} />
-                      </button>
-                      <button 
-                        onClick={() => handleNoShow(app.id)}
-                        className="p-1.5 text-rose-400 hover:bg-rose-50 rounded-lg transition-colors"
-                        title="Faltou (No-Show)"
-                      >
-                        <AlertCircle size={14} />
-                      </button>
-                      <button 
-                        onClick={() => updateStatus(app.id, 'cancelled')}
-                        className="p-1.5 text-rose-600 hover:bg-rose-50 rounded-lg transition-colors"
-                        title="Cancelar"
-                      >
-                        <X size={14} />
-                      </button>
-                    </div>
-                  )}
-                </div>
-                <p className="text-xs text-zinc-500">{app.serviceName}</p>
-                <div className="flex items-center gap-2 mt-3 pt-3 border-t border-zinc-50">
-                  <div className="w-6 h-6 bg-zinc-100 rounded-full flex items-center justify-center text-[10px] font-bold text-zinc-500">
-                    {app.staffName?.charAt(0) || 'G'}
-                  </div>
-                  <span className="text-[10px] text-zinc-400 font-medium">{app.staffName || 'Geral'}</span>
-                </div>
-              </div>
-            )) : (
-              <div className="h-full flex flex-col items-center justify-center text-center p-8">
-                <div className="w-12 h-12 bg-zinc-50 rounded-full flex items-center justify-center mb-4">
-                  <CalendarIcon size={24} className="text-zinc-300" />
-                </div>
-                <p className="text-sm text-zinc-500">Nenhum agendamento para este dia.</p>
-              </div>
-            )}
-          </div>
-        </div>
-      </div>
-    );
-  };
-
-  const renderAppointmentRow = (app: Appointment, isGroupChild = false) => (
-    <tr key={app.id} className={`hover:bg-zinc-50 transition-colors ${isGroupChild ? 'bg-zinc-50/50' : ''}`}>
-      <td className="px-6 py-4">
-        <div className="flex items-center gap-3">
-          {isGroupChild && <div className="w-4 h-px bg-zinc-200 ml-4" />}
-          <div className="w-8 h-8 bg-zinc-100 rounded-full flex items-center justify-center text-xs font-bold text-zinc-600">
-            {app.clientName?.charAt(0) || '?'}
-          </div>
-          <div className="flex flex-col">
-            <span className="font-medium text-zinc-900">{app.clientName}</span>
-            {app.isFitIn && <span className="text-[10px] text-rose-600 font-bold uppercase">Encaixe</span>}
-          </div>
-        </div>
-      </td>
-      <td className="px-6 py-4 text-zinc-600">{app.serviceName}</td>
-      <td className="px-6 py-4 text-zinc-600">{app.staffName || 'Geral'}</td>
-      <td className="px-6 py-4">
-        <div className="flex flex-col">
-          <span className="text-zinc-900 font-medium">
-            {new Date(app.date).toLocaleDateString('pt-BR')}
-          </span>
-          <span className="text-xs text-zinc-500">
-            {new Date(app.date).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}
-          </span>
-        </div>
-      </td>
-      <td className="px-6 py-4">
-        <span className={`
-          text-[10px] uppercase tracking-wider font-bold px-2 py-1 rounded-full
-          ${app.status === 'scheduled' ? 'bg-rose-100 text-rose-700' : 
-            app.status === 'completed' ? 'bg-emerald-100 text-emerald-700' : 
-            app.status === 'no_show' ? 'bg-amber-100 text-amber-700' :
-            'bg-rose-100 text-rose-700'}
-        `}>
-          {app.status === 'scheduled' ? 'Agendado' : app.status === 'completed' ? 'Concluído' : app.status === 'no_show' ? 'No-Show' : 'Cancelado'}
-        </span>
-      </td>
-      <td className="px-6 py-4 text-right">
-        <div className="flex items-center justify-end gap-2">
-          {app.phone && (
-            <a
-              href={`https://wa.me/55${app.phone.replace(/\\D/g, '')}?text=${encodeURIComponent('Olá, ' + app.clientName + '! Tudo bem? Aqui é do salão.')}`}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="p-2 text-emerald-500 hover:bg-emerald-50 rounded-lg transition-colors"
-              title="Conversar no WhatsApp"
-            >
-              <MessageCircle size={18} />
-            </a>
-          )}
-          {app.status === 'scheduled' && (
-            <>
-              <button 
-                onClick={() => updateStatus(app.id, 'completed')}
-                className="p-2 text-emerald-600 hover:bg-emerald-50 rounded-lg transition-colors"
-                title="Concluir"
-              >
-                <Check size={18} />
-              </button>
-              <button 
-                onClick={() => handleNoShow(app.id)}
-                className="p-2 text-amber-600 hover:bg-amber-50 rounded-lg transition-colors"
-                title="Faltou (No-Show)"
-              >
-                <AlertCircle size={18} />
-              </button>
-              <button 
-                onClick={() => updateStatus(app.id, 'cancelled')}
-                className="p-2 text-rose-600 hover:bg-rose-50 rounded-lg transition-colors"
-                title="Cancelar"
-              >
-                <X size={18} />
-              </button>
-            </>
-          )}
-          <button 
-            onClick={() => handleDelete(app.id)}
-            className="p-2 text-zinc-400 hover:bg-rose-50 hover:text-rose-600 rounded-lg transition-colors"
-            title="Excluir"
-          >
-            <Trash2 size={18} />
-          </button>
-        </div>
-      </td>
-    </tr>
-  );
-
-  return (
-    <div className="space-y-6">
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-        <div className="flex items-center gap-2 bg-white p-1 rounded-2xl border border-zinc-200">
-          <button 
-            onClick={() => setViewMode('list')}
-            className={`p-2 rounded-xl transition-all ${viewMode === 'list' ? 'bg-rose-500 text-white' : 'text-zinc-400 hover:text-zinc-600'}`}
-            title="Lista"
-          >
-            <LayoutList size={20} />
-          </button>
-          <button 
-            onClick={() => setViewMode('monthly')}
-            className={`p-2 rounded-xl transition-all ${viewMode === 'monthly' ? 'bg-rose-500 text-white' : 'text-zinc-400 hover:text-zinc-600'}`}
-            title="Mensal"
-          >
-            <CalendarIcon size={20} />
-          </button>
-          <button 
-            onClick={() => setViewMode('calendar')}
-            className={`p-2 rounded-xl transition-all ${viewMode === 'calendar' ? 'bg-rose-500 text-white' : 'text-zinc-400 hover:text-zinc-600'}`}
-            title="Semanal"
-          >
-            <Clock size={20} />
-          </button>
-        </div>
-
-        <div className="flex flex-wrap items-center gap-4 flex-1">
-          <div className="relative flex-1 min-w-[200px]">
-            <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-zinc-400" size={18} />
-            <input
-              type="text"
-              placeholder="Buscar agendamentos..."
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-              className="w-full bg-white border border-zinc-200 pl-12 pr-4 py-3 rounded-2xl focus:outline-none focus:ring-2 focus:ring-amber-500/20 focus:border-amber-500 transition-all"
-            />
-          </div>
-
-          <select
-            value={statusFilter}
-            onChange={(e) => setStatusFilter(e.target.value)}
-            className="bg-white border border-zinc-200 px-4 py-3 rounded-2xl focus:outline-none focus:ring-2 focus:ring-amber-500/20 focus:border-amber-500 transition-all text-sm font-medium"
-          >
-            <option value="all">Todos os Status</option>
-            <option value="scheduled">Agendado</option>
-            <option value="completed">Concluído</option>
-            <option value="no_show">No-Show</option>
-            <option value="cancelled">Cancelado</option>
-          </select>
-
-          <select
-            value={staffFilter}
-            onChange={(e) => setStaffFilter(e.target.value)}
-            className="bg-white border border-zinc-200 px-4 py-3 rounded-2xl focus:outline-none focus:ring-2 focus:ring-amber-500/20 focus:border-amber-500 transition-all text-sm font-medium"
-          >
-            <option value="all">Todos os Profissionais</option>
-            {staff.map(member => (
-              <option key={member.id} value={member.id}>{member.name}</option>
-            ))}
-          </select>
-        </div>
-        <button
-          onClick={() => setIsModalOpen(true)}
-          className="bg-rose-500 hover:bg-rose-400 text-white font-bold px-6 py-3 rounded-2xl flex items-center justify-center gap-2 transition-all shadow-lg shadow-rose-500/20"
-        >
-          <Plus size={20} />
-          Novo Agendamento
-        </button>
-        <button
-          id="recurring-open-btn"
-          onClick={() => setIsRecurringOpen(true)}
-          className="bg-zinc-900 hover:bg-zinc-700 text-white font-bold px-5 py-3 rounded-2xl flex items-center justify-center gap-2 transition-all shadow-lg shadow-zinc-900/20"
-          title="Agendamento Recorrente"
-        >
-          <Repeat size={18} />
-          Recorrente
-        </button>
-      </div>
-
-      {viewMode === 'list' ? (
-        <div className="bg-white rounded-3xl border border-zinc-200 shadow-sm overflow-hidden">
-          <div className="overflow-x-auto">
-            <table className="w-full text-left border-collapse">
-              <thead>
-                <tr className="bg-zinc-50 border-b border-zinc-100">
-                  <th className="px-6 py-4 text-xs font-bold text-zinc-500 uppercase tracking-wider">Cliente</th>
-                  <th className="px-6 py-4 text-xs font-bold text-zinc-500 uppercase tracking-wider">Serviço</th>
-                  <th className="px-6 py-4 text-xs font-bold text-zinc-500 uppercase tracking-wider">Profissional</th>
-                  <th className="px-6 py-4 text-xs font-bold text-zinc-500 uppercase tracking-wider">Data & Hora</th>
-                  <th className="px-6 py-4 text-xs font-bold text-zinc-500 uppercase tracking-wider">Status</th>
-                  <th className="px-6 py-4 text-xs font-bold text-zinc-500 uppercase tracking-wider text-right">Ações</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-zinc-100">
-                {filteredAppointments.length > 0 ? (
-                  <>
-                    {groupedAppointments.singles.map((app) => renderAppointmentRow(app))}
-                    
-                    {Object.entries(groupedAppointments.groups).map(([groupId, groupApps]) => {
-                      const isExpanded = expandedGroups.includes(groupId);
-                      const firstApp = groupApps[0];
-                      
-                      return (
-                        <React.Fragment key={groupId}>
-                          {/* Group Header */}
-                          <tr 
-                            onClick={() => toggleGroup(groupId)} 
-                            className="hover:bg-zinc-50 transition-colors cursor-pointer bg-zinc-50/50 group"
-                          >
-                            <td className="px-6 py-4">
-                              <div className="flex items-center gap-3">
-                                <button className="p-1.5 text-zinc-400 group-hover:text-rose-500 transition-colors bg-white rounded-lg shadow-sm border border-zinc-200">
-                                   <ChevronRight size={14} className={`transition-transform duration-200 ${isExpanded ? 'rotate-90' : ''}`} />
-                                </button>
-                                <div className="flex flex-col px-2">
-                                  <span className="font-bold text-zinc-900">{firstApp.clientName}</span>
-                                  <span className="text-[10px] text-rose-600 font-bold uppercase tracking-wider bg-rose-50 px-1.5 py-0.5 rounded-md inline-block w-max mt-1">Série Recorrente</span>
-                                </div>
-                              </div>
-                            </td>
-                            <td className="px-6 py-4 text-zinc-600 font-medium">{firstApp.serviceName}</td>
-                            <td className="px-6 py-4 text-zinc-600">{firstApp.staffName || 'Geral'}</td>
-                            <td className="px-6 py-4">
-                              <span className="text-zinc-600 font-medium text-sm">
-                                {groupApps.length} agendamentos associados
-                              </span>
-                            </td>
-                            <td className="px-6 py-4">
-                              <span className="text-[10px] uppercase font-bold px-2 py-1 bg-zinc-100 text-zinc-500 rounded-lg items-center inline-flex">
-                                 A partir de {new Date(firstApp.date).toLocaleDateString('pt-BR')}
-                              </span>
-                            </td>
-                            <td className="px-6 py-4 text-right">
-                              {/* Empty actions for group header */}
-                            </td>
-                          </tr>
-
-                          {/* Children */}
-                          {isExpanded && groupApps.map(app => renderAppointmentRow(app, true))}
-                        </React.Fragment>
-                      );
-                    })}
-                  </>
-                ) : (
-                  <tr>
-                    <td colSpan={6} className="px-6 py-20 text-center space-y-4">
-                      <div className="w-16 h-16 bg-rose-50 text-rose-500 rounded-2xl flex items-center justify-center mx-auto">
-                        <CalendarIcon size={32} />
-                      </div>
-                      <div>
-                        <h3 className="text-xl font-bold text-zinc-900">Nenhum agendamento</h3>
-                        <p className="text-zinc-500 max-w-xs mx-auto text-sm">
-                          Seus agendamentos aparecerão aqui. Comece marcando um horário para um cliente.
-                        </p>
-                      </div>
-                      <button
-                        onClick={() => setIsModalOpen(true)}
-                        className="bg-rose-500 text-white px-8 py-3 rounded-2xl font-bold hover:bg-rose-400 transition-all shadow-lg shadow-rose-500/20"
-                      >
-                        Marcar Primeiro Horário
-                      </button>
-                    </td>
-                  </tr>
-                )}
-              </tbody>
-            </table>
-          </div>
-        </div>
-      ) : viewMode === 'monthly' ? (
-        renderMonthlyView()
-      ) : (
-        <div className="bg-white rounded-3xl border border-zinc-200 shadow-sm overflow-hidden flex flex-col h-[600px]">
-          <div className="p-4 border-b border-zinc-100 flex items-center justify-between bg-zinc-50/50">
-            <div className="flex items-center gap-4">
-              <h3 className="font-bold text-zinc-900">
-                {weekDays[0].toLocaleDateString('pt-BR', { month: 'long', year: 'numeric' })}
-              </h3>
-              <div className="flex items-center gap-1">
-                <button 
-                  onClick={() => {
-                    const d = new Date(currentDate);
-                    d.setDate(d.getDate() - 7);
-                    setCurrentDate(d);
-                  }}
-                  className="p-1 hover:bg-zinc-200 rounded-lg transition-colors"
-                >
-                  <ChevronLeft size={20} />
-                </button>
-                <button 
-                  onClick={() => setCurrentDate(new Date())}
-                  className="text-xs font-bold px-2 py-1 hover:bg-zinc-200 rounded-lg transition-colors"
-                >
-                  Hoje
-                </button>
-                <button 
-                  onClick={() => {
-                    const d = new Date(currentDate);
-                    d.setDate(d.getDate() + 7);
-                    setCurrentDate(d);
-                  }}
-                  className="p-1 hover:bg-zinc-200 rounded-lg transition-colors"
-                >
-                  <ChevronRight size={20} />
-                </button>
+                  );
+                })}
               </div>
             </div>
-          </div>
-          <div className="flex-1 overflow-auto">
-            <div className="grid grid-cols-[80px_repeat(7,1fr)] min-w-[800px]">
-              <div className="bg-zinc-50 border-r border-zinc-100" />
-              {weekDays.map((day) => (
-                <div key={day.toISOString()} className={`p-3 text-center border-b border-zinc-100 ${day.toDateString() === new Date().toDateString() ? 'bg-rose-50' : 'bg-zinc-50'}`}>
-                  <p className="text-xs font-bold text-zinc-400 uppercase">{day.toLocaleDateString('pt-BR', { weekday: 'short' })}</p>
-                  <p className={`text-lg font-bold ${day.toDateString() === new Date().toDateString() ? 'text-rose-600' : 'text-zinc-900'}`}>{day.getDate()}</p>
-                </div>
-              ))}
+
+            <div className="bg-white p-8 rounded-[2.5rem] border border-zinc-100 shadow-premium flex flex-col h-[600px]">
+              <div className="mb-6">
+                <h4 className="text-lg font-black text-zinc-900 uppercase tracking-tight">Agenda do Dia</h4>
+                <p className="text-[10px] font-bold text-zinc-400 uppercase tracking-widest mt-1">{selectedDate.toLocaleDateString('pt-BR', { weekday: 'long', day: 'numeric', month: 'long' })}</p>
+              </div>
               
-              {hours.map((hour) => (
-                <React.Fragment key={hour}>
-                  <div className="p-2 text-right text-xs font-medium text-zinc-400 border-r border-zinc-100 h-20">
-                    {hour}:00
-                  </div>
-                  {weekDays.map((day) => {
-                    const dayApps = filteredAppointments.filter(app => {
-                      const appDate = new Date(app.date);
-                      return appDate.toDateString() === day.toDateString() && appDate.getHours() === hour;
-                    });
-                    
-                    return (
-                      <div key={`${day.toISOString()}-${hour}`} className="border-b border-r border-zinc-50 p-1 relative group h-20">
-                        {dayApps.map(app => (
-                          <div 
-                            key={app.id} 
-                            className={`
-                              mb-1 p-1.5 rounded-lg text-[10px] leading-tight shadow-sm border
-                              ${app.status === 'completed' ? 'bg-emerald-50 border-emerald-100 text-emerald-700' : 
-                                app.status === 'cancelled' ? 'bg-rose-50 border-rose-100 text-rose-700' : 
-                                app.status === 'no_show' ? 'bg-amber-50 border-amber-100 text-amber-700' :
-                                app.isFitIn ? 'bg-amber-50 border-amber-100 text-amber-700' :
-                                'bg-rose-50 border-rose-100 text-rose-700'}
-                            `}
-                          >
-                            <p className="font-bold truncate">
-                              {app.clientName} {app.isFitIn && '⚡'}
-                            </p>
-                            <p className="opacity-70 truncate">{app.serviceName}</p>
-                          </div>
-                        ))}
+              <div className="flex-1 overflow-y-auto space-y-4 pr-2 custom-scrollbar">
+                {filteredAppointments.filter(a => new Date(a.date).toDateString() === selectedDate.toDateString()).length > 0 ? (
+                  filteredAppointments.filter(a => new Date(a.date).toDateString() === selectedDate.toDateString()).map(app => (
+                    <div key={app.id} className="p-4 bg-zinc-50 rounded-2xl border border-zinc-100 hover:border-zinc-200 transition-all group">
+                      <div className="flex justify-between items-start mb-2">
+                        <span className="text-[10px] font-black text-zinc-400 uppercase">{new Date(app.date).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}</span>
+                        <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                          <button onClick={() => updateStatus(app.id, 'completed')} className="p-1.5 bg-white text-emerald-600 rounded-lg shadow-sm border border-emerald-50"><Check size={14} /></button>
+                          <button onClick={() => updateStatus(app.id, 'cancelled')} className="p-1.5 bg-white text-rose-500 rounded-lg shadow-sm border border-rose-50"><X size={14} /></button>
+                        </div>
                       </div>
-                    );
-                  })}
-                </React.Fragment>
-              ))}
+                      <h5 className="font-bold text-zinc-900 uppercase text-sm truncate">{app.clientName}</h5>
+                      <p className="text-[10px] font-bold text-brand-500 uppercase mt-0.5">{app.serviceName}</p>
+                    </div>
+                  ))
+                ) : (
+                  <div className="flex flex-col items-center justify-center h-full text-center py-10 opacity-40">
+                    <CalendarIcon size={32} className="mb-2" />
+                    <p className="text-[10px] font-bold uppercase tracking-widest">Sem agendamentos</p>
+                  </div>
+                )}
+              </div>
             </div>
-          </div>
-        </div>
-      )}
+          </motion.div>
+        )}
 
-      {/* Toast Notification */}
-      <AnimatePresence>
-        {toast && (
-          <motion.div
-            initial={{ opacity: 0, y: 50, x: '-50%' }}
-            animate={{ opacity: 1, y: 0, x: '-50%' }}
-            exit={{ opacity: 0, y: 50, x: '-50%' }}
-            className={`fixed bottom-8 left-1/2 z-[100] px-6 py-3 rounded-2xl shadow-2xl flex items-center gap-3 border ${
-              toast.type === 'success' 
-                ? 'bg-emerald-900 border-emerald-500/50 text-emerald-50' 
-                : 'bg-rose-900 border-rose-500/50 text-rose-50'
-            }`}
+        {/* Planning View (Semiannual / Annual) */}
+        {(viewMode === 'semiannual' || viewMode === 'annual') && (
+          <motion.div 
+            initial={{ opacity: 0, x: 20 }}
+            animate={{ opacity: 1, x: 0 }}
+            exit={{ opacity: 0, x: -20 }}
+            className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8"
           >
-            {toast.type === 'success' ? (
-              <div className="w-6 h-6 bg-emerald-500 rounded-full flex items-center justify-center">
-                <Check size={14} className="text-emerald-900" />
+            {Array.from({ length: viewMode === 'semiannual' ? 6 : 12 }).map((_, i) => {
+              const d = new Date(currentDate.getFullYear(), currentDate.getMonth() + i, 1);
+              const monthApps = appointments.filter(a => {
+                const appDate = new Date(a.date);
+                return appDate.getMonth() === d.getMonth() && appDate.getFullYear() === d.getFullYear();
+              });
+              const monthRevenue = monthApps.reduce((acc, a) => acc + (a.price || 0), 0);
+
+              return (
+                <div key={i} className="bg-white p-8 rounded-[2.5rem] border border-zinc-100 shadow-premium group hover:border-brand-500 transition-colors">
+                  <div className="flex items-center justify-between mb-8">
+                    <div className="p-4 bg-zinc-900 text-white rounded-2xl group-hover:bg-brand-500 transition-colors">
+                      <TrendingUp size={24} />
+                    </div>
+                    <div className="text-right">
+                      <p className="text-[10px] font-black text-zinc-400 uppercase tracking-widest">{d.getFullYear()}</p>
+                      <h4 className="text-lg font-display font-black text-zinc-900 capitalize leading-none">{d.toLocaleDateString('pt-BR', { month: 'long' })}</h4>
+                    </div>
+                  </div>
+                  <div className="space-y-4">
+                    <div className="flex justify-between items-center bg-zinc-50 p-4 rounded-2xl border border-zinc-100">
+                      <span className="text-[10px] font-black text-zinc-400 uppercase">Ocupação</span>
+                      <span className="text-sm font-black text-zinc-900">{monthApps.length} Apps</span>
+                    </div>
+                    <div className="flex justify-between items-center bg-emerald-50 p-4 rounded-2xl border border-emerald-100">
+                      <span className="text-[10px] font-black text-emerald-600 uppercase">Previsão</span>
+                      <span className="text-sm font-black text-emerald-700">R$ {monthRevenue.toLocaleString('pt-BR')}</span>
+                    </div>
+                  </div>
+                  <button 
+                    onClick={() => { setCurrentDate(d); setViewMode('monthly'); }}
+                    className="w-full mt-6 py-4 bg-zinc-900 text-white text-[10px] font-black uppercase tracking-widest rounded-2xl hover:bg-brand-500 transition-all"
+                  >
+                    Abrir Planejamento
+                  </button>
+                </div>
+              );
+            })}
+          </motion.div>
+        )}
+
+        {/* List View */}
+        {viewMode === 'list' && (
+          <motion.div 
+            initial={{ opacity: 0, scale: 0.95 }}
+            animate={{ opacity: 1, scale: 1 }}
+            exit={{ opacity: 0, scale: 0.95 }}
+            className="bg-white rounded-[2.5rem] border border-zinc-100 shadow-premium overflow-hidden"
+          >
+            <div className="p-8 border-b border-zinc-100 bg-zinc-50/50 flex flex-col md:flex-row md:items-center justify-between gap-6">
+              <div className="relative flex-1">
+                <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-zinc-400" size={18} />
+                <input 
+                  type="text" placeholder="Buscar por cliente ou serviço..." 
+                  value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)}
+                  className="w-full bg-white border border-zinc-200 pl-12 pr-4 py-3 rounded-2xl outline-none focus:ring-2 focus:ring-brand-500/20 transition-all font-bold"
+                />
               </div>
-            ) : (
-              <div className="w-6 h-6 bg-rose-500 rounded-full flex items-center justify-center">
-                <X size={14} className="text-rose-900" />
-              </div>
-            )}
-            <span className="font-bold text-sm tracking-tight">{toast.message}</span>
+              <select 
+                value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)}
+                className="bg-white border border-zinc-200 px-6 py-3 rounded-2xl font-bold text-zinc-900 outline-none"
+              >
+                <option value="all">Todos os Status</option>
+                <option value="scheduled">Agendados</option>
+                <option value="completed">Concluídos</option>
+                <option value="cancelled">Cancelados</option>
+              </select>
+            </div>
+            <div className="overflow-x-auto">
+              <table className="w-full">
+                <thead>
+                  <tr className="bg-zinc-50/50 border-b border-zinc-100">
+                    <th className="px-8 py-5 text-left text-[10px] font-black text-zinc-400 uppercase tracking-widest">Cliente</th>
+                    <th className="px-8 py-5 text-left text-[10px] font-black text-zinc-400 uppercase tracking-widest">Serviço</th>
+                    <th className="px-8 py-5 text-left text-[10px] font-black text-zinc-400 uppercase tracking-widest">Data & Hora</th>
+                    <th className="px-8 py-5 text-left text-[10px] font-black text-zinc-400 uppercase tracking-widest">Status</th>
+                    <th className="px-8 py-5 text-right text-[10px] font-black text-zinc-400 uppercase tracking-widest">Ações</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-zinc-50">
+                  {filteredAppointments.map(app => (
+                    <tr key={app.id} className="hover:bg-zinc-50 transition-colors">
+                      <td className="px-8 py-6 font-bold text-zinc-900 uppercase text-sm">{app.clientName}</td>
+                      <td className="px-8 py-6">
+                        <span className="bg-brand-50 text-brand-500 px-3 py-1.5 rounded-lg text-[10px] font-black uppercase border border-brand-100">{app.serviceName}</span>
+                      </td>
+                      <td className="px-8 py-6">
+                        <div className="flex flex-col">
+                          <span className="text-sm font-bold text-zinc-900">{new Date(app.date).toLocaleDateString('pt-BR')}</span>
+                          <span className="text-[10px] font-black text-zinc-400 uppercase">{new Date(app.date).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}</span>
+                        </div>
+                      </td>
+                      <td className="px-8 py-6">
+                        <span className={`text-[9px] font-black uppercase px-3 py-1.5 rounded-full border ${
+                          app.status === 'scheduled' ? 'bg-amber-50 text-amber-600 border-amber-100' : 
+                          app.status === 'completed' ? 'bg-emerald-50 text-emerald-600 border-emerald-100' : 'bg-rose-50 text-rose-500 border-rose-100'
+                        }`}>
+                          {app.status === 'scheduled' ? 'Agendado' : app.status === 'completed' ? 'Concluído' : 'Cancelado'}
+                        </span>
+                      </td>
+                      <td className="px-8 py-6 text-right">
+                        <div className="flex items-center justify-end gap-2">
+                          <button onClick={() => updateStatus(app.id, 'completed')} className="p-2 text-emerald-600 hover:bg-emerald-50 rounded-xl transition-colors"><Check size={18} /></button>
+                          <button onClick={() => handleDelete(app.id)} className="p-2 text-zinc-300 hover:text-rose-500 transition-colors"><Trash2 size={18} /></button>
+                        </div>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
           </motion.div>
         )}
       </AnimatePresence>
 
-      {/* Modal */}
-      {isModalOpen && (
-        <div className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm">
-          <div className="bg-white w-full max-w-md rounded-3xl shadow-2xl overflow-hidden">
-            <div className="p-6 border-b border-zinc-100 flex items-center justify-between">
-              <h3 className="text-xl font-bold text-zinc-900">Novo Agendamento</h3>
-              <button onClick={() => setIsModalOpen(false)} className="text-zinc-400 hover:text-zinc-600">
-                <X size={24} />
-              </button>
-            </div>
-            <form onSubmit={handleCreate} className="p-6 space-y-4">
-              <div className="space-y-2">
-                <label className="text-sm font-medium text-zinc-700">Cliente</label>
-                <select
-                  required
-                  value={selectedClient}
-                  onChange={(e) => setSelectedClient(e.target.value)}
-                  className="w-full bg-zinc-50 border border-zinc-200 px-4 py-3 rounded-xl focus:outline-none focus:ring-2 focus:ring-rose-500/20 focus:border-rose-500"
-                >
-                  <option value="">Selecione um cliente</option>
-                  {clients.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
-                </select>
-              </div>
-
-              <div className="space-y-2">
-                <label className="text-sm font-medium text-zinc-700">Serviço</label>
-                <select
-                  required
-                  value={selectedService}
-                  onChange={(e) => setSelectedService(e.target.value)}
-                  className="w-full bg-zinc-50 border border-zinc-200 px-4 py-3 rounded-xl focus:outline-none focus:ring-2 focus:ring-rose-500/20 focus:border-rose-500"
-                >
-                  <option value="">Selecione um serviço</option>
-                  {services.map(s => <option key={s.id} value={s.id}>{s.name} - R$ {s.price}</option>)}
-                </select>
-              </div>
-
-              <div className="space-y-2">
-                <label className="text-sm font-medium text-zinc-700">Profissional</label>
-                <select
-                  value={selectedStaff}
-                  onChange={(e) => setSelectedStaff(e.target.value)}
-                  className="w-full bg-zinc-50 border border-zinc-200 px-4 py-3 rounded-xl focus:outline-none focus:ring-2 focus:ring-rose-500/20 focus:border-rose-500"
-                >
-                  <option value="">Selecione um profissional (opcional)</option>
-                  {staff.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
-                </select>
-              </div>
-
-              <div className="grid grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <label className="text-sm font-medium text-zinc-700">Data</label>
-                  <input
-                    type="date"
-                    required
-                    value={date}
-                    onChange={(e) => setDate(e.target.value)}
-                    className="w-full bg-zinc-50 border border-zinc-200 px-4 py-3 rounded-xl focus:outline-none focus:ring-2 focus:ring-rose-500/20 focus:border-rose-500"
-                  />
-                </div>
-                <div className="space-y-2">
-                  <label className="text-sm font-medium text-zinc-700">Hora</label>
-                  <input
-                    type="time"
-                    required
-                    value={time}
-                    onChange={(e) => setTime(e.target.value)}
-                    className="w-full bg-zinc-50 border border-zinc-200 px-4 py-3 rounded-xl focus:outline-none focus:ring-2 focus:ring-rose-500/20 focus:border-rose-500"
-                  />
-                </div>
-              </div>
-
-              <div className="flex items-center gap-2 py-2">
-                <input
-                  type="checkbox"
-                  id="fitin"
-                  checked={isFitIn}
-                  onChange={(e) => setIsFitIn(e.target.checked)}
-                  className="w-4 h-4 text-rose-500 border-zinc-300 rounded focus:ring-rose-500"
-                />
-                <label htmlFor="fitin" className="text-sm font-medium text-zinc-700 cursor-pointer">
-                  Marcar como Encaixe
-                </label>
-              </div>
-
-              <button
-                type="submit"
-                className="w-full bg-rose-500 hover:bg-rose-400 text-white font-bold py-4 rounded-xl transition-all mt-4"
-              >
-                Confirmar Agendamento
-              </button>
-            </form>
-          </div>
-        </div>
-      )}
-      {/* Recurring Appointment Modal */}
+      {/* Modals */}
       <RecurringAppointmentModal
         isOpen={isRecurringOpen}
         onClose={() => setIsRecurringOpen(false)}
@@ -934,11 +409,30 @@ export default function Appointments() {
         staff={staff}
         combos={combos}
         onSuccess={(msg) => {
-          setToast({ message: msg, type: 'success' });
-          setTimeout(() => setToast(null), 5000);
           fetchData();
+          setToast({ message: msg, type: 'success' });
+          setTimeout(() => setToast(null), 3000);
         }}
       />
+
+      {/* Toast */}
+      <AnimatePresence>
+        {toast && (
+          <motion.div
+            initial={{ opacity: 0, y: 50, x: '-50%' }}
+            animate={{ opacity: 1, y: 0, x: '-50%' }}
+            exit={{ opacity: 0, y: 50, x: '-50%' }}
+            className={`fixed bottom-10 left-1/2 z-[200] px-8 py-4 rounded-[2rem] shadow-2xl flex items-center gap-4 border backdrop-blur-xl ${
+              toast.type === 'success' ? 'bg-zinc-900/90 border-zinc-500/50 text-white' : 'bg-rose-900/90 border-rose-500/50 text-white'
+            }`}
+          >
+            <div className={`w-8 h-8 rounded-full flex items-center justify-center ${toast.type === 'success' ? 'bg-emerald-500' : 'bg-rose-500'}`}>
+              <Check size={18} strokeWidth={3} />
+            </div>
+            <span className="text-[10px] font-black uppercase tracking-widest">{toast.message}</span>
+          </motion.div>
+        )}
+      </AnimatePresence>
     </div>
   );
 }

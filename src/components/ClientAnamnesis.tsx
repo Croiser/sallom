@@ -136,17 +136,86 @@ export default function ClientAnamnesis({ clientId }: ClientAnamnesisProps) {
               </div>
               <div className="p-8 space-y-6 max-h-[60vh] overflow-y-auto">
                 {selectedRecord.isPodology ? (
-                  <>
-                    {/* Render specific podology details */}
-                    <div className="grid grid-cols-2 gap-6">
-                      <DetailItem label="Profissão" value={selectedRecord.profession} />
-                      <DetailItem label="Tipo de Calçado" value={selectedRecord.shoeType} />
-                      <DetailItem label="Alergias" value={selectedRecord.allergies} />
-                      <DetailItem label="Medicamentos" value={selectedRecord.medications} />
+                  <div className="space-y-8">
+                    {/* Informações Pessoais */}
+                    <div>
+                      <div className="flex items-center gap-2 mb-4">
+                        <div className="w-1 h-4 bg-emerald-500 rounded-full" />
+                        <h4 className="text-sm font-bold uppercase text-zinc-400">Informações Pessoais</h4>
+                      </div>
+                      <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
+                        <DetailItem label="Profissão" value={selectedRecord.profession} />
+                        <DetailItem label="RG" value={selectedRecord.rg} />
+                        <DetailItem label="CPF" value={selectedRecord.cpf} />
+                        <DetailItem label="Indicação" value={selectedRecord.referral} />
+                        <DetailItem label="Tipo de Calçado" value={selectedRecord.shoeType} />
+                        <DetailItem label="Postura de Trabalho" value={selectedRecord.workPosture === 'sitting' ? 'Sentado' : 'Em Pé'} />
+                      </div>
                     </div>
-                    <div className="p-4 bg-zinc-950 rounded-2xl border border-zinc-800">
-                      <p className="text-xs font-bold text-zinc-500 uppercase mb-2">Observações do Profissional</p>
-                      <p className="text-sm text-zinc-300 leading-relaxed">{selectedRecord.professionalObservations || 'Nenhuma observação.'}</p>
+
+                    {/* Histórico de Saúde */}
+                    <div>
+                      <div className="flex items-center gap-2 mb-4">
+                        <div className="w-1 h-4 bg-rose-500 rounded-full" />
+                        <h4 className="text-sm font-bold uppercase text-zinc-400">Histórico de Saúde</h4>
+                      </div>
+                      <div className="grid grid-cols-2 gap-4">
+                        <DetailItem label="Alergias" value={selectedRecord.allergies} />
+                        <DetailItem label="Medicamentos" value={selectedRecord.medications} />
+                        <DetailItem label="Cirurgias Recentes" value={selectedRecord.recentSurgeries} />
+                      </div>
+                    </div>
+
+                    {/* Mapa dos Pés */}
+                    {selectedRecord.footMarks && (
+                      <div>
+                        <div className="flex items-center gap-2 mb-4">
+                          <div className="w-1 h-4 bg-amber-500 rounded-full" />
+                          <h4 className="text-sm font-bold uppercase text-zinc-400">Mapeamento Visual (Pés)</h4>
+                        </div>
+                        <div className="relative aspect-[4/3] bg-white rounded-2xl overflow-hidden border border-zinc-800">
+                          <img 
+                            src={selectedRecord.footMarks} 
+                            alt="Mapa dos Pés" 
+                            className="w-full h-full object-contain p-4"
+                          />
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Avaliação Técnica */}
+                    <div>
+                      <div className="flex items-center gap-2 mb-4">
+                        <div className="w-1 h-4 bg-blue-500 rounded-full" />
+                        <h4 className="text-sm font-bold uppercase text-zinc-400">Avaliação Técnica</h4>
+                      </div>
+                      <div className="grid grid-cols-2 gap-4">
+                        <DetailItem label="Tipo de Unha" value={selectedRecord.nailType} />
+                      </div>
+                      <div className="mt-4 p-4 bg-zinc-950 rounded-2xl border border-zinc-800">
+                        <p className="text-xs font-bold text-zinc-500 uppercase mb-2">Observações do Profissional</p>
+                        <p className="text-sm text-zinc-300 leading-relaxed">{selectedRecord.professionalObservations || 'Nenhuma observação.'}</p>
+                      </div>
+                    </div>
+
+                    {/* Assinaturas */}
+                    <div className="grid grid-cols-2 gap-4">
+                      {selectedRecord.patientSignatureUrl && (
+                        <div>
+                          <p className="text-[10px] font-bold text-zinc-500 uppercase text-center mb-2">Paciente</p>
+                          <div className="bg-white rounded-xl p-2 h-24">
+                            <img src={selectedRecord.patientSignatureUrl} className="w-full h-full object-contain" />
+                          </div>
+                        </div>
+                      )}
+                      {selectedRecord.professionalSignatureUrl && (
+                        <div>
+                          <p className="text-[10px] font-bold text-zinc-500 uppercase text-center mb-2">Profissional</p>
+                          <div className="bg-white rounded-xl p-2 h-24">
+                            <img src={selectedRecord.professionalSignatureUrl} className="w-full h-full object-contain" />
+                          </div>
+                        </div>
+                      )}
                     </div>
                     
                     <div className="flex justify-end pt-4">
@@ -154,7 +223,7 @@ export default function ClientAnamnesis({ clientId }: ClientAnamnesisProps) {
                         <FileText size={16} /> Imprimir Ficha
                       </button>
                     </div>
-                  </>
+                  </div>
                 ) : (
                   <>
                     <div className="grid grid-cols-2 gap-6">

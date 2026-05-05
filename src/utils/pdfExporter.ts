@@ -196,7 +196,7 @@ export const exportPodologyToPDF = async (data: PDFExportData) => {
   const evalCol1 = evalItems.slice(0, evalMid);
   const evalCol2 = evalItems.slice(evalMid);
 
-  startY = y;
+  const startY = y;
   evalCol1.forEach(([key, label]) => {
     const isChecked = data.evalConditions[key];
     doc.rect(20, y - 3, 3, 3);

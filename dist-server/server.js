@@ -6,6 +6,7 @@ import { createServer as createViteServer } from 'vite';
 import { initDb } from './server/db.js';
 import prisma from './server/db.js';
 import apiRoutes from './server/routes.js';
+import { initReminderCron } from './server/services/reminderCron.js';
 async function startServer() {
     const app = express();
     const PORT = Number(process.env.PORT) || 3000;
@@ -26,6 +27,10 @@ async function startServer() {
     initDb();
     // API Routes
     app.use('/api', apiRoutes);
+    // Initialize background jobs
+    if (process.env.NODE_ENV === 'production') {
+        initReminderCron();
+    }
     app.get('/api/diag', async (req, res) => {
         try {
             const plans = await prisma.plan.findMany();

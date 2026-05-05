@@ -1,4 +1,4 @@
-# Barbeiro Manager pro - Histórico de Funcionalidades e Atualizações
+# Sallon pro manager pro - Histórico de Funcionalidades e Atualizações
 
 Este documento detalha o estado atual do sistema, suas funcionalidades principais e todas as transformações e melhorias implementadas recentemente.
 
@@ -7,7 +7,7 @@ Este documento detalha o estado atual do sistema, suas funcionalidades principai
 ## 💎 Nova Identidade Visual (Rebranding Premium)
 Recentemente, o sistema passou por uma reformulação visual completa para transmitir mais profissionalismo e exclusividade.
 - **Nova Logo Oficial:** Substituição de ícones genéricos por uma marca personalizada e moderna disponível em todo o sistema.
-- **Tipografia e Estilo:** Aplicação de gradientes "premium" e estilo itálico na marca **Barbeiro Manager pro** em layouts internos e públicos.
+- **Tipografia e Estilo:** Aplicação de gradientes "premium" e estilo itálico na marca **Sallon Pro Manager** em layouts internos e públicos.
 - **Consistência Visual:** Unificação da identidade na Landing Page, Tela de Login/Cadastro, Dashboard de Usuário, Página de Agendamento Online e Painel de Super Admin.
 
 ---
@@ -55,5 +55,65 @@ Funcionalidades para gestão centralizada do software como serviço.
 
 ---
 
+## 🛒 PDV e Estabilidade do Sistema
+Melhorias contínuas na ferramenta de frente de caixa e robustez do código.
+- **Correções Críticas:** Ajustes em formatações de data e hora que preveniram travamentos no PDV.
+- **Sincronização:** Integração total entre o Ponto de Venda e os débitos de agendamentos (No-show).
+
+---
+
+## 🤖 Automação e Inteligência
+- **Inteligência Preditiva (Business Intelligence):**
+  - Algoritmo de Churn: Identifica clientes em risco (atraso de 1.5x o intervalo médio).
+  - Previsão de Caixa: Projeção baseada em média de 3 meses e Break-even automático.
+  - Upsell Inteligente: Banner no PDV sugerindo reposição de produtos baseada no ciclo de uso.
+- **Automação de Relatórios:**
+  - Envio semanal via WhatsApp (WAHA) toda segunda-feira às 09:00 (Churn + Aniversariantes).
+- **UX/UI Premium (Dark Glassmorphism):**
+  - Redesenho completo das telas de Serviços e Configurações inspirado em referências de alto nível.
+  - Implementação de Toggles modernos e Inputs em Dark Mode.
+- **Módulo de Pacotes e Planejamento:**
+  - Criação de Pacotes Mensais (ex: Assinatura de 4 cortes).
+  - Visão de Agenda Semestral e Anual para planejamento estratégico de longo prazo.
+  - Atalhos de duração (1 mês, 6 meses, 1 ano) para criação rápida de séries recorrentes.
+
+---
+
+## 💳 Assinaturas e SaaS (Asaas)
+- **Correção de Fluxo:** Resolução de erros 404 que impediam o carregamento de pagamentos na tela de planos.
+- **Integração PIX/Cartão:** Estabilização do checkout com geração de QR Code PIX e processamento via API do Asaas.
+- **Rotas de API:** Padronização de endpoints singulares/plurais para compatibilidade total entre frontend e backend.
+
+---
+
+## 🦶 Fichas de Anamnese (Podologia)
+Uma solução especializada para profissionais de podologia integrada ao cadastro de clientes.
+- **Mapeamento Visual (Feet Map):** Ferramenta interativa de desenho para marcar condições nos pés (dor, calos, etc.) diretamente na tela.
+- **Assinaturas Digitais:** Coleta de assinaturas do paciente e do profissional diretamente no dispositivo.
+- **Histórico Centralizado:** Todas as fichas salvas ficam acessíveis no perfil do cliente para consulta rápida.
+- **Exportação PDF:** Geração de documento PDF profissional com todas as informações e assinaturas para impressão ou compartilhamento.
+
+---
+
+## 🏦 Módulo Financeiro Avançado
+Expansão robusta do controle financeiro para gestão completa do negócio.
+- **Contas a Receber:** Gestão de pagamentos futuros, permitindo acompanhar o que o salão tem a receber de cartões e vendas na conta (pendura).
+- **Contas a Pagar:** Controle de despesas agendadas, permitindo lançar contas fixas e variáveis com datas de vencimento.
+- **Parcelamento de Vendas:** O PDV agora permite dividir vendas de produtos e serviços em até 12x, gerando automaticamente múltiplas parcelas no Contas a Receber.
+- **Crediário da Casa:** Novo método de pagamento "Crediário" no PDV, permitindo parcelar vendas diretamente para o cliente (sem cartão), com acompanhamento rigoroso de parcelas pendentes.
+- **Gestão de Taxas de Cartão:** Possibilidade de informar a taxa da máquina no momento da venda. O sistema calcula automaticamente o valor líquido e registra a taxa como uma despesa administrativa automática.
+- **Relatórios de Gastos Detalhados:** Nova aba de "Relatórios" que categoriza todos os gastos do dono do salão, mostrando porcentagens e gráficos de barras para identificar onde o dinheiro está sendo gasto (ex: Aluguel, Produtos, Taxas, Comissões).
+- **Fluxo de Caixa Consolidado:** Dashboard financeiro com abas separadas para Fluxo Realizado, Pendências de Entrada e Pendências de Saída.
+- **Saldo Previsto:** Cálculo inteligente que projeta o saldo futuro considerando o dinheiro em caixa somado às entradas pendentes e subtraído das saídas agendadas.
+- **Liquidação de Parcelas:** Interface intuitiva para confirmar recebimentos e pagamentos com um único clique.
+
+---
+
+## 🛡️ Infraestrutura e Segurança
+- **Segurança de Kernel:** Mitigação da vulnerabilidade "Copy Fail" (CVE-2026-31431) no servidor de produção via configuração de segurança de módulos.
+- **Build de Produção:** Otimização do processo de deploy via Docker para garantir que assets (imagens/scripts) sejam carregados corretamente em produção.
+
+---
+
 > [!NOTE]
-> Este log reflete as atualizações realizadas até **Março de 2026**. O sistema continua em constante evolução para se tornar a ferramenta definitiva para gestão de barbearias de alto nível.
+> Este log reflete as atualizações realizadas até **Maio de 2026**. O sistema continua em constante evolução para se tornar a ferramenta definitiva para gestão de barbearias e clínicas de estética de alto nível.

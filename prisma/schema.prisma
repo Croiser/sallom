@@ -40,6 +40,9 @@ model User {
   anamnesis         Anamnesis[]
   podologyAnamnesis PodologyAnamnesis[]
   sales             Sale[]
+  paymentMachines   PaymentMachine[]
+  servicePackages   ServicePackage[]
+  clientPackages    ClientPackage[]
 
   @@map("users")
 }
@@ -54,8 +57,45 @@ model Service {
   appointments Appointment[]
   saleItems    SaleItem[]
   comboItems   ComboItem[]
+  servicePackages ServicePackage[]
 
   @@map("services")
+}
+
+model ServicePackage {
+  id           String          @id @default(uuid())
+  ownerUid     String
+  name         String
+  description  String?
+  price        Float
+  sessions     Int             // Number of sessions included
+  validityDays Int             @default(30)
+  createdAt    DateTime        @default(now())
+  
+  owner        User            @relation(fields: [ownerUid], references: [id], onDelete: Cascade)
+  clientPackages ClientPackage[]
+  serviceId    String
+  service      Service         @relation(fields: [serviceId], references: [id])
+
+  @@map("service_packages")
+}
+
+model ClientPackage {
+  id                String         @id @default(uuid())
+  ownerUid          String
+  clientId          String
+  packageId         String
+  totalSessions     Int
+  sessionsRemaining Int
+  startDate         DateTime       @default(now())
+  endDate           DateTime?
+  status            String         @default("active") // active, expired, completed
+  
+  owner             User           @relation(fields: [ownerUid], references: [id], onDelete: Cascade)
+  client            Client         @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  package           ServicePackage @relation(fields: [packageId], references: [id], onDelete: Cascade)
+
+  @@map("client_packages")
 }
 
 model Staff {
@@ -84,6 +124,7 @@ model Client {
   rg            String?
   cpf           String?
   notes         String?
+  birthDate     DateTime?
   loyaltyPoints Int           @default(0)
   loyaltyVisits Int           @default(0)
   pendingDebt   Float         @default(0)
@@ -94,6 +135,7 @@ model Client {
   podologyAnamnesis PodologyAnamnesis[]
   sales         Sale[]
   magicTokens   ClientMagicToken[]
+  clientPackages ClientPackage[]
 
   @@map("clients")
 }
@@ -152,6 +194,7 @@ model Appointment {
   staff           Staff?           @relation(fields: [staffId], references: [id], onDelete: SetNull)
   recurrenceGroup RecurrenceGroup? @relation(fields: [recurrenceGroupId], references: [id], onDelete: SetNull)
   combo           ServiceCombo?    @relation(fields: [comboId], references: [id], onDelete: SetNull)
+  sale            Sale?
 
   @@index([staffId, startTime, endTime]) // Critical for overlap queries
   @@index([ownerUid, startTime])
@@ -229,6 +272,7 @@ model Setting {
   whatsappConfig String? // JSON string
   holidays       String? // JSON string
   fidelityConfig String? // JSON string
+  cardFees       String? // JSON string { debit: number, credit: number, etc }
   allowProfessionalViewAllAgendas Boolean @default(false)
   podologyAnamnesisActive         Boolean @default(false)
   user           User    @relation(fields: [uid], references: [id], onDelete: Cascade)
@@ -236,15 +280,37 @@ model Setting {
   @@map("settings")
 }
 
+model PaymentMachine {
+  id        String   @id @default(uuid())
+  ownerUid  String
+  name      String
+  fee       Float
+  createdAt DateTime @default(now())
+  
+  owner     User     @relation(fields: [ownerUid], references: [id], onDelete: Cascade)
+
+  @@map("payment_machines")
+}
+
 model Transaction {
-  id          String   @id @default(uuid())
-  ownerUid    String
-  type        String   // 'income' | 'expense'
-  amount      Float
-  description String
-  date        DateTime
-  category    String
-  owner       User     @relation(fields: [ownerUid], references: [id], onDelete: Cascade)
+  id                String    @id @default(uuid())
+  ownerUid          String
+  type              String    // 'income' | 'expense'
+  amount            Float
+  description       String
+  date              DateTime  @default(now())
+  category          String
+  status            String    @default("completed") // 'pending' | 'completed' | 'cancelled'
+  dueDate           DateTime?
+  paymentDate       DateTime?
+  installment       Int?      // Current installment number (1, 2, 3...)
+  totalInstallments Int?      // Total installments (e.g., 12)
+  parentId          String?   // To link installments to a main transaction
+  paymentMethod     String?   // 'money' | 'card' | 'pix' | 'crediario'
+  feeAmount         Float?    // Fee deducted (e.g. card fee)
+  netAmount         Float?    // Amount after fee
+  
+  owner             User      @relation(fields: [ownerUid], references: [id], onDelete: Cascade)
 
   @@map("transactions")
 }
@@ -368,8 +434,13 @@ model Sale {
   clientId      String?
   staffId       String?
   totalAmount   Float
-  paymentMethod String     // 'money' | 'card' | 'pix'
+  paymentMethod         String?    // 'money' | 'card' | 'pix' | 'hybrid'
+  paymentMethodServices String?    // 'money' | 'card' | 'pix'
+  paymentMethodProducts String?    // 'money' | 'card' | 'pix' | 'on_account'
   createdAt     DateTime   @default(now())
+  
+  appointmentId String?    @unique
+  appointment   Appointment? @relation(fields: [appointmentId], references: [id])
   
   owner         User       @relation(fields: [ownerUid], references: [id], onDelete: Cascade)
   client        Client?    @relation(fields: [clientId], references: [id], onDelete: SetNull)
