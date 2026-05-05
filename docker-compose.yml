@@ -64,8 +64,11 @@ services:
     restart: always
     ports:
       - "3006:3000"
+    volumes:
+      - waha_sessions:/app/.sessions
     environment:
       WHATSAPP_DEFAULT_SESSION: default
+      WHATSAPP_RESTART_ALL_SESSIONS: "True"
       WAHA_PRINT_QR: "true"
       WAHA_API_KEY: waha_secret_key_2024
     networks:
@@ -82,6 +85,7 @@ services:
 
 volumes:
   postgres_data:
+  waha_sessions:
 
 networks:
   web-network:
