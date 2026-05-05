@@ -27,14 +27,10 @@ export default function BookingPage({ slug }: BookingPageProps) {
   const [clientInfo, setClientInfo] = useState({ name: '', phone: '', birthDate: '' });
   const [isBooking, setIsBooking] = useState(false);
   const [bookingSuccess, setBookingSuccess] = useState(false);
-  const [showCustomAlert, setShowCustomAlert] = useState(false);
   const [pendingDebt, setPendingDebt] = useState(0);
   const [clientNameFromDebt, setClientNameFromDebt] = useState('');
 
-  const triggerAlert = () => {
-    setShowCustomAlert(true);
-    setTimeout(() => setShowCustomAlert(false), 1500);
-  };
+
 
   useEffect(() => {
     const fetchShopData = async () => {
@@ -285,29 +281,7 @@ export default function BookingPage({ slug }: BookingPageProps) {
           ))}
         </div>
 
-        {/* Custom Alert Modal */}
-        <AnimatePresence>
-          {showCustomAlert && (
-            <motion.div
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              exit={{ opacity: 0 }}
-              className="fixed inset-0 z-[100] flex items-center justify-center p-6 bg-black/60 backdrop-blur-sm"
-            >
-              <motion.div
-                initial={{ scale: 0.9, opacity: 0 }}
-                animate={{ scale: 1, opacity: 1 }}
-                exit={{ scale: 0.9, opacity: 0 }}
-                className="bg-zinc-900 border border-zinc-800 p-8 rounded-3xl shadow-2xl text-center space-y-4 max-w-xs w-full"
-              >
-                <div className="w-16 h-16 bg-rose-500/20 rounded-full flex items-center justify-center mx-auto text-rose-500">
-                  <CheckCircle2 size={32} />
-                </div>
-                <p className="text-xl font-bold text-white">Elemento clicado!</p>
-              </motion.div>
-            </motion.div>
-          )}
-        </AnimatePresence>
+
 
         <AnimatePresence mode="wait">
           {step === 1 && (
@@ -328,7 +302,6 @@ export default function BookingPage({ slug }: BookingPageProps) {
                     key={service.id}
                     onClick={() => {
                       setSelectedService(service);
-                      triggerAlert();
                       setStep(2);
                     }}
                     className={`flex items-center justify-between p-6 rounded-3xl border-2 transition-all text-left ${
@@ -398,7 +371,6 @@ export default function BookingPage({ slug }: BookingPageProps) {
                       <button
                         onClick={() => {
                           setSelectedStaff(member);
-                          triggerAlert();
                           setStep(3);
                         }}
                         className="bg-rose-500 text-white px-4 py-2 rounded-xl font-bold text-sm hover:bg-rose-600 transition-all"
@@ -461,7 +433,6 @@ export default function BookingPage({ slug }: BookingPageProps) {
                         key={i}
                         onClick={() => {
                           setSelectedDate(date);
-                          triggerAlert();
                         }}
                         className={`flex flex-col items-center justify-center min-w-[80px] h-24 rounded-2xl border-2 transition-all ${
                           isSelected 
@@ -491,7 +462,6 @@ export default function BookingPage({ slug }: BookingPageProps) {
                       key={time}
                       onClick={() => {
                         setSelectedTime(time);
-                        triggerAlert();
                         setStep(4);
                       }}
                       className={`py-4 rounded-2xl border-2 font-bold transition-all ${
