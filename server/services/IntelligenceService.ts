@@ -71,12 +71,18 @@ export class IntelligenceService {
     });
 
     const breakEven = (pendingExpenses._sum.amount || 0) - (currentMonthRevenue._sum.price || 0);
+    const breakEvenProgress = (pendingExpenses._sum.amount || 0) > 0 
+      ? Math.min(100, ((currentMonthRevenue._sum.price || 0) / (pendingExpenses._sum.amount || 0)) * 100)
+      : 100;
 
     return {
       avgMonthlyRevenue,
       currentMonthRevenue: currentMonthRevenue._sum.price || 0,
       pendingExpenses: pendingExpenses._sum.amount || 0,
       breakEven: Math.max(0, breakEven),
+      gapToExpenses: Math.max(0, breakEven),
+      breakEvenProgress,
+      isHealthy: breakEven <= 0,
       projectionStatus: (currentMonthRevenue._sum.price || 0) >= avgMonthlyRevenue ? 'ABOVE_AVG' : 'BELOW_AVG'
     };
   }

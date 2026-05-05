@@ -56,9 +56,9 @@ export default function IntelligenceInsights() {
               <h3 className="text-lg font-display font-black text-surface-900 tracking-tight">Saúde Financeira</h3>
             </div>
             <span className={`text-[10px] font-black px-3 py-1.5 rounded-full uppercase tracking-widest border ${
-              cashFlow.isHealthy ? 'bg-emerald-50 text-emerald-600 border-emerald-100' : 'bg-amber-50 text-amber-600 border-amber-100'
+              cashFlow?.isHealthy ? 'bg-emerald-50 text-emerald-600 border-emerald-100' : 'bg-amber-50 text-amber-600 border-amber-100'
             }`}>
-              {cashFlow.isHealthy ? 'Saudável' : 'Atenção'}
+              {cashFlow?.isHealthy ? 'Saudável' : 'Atenção'}
             </span>
           </div>
 
@@ -66,14 +66,14 @@ export default function IntelligenceInsights() {
             <div>
               <div className="flex justify-between items-end mb-2">
                 <p className="text-xs font-bold text-zinc-400 uppercase tracking-widest">Meta de Equilíbrio (Break-even)</p>
-                <span className="text-sm font-black text-surface-900">{Math.round(cashFlow.breakEvenProgress)}%</span>
+                <span className="text-sm font-black text-surface-900">{Math.round(cashFlow?.breakEvenProgress || 0)}%</span>
               </div>
               <div className="w-full bg-zinc-100 h-3 rounded-full overflow-hidden">
                 <motion.div 
                   initial={{ width: 0 }}
-                  animate={{ width: `${cashFlow.breakEvenProgress}%` }}
+                  animate={{ width: `${cashFlow?.breakEvenProgress || 0}%` }}
                   transition={{ duration: 1.5, ease: "easeOut" }}
-                  className={`h-full ${cashFlow.isHealthy ? 'bg-emerald-500' : 'bg-amber-500'}`}
+                  className={`h-full ${cashFlow?.isHealthy ? 'bg-emerald-500' : 'bg-amber-500'}`}
                 />
               </div>
             </div>
@@ -81,21 +81,21 @@ export default function IntelligenceInsights() {
             <div className="grid grid-cols-2 gap-4">
               <div className="bg-surface-50 p-4 rounded-2xl border border-surface-100">
                 <p className="text-[10px] font-black text-zinc-400 uppercase tracking-widest mb-1">Média Mensal</p>
-                <p className="text-lg font-display font-black text-surface-900">R$ {cashFlow.avgMonthlyRevenue.toLocaleString('pt-BR')}</p>
+                <p className="text-lg font-display font-black text-surface-900">R$ {(cashFlow?.avgMonthlyRevenue || 0).toLocaleString('pt-BR')}</p>
               </div>
               <div className="bg-surface-50 p-4 rounded-2xl border border-surface-100">
                 <p className="text-[10px] font-black text-zinc-400 uppercase tracking-widest mb-1">Gap para Custos</p>
-                <p className={`text-lg font-display font-black ${cashFlow.gapToExpenses > 0 ? 'text-brand-500' : 'text-emerald-600'}`}>
-                  R$ {cashFlow.gapToExpenses.toLocaleString('pt-BR')}
+                <p className={`text-lg font-display font-black ${(cashFlow?.gapToExpenses || 0) > 0 ? 'text-brand-500' : 'text-emerald-600'}`}>
+                  R$ {(cashFlow?.gapToExpenses || 0).toLocaleString('pt-BR')}
                 </p>
               </div>
             </div>
 
-            {cashFlow.gapToExpenses > 0 && (
+            {(cashFlow?.gapToExpenses || 0) > 0 && (
               <div className="flex items-center gap-3 p-4 bg-brand-50 rounded-2xl border border-brand-100">
                 <AlertTriangle size={18} className="text-brand-500" />
                 <p className="text-xs font-medium text-brand-700 leading-tight">
-                  Ainda faltam <span className="font-black">R$ {cashFlow.gapToExpenses.toFixed(2)}</span> em vendas confirmadas para cobrir as despesas agendadas do mês.
+                  Ainda faltam <span className="font-black">R$ {(cashFlow?.gapToExpenses || 0).toFixed(2)}</span> em vendas confirmadas para cobrir as despesas agendadas do mês.
                 </p>
               </div>
             )}
