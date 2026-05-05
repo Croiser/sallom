@@ -2692,11 +2692,13 @@ router.get('/public/client-portal/:slug/verify-token', async (req, res) => {
     let payload: any;
     try {
       payload = jwt.verify(token, JWT_SECRET);
-    } catch {
+    } catch (err: any) {
+      console.error('[Magic Link] JWT Verify failed:', err.message);
       return res.status(401).json({ error: 'Link inválido ou expirado.' });
     }
 
     if (payload.type !== 'magic_link') {
+      console.error('[Magic Link] Payload type mismatch:', payload.type);
       return res.status(401).json({ error: 'Token inválido.' });
     }
 
@@ -2705,9 +2707,18 @@ router.get('/public/client-portal/:slug/verify-token', async (req, res) => {
       where: { token }
     });
 
-    if (!tokenRecord) return res.status(401).json({ error: 'Link não encontrado.' });
-    if (tokenRecord.usedAt) return res.status(401).json({ error: 'Este link já foi utilizado. Solicite um novo.' });
-    if (new Date() > tokenRecord.expiresAt) return res.status(401).json({ error: 'Link expirado. Solicite um novo.' });
+    if (!tokenRecord) {
+      console.error('[Magic Link] Token record not found in DB');
+      return res.status(401).json({ error: 'Link não encontrado.' });
+    }
+    if (tokenRecord.usedAt) {
+      console.error('[Magic Link] Token already used at:', tokenRecord.usedAt);
+      return res.status(401).json({ error: 'Este link já foi utilizado. Solicite um novo.' });
+    }
+    if (new Date() > tokenRecord.expiresAt) {
+      console.error('[Magic Link] Token expired at:', tokenRecord.expiresAt);
+      return res.status(401).json({ error: 'Link expirado. Solicite um novo.' });
+    }
 
     // Validate slug matches ownerUid
     let user = await prisma.user.findUnique({ where: { slug } });
@@ -2716,6 +2727,7 @@ router.get('/public/client-portal/:slug/verify-token', async (req, res) => {
       if (shop) user = await prisma.user.findUnique({ where: { id: shop.uid } });
     }
     if (!user || user.id !== tokenRecord.ownerUid) {
+      console.error('[Magic Link] Salon mismatch. Slug user ID:', user?.id, 'Token ownerUid:', tokenRecord.ownerUid);
       return res.status(401).json({ error: 'Token inválido para este salão.' });
     }
 
