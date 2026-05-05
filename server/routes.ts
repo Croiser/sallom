@@ -2658,7 +2658,7 @@ router.post('/public/client-portal/:slug/magic-link', async (req, res) => {
     const shopName = user.shopName || 'nosso salão';
     const message = `Olá, ${client.name}! 👋\n\nAcesse sua área exclusiva em *${shopName}* clicando no link abaixo:\n\n🔗 ${magicLink}\n\n_Este link é válido por 15 minutos e é de uso único._`;
 
-    if (wahaSettings?.enabled) {
+    if (wahaSettings?.enabled || wahaSettings?.wahaInstanceName) {
       const waha = new WAHAService(WAHA_API_URL);
       // Try to send regardless of cached status, catch error if instance is actually offline
       await waha.sendTextMessage(wahaSettings.wahaInstanceName || 'default', chatId, message).catch(err => {
