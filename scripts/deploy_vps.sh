@@ -5,9 +5,13 @@
 
 VPS_IP="187.77.45.37"
 VPS_USER="root"
-VPS_KEY="/c/Users/rp02/.ssh/id_rsa"
+VPS_KEY="/tmp/id_rsa"
 PROJECT_DIR="/root/salaopromanager"
 ARCHIVE_NAME="project_deploy.tar.gz"
+
+echo "🔐 Setting up SSH Key..."
+cp "/mnt/c/Users/rp02/.ssh/id_rsa" "$VPS_KEY"
+chmod 600 "$VPS_KEY"
 
 echo "🚀 Starting Deployment to $VPS_IP..."
 

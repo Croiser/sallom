@@ -44,7 +44,8 @@ export default function Inventory({ onNavigate }: InventoryProps) {
     user?.role === 'superadmin' ||
     user?.email === 'admin@sallonpromanager.com.br' ||
     user?.email === 'renatadouglas739@gmail.com' || 
-    user?.email === 'sallonpromanager@gmail.com';
+    user?.email === 'sallonpromanager@gmail.com' ||
+    user?.email === 'lucyr8585@gmail.com';
 
   const fetchData = async () => {
     if (subLoading || !user) return;

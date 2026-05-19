@@ -20,7 +20,8 @@ import {
   Flower2,
   Settings2,
   QrCode,
-  ShoppingCart
+  ShoppingCart,
+  BookOpen
 } from 'lucide-react';
 import { UserProfile } from '../types';
 import { motion, AnimatePresence } from 'motion/react';
@@ -76,6 +77,7 @@ export default function Layout({ children, activeTab, setActiveTab }: LayoutProp
     { id: 'subscription', label: 'Minha Assinatura', icon: CreditCard },
     { id: 'automation', label: 'Automação', icon: Settings2 },
     { id: 'whatsapp-connection', label: 'Conexão WhatsApp', icon: QrCode },
+    { id: 'blog', label: 'Blog & Dicas', icon: BookOpen },
     { id: 'help', label: 'Ajuda', icon: HelpCircle },
   ];
 
@@ -84,9 +86,10 @@ export default function Layout({ children, activeTab, setActiveTab }: LayoutProp
     userProfile?.role === 'superadmin' ||
     userProfile?.email === 'admin@sallonpromanager.com.br' ||
     userProfile?.email === 'renatadouglas739@gmail.com' || 
-    userProfile?.email === 'sallonpromanager@gmail.com';
+    userProfile?.email === 'sallonpromanager@gmail.com' ||
+    userProfile?.email === 'lucyr8585@gmail.com';
 
-  const isProfessional = userProfile?.role === 'professional';
+  const isProfessional = userProfile?.role === 'professional' && !isSuperAdmin;
 
   const filteredMenuItems = menuItems.filter(item => {
     if (isSuperAdmin) return true;

@@ -48,7 +48,8 @@ export default function Reports({ onNavigate }: ReportsProps) {
     user?.role === 'superadmin' ||
     user?.email === 'admin@sallonpromanager.com.br' ||
     user?.email === 'renatadouglas739@gmail.com' || 
-    user?.email === 'sallonpromanager@gmail.com';
+    user?.email === 'sallonpromanager@gmail.com' ||
+    user?.email === 'lucyr8585@gmail.com';
 
   useEffect(() => {
     if (subLoading || !user) return;

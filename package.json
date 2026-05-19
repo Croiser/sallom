@@ -39,6 +39,7 @@
         "pm2": "^5.4.2",
         "react": "^19.0.0",
         "react-dom": "^19.0.0",
+        "react-helmet-async": "^3.0.0",
         "react-signature-canvas": "^1.1.0-alpha.2",
         "recharts": "^3.8.0",
         "tar": "^7.5.11"

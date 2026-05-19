@@ -109,11 +109,20 @@ Expansão robusta do controle financeiro para gestão completa do negócio.
 
 ---
 
-## 🛡️ Infraestrutura e Segurança
-- **Segurança de Kernel:** Mitigação da vulnerabilidade "Copy Fail" (CVE-2026-31431) no servidor de produção via configuração de segurança de módulos.
-- **Build de Produção:** Otimização do processo de deploy via Docker para garantir que assets (imagens/scripts) sejam carregados corretamente em produção.
+## 🚀 Estabilização e Automação de Produção (Maio/2026)
+Série de melhorias críticas para garantir a disponibilidade e confiabilidade do sistema em ambiente real.
+- **Conectividade WhatsApp (WAHA):** Atualização da lógica de status para reconhecer o estado `WORKING` como conectado, evitando alertas falsos de desconexão no Dashboard.
+- **Sistema de Magic Link (Área do Cliente):**
+  - **Resolução de Conflitos de Rota:** Correção na arquitetura de rotas da API para evitar que o comando de verificação de token fosse confundido com buscas por número de telefone.
+  - **Fluxo de Acesso Simplificado:** Estabilização do envio de links de acesso único via WhatsApp, permitindo que clientes acessem sua agenda e débitos sem necessidade de senhas.
+  - **Configuração de Produção:** Ajuste das variáveis de ambiente (`APP_URL`) na VPS para garantir que todos os links gerados apontem corretamente para o domínio oficial.
+- **Segurança de Dados e Backups:**
+  - **Automação de Backups:** Implementação de rotina diária (Cron) às 03:00 da manhã para backup completo do banco de dados PostgreSQL.
+  - **Política de Retenção:** Configuração de limpeza automática para manter os últimos 7 dias de backup, otimizando o espaço em disco.
+  - **Recuperação de Desastres:** Criação de scripts de restauração rápida para garantir continuidade do serviço em caso de resets acidentais.
+- **Refinamento de UX:** Remoção de alertas de depuração ("Elemento clicado!") da interface pública para uma experiência de agendamento mais limpa e profissional.
 
 ---
 
 > [!NOTE]
-> Este log reflete as atualizações realizadas até **Maio de 2026**. O sistema continua em constante evolução para se tornar a ferramenta definitiva para gestão de barbearias e clínicas de estética de alto nível.
+> Este log reflete as atualizações realizadas até **05 de Maio de 2026**. O sistema continua em constante evolução para se tornar a ferramenta definitiva para gestão de barbearias e clínicas de estética de alto nível.

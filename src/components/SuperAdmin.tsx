@@ -85,7 +85,8 @@ export default function SuperAdmin() {
       user.role === 'superadmin' ||
       user.email === 'admin@sallonpromanager.com.br' ||
       user.email === 'renatadouglas739@gmail.com' || 
-      user.email === 'sallonpromanager@gmail.com';
+      user.email === 'sallonpromanager@gmail.com' ||
+      user.email === 'lucyr8585@gmail.com';
     
     setIsSuperAdmin(adminStatus);
     setLoading(false);

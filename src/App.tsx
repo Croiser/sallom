@@ -32,10 +32,14 @@ import { ShieldAlert } from 'lucide-react';
 import { api } from './services/api';
 import ErrorBoundary from './components/ErrorBoundary';
 import { useAuth } from './contexts/AuthContext';
+import { HelmetProvider } from 'react-helmet-async';
+import Blog from './components/Blog';
+import BlogPost from './components/BlogPost';
 
 export default function App() {
   const { user, loading, logout } = useAuth();
   const [activeTab, setActiveTab] = useState('dashboard');
+  const [blogData, setBlogData] = useState<{ slug: string } | null>(null);
   const [showAuth, setShowAuth] = useState<'login' | 'register' | null>(null);
   const [plans, setPlans] = useState<Plan[]>([]);
   const [checkoutData, setCheckoutData] = useState<{ plan: Plan, cycle: 'monthly' | 'yearly' } | null>(null);
@@ -50,6 +54,19 @@ export default function App() {
   const path = window.location.pathname;
   let subdomainSlug = '';
   
+  useEffect(() => {
+    const path = window.location.pathname;
+    if (path.startsWith('/blog/')) {
+      const slug = path.split('/')[2];
+      if (slug) {
+        setActiveTab('blog-post');
+        setBlogData({ slug });
+      }
+    } else if (path === '/blog') {
+      setActiveTab('blog');
+    }
+  }, []);
+
   if (path.startsWith('/t/')) {
     subdomainSlug = path.split('/')[2];
   } else if (!isLocalhost) {
@@ -109,8 +126,17 @@ export default function App() {
     fetchPlans();
   }, []);
 
-  const handleNavigate = (tab: string, data?: { planId?: string, cycle?: 'monthly' | 'yearly' }) => {
+  const handleNavigate = (tab: string, data?: any) => {
     setActiveTab(tab);
+    if (tab === 'blog-post' && data?.slug) {
+      setBlogData({ slug: data.slug });
+      window.history.pushState(null, '', `/blog/${data.slug}`);
+    } else if (tab === 'blog') {
+      window.history.pushState(null, '', '/blog');
+    } else if (tab === 'dashboard') {
+      window.history.pushState(null, '', '/');
+    }
+
     if (tab === 'subscription' && data?.planId) {
       const selectedPlan = plans.find(p => p.id === data.planId || p.slug === data.planId);
       if (selectedPlan) {
@@ -218,47 +244,13 @@ export default function App() {
     );
   }
 
-  if (!user) {
-    if (showAuth) {
-      return <Auth 
-        onBack={() => setShowAuth(null)} 
-        initialView={showAuth}
-      />;
-    }
-    return <LandingPage 
-      onAuthClick={(view = 'login') => setShowAuth(view)} 
-    />;
-  }
-
-  if (user?.status === 'suspended') {
-    return (
-      <div className="min-h-screen bg-zinc-950 flex items-center justify-center p-6 text-center">
-        <div className="max-w-md space-y-6">
-          <div className="w-20 h-20 bg-rose-500/10 rounded-full flex items-center justify-center mx-auto">
-            <ShieldAlert className="text-rose-500" size={40} />
-          </div>
-          <h2 className="text-3xl font-bold text-white">Conta Suspensa</h2>
-          <p className="text-zinc-400">Sua conta foi suspensa por um administrador. Entre em contato com o suporte para mais informações.</p>
-          <button
-            onClick={() => {
-              localStorage.removeItem('token');
-              window.location.reload();
-            }}
-            className="bg-zinc-800 text-white px-8 py-3 rounded-xl hover:bg-zinc-700 transition-colors"
-          >
-            Sair da Conta
-          </button>
-        </div>
-      </div>
-    );
-  }
-
   const isAdmin = 
     user?.role === 'admin' || 
     user?.role === 'superadmin' ||
     user?.email === 'admin@sallonpromanager.com.br' ||
     user?.email === 'renatadouglas739@gmail.com' || 
-    user?.email === 'sallonpromanager@gmail.com';
+    user?.email === 'sallonpromanager@gmail.com' ||
+    user?.email === 'lucyr8585@gmail.com';
 
   // Multi-Tenancy: Professional View (Admins and Owners see full dashboard)
   const isProfessional = user?.role === 'professional' && !isAdmin;
@@ -310,16 +302,59 @@ export default function App() {
         return <WhatsAppConnection />;
       case 'help':
         return <HelpGuide onNavigate={handleNavigate} />;
+      case 'blog':
+        return <Blog onNavigate={handleNavigate} />;
+      case 'blog-post':
+        return <BlogPost slug={blogData?.slug || ''} onNavigate={handleNavigate} />;
       default:
         return <Dashboard onNavigate={handleNavigate} />;
     }
   };
 
   return (
-    <ErrorBoundary>
-      <Layout activeTab={activeTab} setActiveTab={setActiveTab}>
-        {renderContent()}
-      </Layout>
-    </ErrorBoundary>
+    <HelmetProvider>
+      <ErrorBoundary>
+        {(!user && (activeTab === 'blog' || activeTab === 'blog-post')) ? (
+          renderContent()
+        ) : !user ? (
+          showAuth ? (
+            <Auth 
+              onBack={() => setShowAuth(null)} 
+              initialView={showAuth}
+            />
+          ) : (
+            <LandingPage 
+              onAuthClick={(view = 'login') => setShowAuth(view)} 
+              onNavigate={handleNavigate}
+            />
+          )
+        ) : (
+          <Layout activeTab={activeTab} setActiveTab={setActiveTab}>
+            {user?.status === 'suspended' ? (
+              <div className="min-h-screen bg-zinc-950 flex items-center justify-center p-6 text-center">
+                <div className="max-w-md space-y-6">
+                  <div className="w-20 h-20 bg-rose-500/10 rounded-full flex items-center justify-center mx-auto">
+                    <ShieldAlert className="text-rose-500" size={40} />
+                  </div>
+                  <h2 className="text-3xl font-bold text-white">Conta Suspensa</h2>
+                  <p className="text-zinc-400">Sua conta foi suspensa por um administrador. Entre em contato com o suporte para mais informações.</p>
+                  <button
+                    onClick={() => {
+                      localStorage.removeItem('token');
+                      window.location.reload();
+                    }}
+                    className="bg-zinc-800 text-white px-8 py-3 rounded-xl hover:bg-zinc-700 transition-colors"
+                  >
+                    Sair da Conta
+                  </button>
+                </div>
+              </div>
+            ) : (
+              renderContent()
+            )}
+          </Layout>
+        )}
+      </ErrorBoundary>
+    </HelmetProvider>
   );
 }

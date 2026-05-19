@@ -22,13 +22,18 @@ import {
   DollarSign as DollarIcon,
   Smartphone as MobileIcon,
   CheckCircle,
-  Plus as PlusIcon
+  Plus as PlusIcon,
+  BookOpen
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import Pricing from './Pricing';
 import { api } from '../services/api';
+import SEO from './SEO';
 
-export default function LandingPage({ onAuthClick }: { onAuthClick: (view?: 'login' | 'register') => void }) {
+export default function LandingPage({ onAuthClick, onNavigate }: { 
+  onAuthClick: (view?: 'login' | 'register') => void,
+  onNavigate: (tab: string) => void 
+}) {
   const [quickReg, setQuickReg] = useState({ name: '', shopName: '', whatsapp: '' });
 
   const handleQuickRegister = (e: React.FormEvent) => {
@@ -42,9 +47,39 @@ export default function LandingPage({ onAuthClick }: { onAuthClick: (view?: 'log
 
   return (
     <div className="min-h-screen bg-white">
+      <SEO 
+        title="SallonProManager | Sistema de Gestão para Salões e Barbearias"
+        description="Automatize seu salão com o SallonProManager. Controle agendamentos, cálculo automático de comissões e financeiro em um só lugar. Modernize sua gestão hoje!"
+        keywords={['sistema para salão', 'gestão de barbearia', 'agendamento online', 'controle de comissões', 'financeiro salão']}
+      />
       {/* Navigation */}
       <nav className="fixed top-0 left-0 right-0 z-50 bg-white/80 backdrop-blur-md border-b border-zinc-100">
         <div className="max-w-7xl mx-auto px-4 h-20 flex items-center justify-between">
+          {/* FAQ Structured Data */}
+          <script type="application/ld+json">
+            {JSON.stringify({
+              "@context": "https://schema.org",
+              "@type": "FAQPage",
+              "mainEntity": [
+                {
+                  "@type": "Question",
+                  "name": "O sistema calcula comissão de cabeleireiro automaticamente?",
+                  "acceptedAnswer": {
+                    "@type": "Answer",
+                    "text": "Sim, o SallonProManager possui um módulo avançado para automação de comissões e divisão de pagamentos, facilitando a gestão financeira do seu negócio."
+                  }
+                },
+                {
+                  "@type": "Question",
+                  "name": "O SallonProManager serve para barbearias?",
+                  "acceptedAnswer": {
+                    "@type": "Answer",
+                    "text": "Sim, o software foi projetado tanto para salões de beleza quanto para barbearias, com foco em modernização e agilidade no atendimento."
+                  }
+                }
+              ]
+            })}
+          </script>
           <div className="flex items-center gap-2">
             <div className="w-10 h-10 bg-rose-500 rounded-xl flex items-center justify-center shadow-lg shadow-rose-500/20 overflow-hidden">
               <ScissorsIcon className="text-white" size={24} />
@@ -56,6 +91,12 @@ export default function LandingPage({ onAuthClick }: { onAuthClick: (view?: 'log
             <a href="#features" className="text-sm font-medium text-zinc-600 hover:text-zinc-900 transition-colors">Recursos</a>
             <a href="#pricing" className="text-sm font-medium text-zinc-600 hover:text-zinc-900 transition-colors">Preços</a>
             <a href="#testimonials" className="text-sm font-medium text-zinc-600 hover:text-zinc-900 transition-colors">Depoimentos</a>
+            <button 
+              onClick={() => onNavigate('blog')}
+              className="text-sm font-medium text-zinc-600 hover:text-zinc-900 transition-colors"
+            >
+              Blog
+            </button>
           </div>
 
           <div className="flex items-center gap-4">
@@ -94,7 +135,7 @@ export default function LandingPage({ onAuthClick }: { onAuthClick: (view?: 'log
                 transition={{ delay: 0.1 }}
                 className="text-5xl lg:text-7xl font-bold text-zinc-900 leading-[1.1] mb-6"
               >
-                SallonProManager: Chega de <span className="text-rose-500">Caos</span> na Agenda e Prejuízo no Fim do Mês.
+                SallonProManager: O Sistema de Gestão <span className="text-rose-500">Completo</span> para o seu Salão ou Barbearia.
               </motion.h1>
               <motion.p 
                 initial={{ opacity: 0, y: 20 }}
@@ -168,6 +209,7 @@ export default function LandingPage({ onAuthClick }: { onAuthClick: (view?: 'log
                   src="https://images.unsplash.com/photo-1560066984-138dadb4c035?auto=format&fit=crop&q=80&w=1200" 
                   alt="Modern premium beauty salon" 
                   className="rounded-[2rem] w-full h-[500px] object-cover"
+                  fetchPriority="high"
                 />
                 
                 <div className="absolute -bottom-10 -left-10 bg-white p-6 rounded-3xl shadow-xl border border-zinc-100 hidden md:block">
@@ -221,7 +263,7 @@ export default function LandingPage({ onAuthClick }: { onAuthClick: (view?: 'log
       <section className="py-24 bg-white">
         <div className="max-w-7xl mx-auto px-4">
           <div className="text-center mb-16">
-            <h2 className="text-4xl font-bold text-zinc-900 mb-4">Como funciona o SallonProManager?</h2>
+            <h2 className="text-4xl font-bold text-zinc-900 mb-4">Gestão Profissional de Agendamentos e Clientes</h2>
             <p className="text-zinc-500 text-lg">Três passos simples para profissionalizar sua agenda.</p>
           </div>
           <div className="grid grid-cols-1 md:grid-cols-3 gap-12">
@@ -249,7 +291,7 @@ export default function LandingPage({ onAuthClick }: { onAuthClick: (view?: 'log
         <div className="max-w-7xl mx-auto px-4 relative z-10">
           <div className="flex flex-col lg:flex-row items-center gap-16">
             <div className="flex-1">
-              <h2 className="text-4xl font-bold mb-6">Quanto tempo você perde com agenda manual?</h2>
+              <h2 className="text-4xl font-bold mb-6">Cálculo Automático de Comissões para Profissionais</h2>
               <p className="text-zinc-400 text-lg mb-8">
                 Cada agendamento manual via WhatsApp leva em média 5 minutos. Calcule quanto tempo você está jogando fora todo mês.
               </p>
@@ -321,7 +363,7 @@ export default function LandingPage({ onAuthClick }: { onAuthClick: (view?: 'log
       <section id="features" className="py-24 bg-zinc-50">
         <div className="max-w-7xl mx-auto px-4">
           <div className="text-center mb-20">
-            <h2 className="text-4xl font-bold text-zinc-900 mb-4">Tudo o que seu salão precisa para brilhar</h2>
+            <h2 className="text-4xl font-bold text-zinc-900 mb-4">Controle Financeiro e Fluxo de Caixa Integrado</h2>
             <p className="text-zinc-500 text-lg max-w-2xl mx-auto">
               Desenvolvido para profissionais que buscam excelência no atendimento e gestão.
             </p>
@@ -356,7 +398,7 @@ export default function LandingPage({ onAuthClick }: { onAuthClick: (view?: 'log
       <section className="py-24 bg-white">
         <div className="max-w-4xl mx-auto px-4">
           <div className="text-center mb-16">
-            <h2 className="text-4xl font-bold text-zinc-900 mb-4">Por que escolher o Dodile?</h2>
+            <h2 className="text-4xl font-bold text-zinc-900 mb-4">Divisão de Pagamentos e Split (Rebranding SallonProManager)</h2>
             <p className="text-zinc-500 text-lg">Compare e veja a diferença na sua rotina.</p>
           </div>
           <div className="bg-white rounded-[2.5rem] border border-zinc-100 shadow-2xl overflow-hidden">
@@ -434,8 +476,8 @@ export default function LandingPage({ onAuthClick }: { onAuthClick: (view?: 'log
               </div>
             </div>
             <div className="flex-1 grid grid-cols-2 gap-4">
-              <img src="https://images.unsplash.com/photo-1522335789203-aabd1fc54bc9?auto=format&fit=crop&q=80&w=400" alt="Ambiente de salão de beleza moderno" className="rounded-3xl w-full h-64 object-cover rotate-3" />
-              <img src="https://images.unsplash.com/photo-1527799822367-3188572f483f?auto=format&fit=crop&q=80&w=400" alt="Detalhe de produtos de beleza profissionais" className="rounded-3xl w-full h-64 object-cover -rotate-3 mt-12" />
+              <img src="https://images.unsplash.com/photo-1522335789203-aabd1fc54bc9?auto=format&fit=crop&q=80&w=400" alt="Ambiente de salão de beleza moderno" className="rounded-3xl w-full h-64 object-cover rotate-3" loading="lazy" />
+              <img src="https://images.unsplash.com/photo-1527799822367-3188572f483f?auto=format&fit=crop&q=80&w=400" alt="Detalhe de produtos de beleza profissionais" className="rounded-3xl w-full h-64 object-cover -rotate-3 mt-12" loading="lazy" />
             </div>
           </div>
         </div>
@@ -457,6 +499,14 @@ export default function LandingPage({ onAuthClick }: { onAuthClick: (view?: 'log
             <FAQItem 
               question="Como minhas clientes agendam?"
               answer="Você recebe um link exclusivo (ex: seu-salao.sallonpromanager.com.br). Basta colocar esse link no seu Instagram ou enviar pelo WhatsApp. A cliente escolhe o serviço, o profissional e o horário disponível."
+            />
+            <FAQItem 
+              question="O sistema calcula comissão de cabeleireiro automaticamente?"
+              answer="Sim, o SallonProManager possui um módulo avançado para automação de comissões e divisão de pagamentos, facilitando a gestão financeira do seu negócio."
+            />
+            <FAQItem 
+              question="O SallonProManager serve para barbearias?"
+              answer="Sim, o software foi projetado tanto para salões de beleza quanto para barbearias, com foco em modernização e agilidade no atendimento."
             />
             <FAQItem 
               question="O sistema envia lembretes automáticos?"
@@ -515,6 +565,12 @@ export default function LandingPage({ onAuthClick }: { onAuthClick: (view?: 'log
           </div>
           <p className="text-zinc-500 text-sm">© 2026 Salão Pro Manager. Todos os direitos reservados.</p>
           <div className="flex items-center gap-6">
+            <button 
+              onClick={() => onNavigate('blog')}
+              className="text-zinc-400 hover:text-zinc-900 transition-colors"
+            >
+              Blog
+            </button>
             <a href="#" className="text-zinc-400 hover:text-zinc-900 transition-colors">Termos</a>
             <a href="#" className="text-zinc-400 hover:text-zinc-900 transition-colors">Privacidade</a>
           </div>
@@ -618,7 +674,7 @@ function Testimonial({ quote, author, role }: { quote: string, author: string, r
     <div className="bg-zinc-800/50 p-8 rounded-3xl border border-zinc-700">
       <p className="text-lg italic text-zinc-300 mb-6">"{quote}"</p>
       <div className="flex items-center gap-4">
-        <img src={`https://i.pravatar.cc/100?u=salon-user${author}`} alt={`Foto de ${author}`} className="w-12 h-12 rounded-full" />
+        <img src={`https://i.pravatar.cc/100?u=salon-user${author}`} alt={`Foto de ${author}`} className="w-12 h-12 rounded-full" loading="lazy" />
         <div>
           <p className="font-bold text-white">{author}</p>
           <p className="text-sm text-zinc-500">{role}</p>

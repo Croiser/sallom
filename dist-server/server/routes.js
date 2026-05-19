@@ -1515,6 +1515,26 @@ router.put('/transactions/:id/status', authenticateToken, async (req, res) => {
         res.status(500).json({ error: err.message });
     }
 });
+router.put('/transactions/:id', authenticateToken, async (req, res) => {
+    const { amount, description, dueDate, status } = req.body;
+    const ownerUid = req.user?.id;
+    const id = req.params.id;
+    try {
+        const transaction = await prisma.transaction.update({
+            where: { id, ownerUid },
+            data: {
+                amount,
+                description,
+                dueDate: dueDate ? new Date(dueDate) : undefined,
+                status: status || undefined
+            }
+        });
+        res.json(transaction);
+    }
+    catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
 router.delete('/transactions/:id', authenticateToken, async (req, res) => {
     await prisma.transaction.deleteMany({
         where: { id: req.params.id, ownerUid: req.user?.id }
@@ -1989,11 +2009,39 @@ router.post('/sales', authenticateToken, async (req, res) => {
             }
             // Part 2: Products
             if (totalProducts > 0 && paymentMethodProducts !== 'on_account') {
-                if (installmentsCount > 1) {
-                    const installmentAmount = totalProducts / installmentsCount;
+                const entryAmount = parseFloat(req.body.entryAmount) || 0;
+                const entryPaymentMethod = req.body.entryPaymentMethod || 'money';
+                const nextPaymentDateStr = req.body.nextPaymentDate;
+                const balanceToInstall = totalProducts - entryAmount;
+                // 2.1 Register Entry if exists
+                if (entryAmount > 0) {
+                    await tx.transaction.create({
+                        data: {
+                            ownerUid,
+                            parentId: sale.id,
+                            type: 'income',
+                            amount: entryAmount,
+                            description: `Venda #${sale.id.slice(-4)} - Entrada de Produtos`,
+                            category: 'Produtos',
+                            date: new Date(),
+                            status: 'completed',
+                            paymentMethod: entryPaymentMethod,
+                            installment: 0,
+                            totalInstallments: installmentsCount
+                        }
+                    });
+                }
+                // 2.2 Register Installments for the balance
+                if (installmentsCount > 0 && balanceToInstall > 0) {
+                    const installmentAmount = balanceToInstall / installmentsCount;
                     for (let i = 1; i <= installmentsCount; i++) {
-                        const dueDate = new Date();
-                        dueDate.setMonth(dueDate.getMonth() + (i - 1));
+                        const dueDate = nextPaymentDateStr ? new Date(nextPaymentDateStr) : new Date();
+                        if (nextPaymentDateStr) {
+                            dueDate.setMonth(dueDate.getMonth() + (i - 1));
+                        }
+                        else {
+                            dueDate.setMonth(dueDate.getMonth() + i);
+                        }
                         const feeAmount = paymentMethodProducts === 'card' ? (installmentAmount * (cardFeePercentage / 100)) : 0;
                         const netAmount = installmentAmount - feeAmount;
                         await tx.transaction.create({
@@ -2002,12 +2050,11 @@ router.post('/sales', authenticateToken, async (req, res) => {
                                 parentId: sale.id,
                                 type: 'income',
                                 amount: installmentAmount,
-                                description: `Venda #${sale.id.slice(-4)} - Produtos (${i}/${installmentsCount})`,
+                                description: `Venda #${sale.id.slice(-4)} - Produto (Parc ${i}/${installmentsCount})`,
                                 category: 'Produtos',
                                 date: new Date(),
-                                dueDate: i === 1 ? null : dueDate,
-                                paymentDate: i === 1 ? new Date() : null,
-                                status: i === 1 ? 'completed' : 'pending',
+                                dueDate: dueDate,
+                                status: paymentMethodProducts === 'card' ? 'completed' : 'pending',
                                 paymentMethod: paymentMethodProducts,
                                 installment: i,
                                 totalInstallments: installmentsCount,
@@ -2015,7 +2062,7 @@ router.post('/sales', authenticateToken, async (req, res) => {
                                 netAmount
                             }
                         });
-                        // Register card fee as expense if applicable
+                        // Card fees as expenses
                         if (feeAmount > 0) {
                             await tx.transaction.create({
                                 data: {
@@ -2023,48 +2070,30 @@ router.post('/sales', authenticateToken, async (req, res) => {
                                     parentId: sale.id,
                                     type: 'expense',
                                     amount: feeAmount,
-                                    description: `Taxa Cartão - Venda #${sale.id.slice(-4)} (Produto Parcela ${i})`,
+                                    description: `Taxa Cartão - Venda #${sale.id.slice(-4)} (Parc ${i})`,
                                     category: 'Taxas Administrativas',
                                     date: new Date(),
-                                    status: i === 1 ? 'completed' : 'pending'
+                                    status: 'completed'
                                 }
                             });
                         }
                     }
                 }
-                else {
-                    // 1x Product Payment
-                    const feeAmount = paymentMethodProducts === 'card' ? (totalProducts * (cardFeePercentage / 100)) : 0;
-                    const netAmount = totalProducts - feeAmount;
+                else if (balanceToInstall > 0) {
+                    // Case for single payment (can be the total or just the balance)
                     await tx.transaction.create({
                         data: {
                             ownerUid,
                             parentId: sale.id,
                             type: 'income',
-                            amount: totalProducts,
+                            amount: balanceToInstall,
                             description: `Venda #${sale.id.slice(-4)} - Produtos`,
                             category: 'Produtos',
                             date: new Date(),
                             status: 'completed',
-                            paymentMethod: paymentMethodProducts,
-                            feeAmount,
-                            netAmount
+                            paymentMethod: paymentMethodProducts
                         }
                     });
-                    if (feeAmount > 0) {
-                        await tx.transaction.create({
-                            data: {
-                                ownerUid,
-                                parentId: sale.id,
-                                type: 'expense',
-                                amount: feeAmount,
-                                description: `Taxa Cartão - Venda #${sale.id.slice(-4)} (Produtos)`,
-                                category: 'Taxas Administrativas',
-                                date: new Date(),
-                                status: 'completed'
-                            }
-                        });
-                    }
                 }
             }
             // Transaction for On Account (Future Income) - "Pendura"
@@ -2293,43 +2322,6 @@ router.post('/public/appointments/:id/cancel', async (req, res) => {
         res.status(500).json({ error: err.message });
     }
 });
-router.get('/public/client-portal/:slug/:phone', async (req, res) => {
-    let { slug, phone } = req.params;
-    phone = phone.replace(/\D/g, '');
-    try {
-        // Find the shop owner first
-        let user = await prisma.user.findUnique({ where: { slug } });
-        if (!user) {
-            const shop = await prisma.setting.findUnique({ where: { slug } });
-            if (shop) {
-                user = await prisma.user.findUnique({ where: { id: shop.uid } });
-            }
-        }
-        if (!user)
-            return res.status(404).json({ error: 'Shop not found' });
-        const client = await prisma.client.findFirst({
-            where: { ownerUid: user.id, phone },
-            include: {
-                appointments: {
-                    orderBy: { date: 'desc' }
-                }
-            }
-        });
-        if (!client)
-            return res.status(404).json({ error: 'Client not found' });
-        res.json({
-            client: {
-                id: client.id,
-                name: client.name,
-                pendingDebt: client.pendingDebt || 0
-            },
-            appointments: client.appointments
-        });
-    }
-    catch (err) {
-        res.status(500).json({ error: err.message });
-    }
-});
 // --- MAGIC LINK ROUTES ---
 /**
  * POST /public/client-portal/:slug/magic-link
@@ -2384,7 +2376,7 @@ router.post('/public/client-portal/:slug/magic-link', async (req, res) => {
         const chatId = `${formattedPhone}@c.us`;
         const shopName = user.shopName || 'nosso salão';
         const message = `Olá, ${client.name}! 👋\n\nAcesse sua área exclusiva em *${shopName}* clicando no link abaixo:\n\n🔗 ${magicLink}\n\n_Este link é válido por 15 minutos e é de uso único._`;
-        if (wahaSettings?.enabled) {
+        if (wahaSettings?.enabled || wahaSettings?.wahaInstanceName) {
             const waha = new WAHAService(WAHA_API_URL);
             // Try to send regardless of cached status, catch error if instance is actually offline
             await waha.sendTextMessage(wahaSettings.wahaInstanceName || 'default', chatId, message).catch(err => {
@@ -2418,22 +2410,30 @@ router.get('/public/client-portal/:slug/verify-token', async (req, res) => {
         try {
             payload = jwt.verify(token, JWT_SECRET);
         }
-        catch {
+        catch (err) {
+            console.error('[Magic Link] JWT Verify failed:', err.message);
             return res.status(401).json({ error: 'Link inválido ou expirado.' });
         }
         if (payload.type !== 'magic_link') {
+            console.error('[Magic Link] Payload type mismatch:', payload.type);
             return res.status(401).json({ error: 'Token inválido.' });
         }
         // Fetch the persisted token record
         const tokenRecord = await prisma.clientMagicToken.findUnique({
             where: { token }
         });
-        if (!tokenRecord)
+        if (!tokenRecord) {
+            console.error('[Magic Link] Token record not found in DB');
             return res.status(401).json({ error: 'Link não encontrado.' });
-        if (tokenRecord.usedAt)
+        }
+        if (tokenRecord.usedAt) {
+            console.error('[Magic Link] Token already used at:', tokenRecord.usedAt);
             return res.status(401).json({ error: 'Este link já foi utilizado. Solicite um novo.' });
-        if (new Date() > tokenRecord.expiresAt)
+        }
+        if (new Date() > tokenRecord.expiresAt) {
+            console.error('[Magic Link] Token expired at:', tokenRecord.expiresAt);
             return res.status(401).json({ error: 'Link expirado. Solicite um novo.' });
+        }
         // Validate slug matches ownerUid
         let user = await prisma.user.findUnique({ where: { slug } });
         if (!user) {
@@ -2442,6 +2442,7 @@ router.get('/public/client-portal/:slug/verify-token', async (req, res) => {
                 user = await prisma.user.findUnique({ where: { id: shop.uid } });
         }
         if (!user || user.id !== tokenRecord.ownerUid) {
+            console.error('[Magic Link] Salon mismatch. Slug user ID:', user?.id, 'Token ownerUid:', tokenRecord.ownerUid);
             return res.status(401).json({ error: 'Token inválido para este salão.' });
         }
         // Mark token as used (single-use)
@@ -2469,6 +2470,44 @@ router.get('/public/client-portal/:slug/verify-token', async (req, res) => {
     }
     catch (err) {
         console.error('[Magic Link Verify] Error:', err.message);
+        res.status(500).json({ error: err.message });
+    }
+});
+/**
+ * GET /public/client-portal/:slug/:phone
+ * Alternative login via direct phone lookup.
+ */
+router.get('/public/client-portal/:slug/:phone', async (req, res) => {
+    let { slug, phone } = req.params;
+    phone = phone.replace(/\D/g, '');
+    try {
+        // Find the shop owner first
+        let user = await prisma.user.findUnique({ where: { slug } });
+        if (!user) {
+            const shop = await prisma.setting.findUnique({ where: { slug } });
+            if (shop)
+                user = await prisma.user.findUnique({ where: { id: shop.uid } });
+        }
+        if (!user)
+            return res.status(404).json({ error: 'Shop not found' });
+        const client = await prisma.client.findFirst({
+            where: { ownerUid: user.id, phone },
+            include: {
+                appointments: { orderBy: { date: 'desc' } }
+            }
+        });
+        if (!client)
+            return res.status(404).json({ error: 'Client not found' });
+        res.json({
+            client: {
+                id: client.id,
+                name: client.name,
+                pendingDebt: client.pendingDebt || 0
+            },
+            appointments: client.appointments
+        });
+    }
+    catch (err) {
         res.status(500).json({ error: err.message });
     }
 });
