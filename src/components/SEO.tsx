@@ -19,10 +19,10 @@ export default function SEO({
   image = 'https://sallon.dodile.com.br/og-image.jpg', 
   url = window.location.href,
   type = 'website',
-  author = 'SallonProManager',
+  author = 'SallonProManager by dodilesistemas',
   publishedDate
 }: SEOProps) {
-  const siteTitle = 'SallonProManager';
+  const siteTitle = 'SallonProManager by dodilesistemas';
   const fullTitle = title.includes(siteTitle) ? title : `${title} | ${siteTitle}`;
 
   // Structured Data (JSON-LD)

@@ -142,7 +142,10 @@ export default function Layout({ children, activeTab, setActiveTab }: LayoutProp
             </div>
             <div className="flex flex-col">
               <h1 className="text-xl font-display font-black tracking-tighter text-white italic leading-none group-hover:text-brand-500 transition-colors">SALLONPRO</h1>
-              <span className="text-[10px] font-bold tracking-[0.2em] text-zinc-500 uppercase mt-1">Manager</span>
+              <div className="flex items-center gap-1.5 mt-1">
+                <span className="text-[10px] font-bold tracking-[0.2em] text-zinc-500 uppercase">Manager</span>
+                <span className="text-[8px] font-medium text-zinc-650 lowercase italic not-italic">by dodile</span>
+              </div>
             </div>
           </div>
 

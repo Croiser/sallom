@@ -35,6 +35,7 @@ import { useAuth } from './contexts/AuthContext';
 import { HelmetProvider } from 'react-helmet-async';
 import Blog from './components/Blog';
 import BlogPost from './components/BlogPost';
+import TermsAndPrivacy from './components/TermsAndPrivacy';
 
 export default function App() {
   const { user, loading, logout } = useAuth();
@@ -306,6 +307,10 @@ export default function App() {
         return <Blog onNavigate={handleNavigate} />;
       case 'blog-post':
         return <BlogPost slug={blogData?.slug || ''} onNavigate={handleNavigate} />;
+      case 'terms':
+        return <TermsAndPrivacy initialTab="terms" onBack={() => handleNavigate('dashboard')} />;
+      case 'privacy':
+        return <TermsAndPrivacy initialTab="privacy" onBack={() => handleNavigate('dashboard')} />;
       default:
         return <Dashboard onNavigate={handleNavigate} />;
     }
@@ -314,7 +319,7 @@ export default function App() {
   return (
     <HelmetProvider>
       <ErrorBoundary>
-        {(!user && (activeTab === 'blog' || activeTab === 'blog-post')) ? (
+        {(!user && (activeTab === 'blog' || activeTab === 'blog-post' || activeTab === 'terms' || activeTab === 'privacy')) ? (
           renderContent()
         ) : !user ? (
           showAuth ? (

@@ -48,8 +48,8 @@ export default function LandingPage({ onAuthClick, onNavigate }: {
   return (
     <div className="min-h-screen bg-white">
       <SEO 
-        title="SallonProManager | Sistema de Gestão para Salões e Barbearias"
-        description="Automatize seu salão com o SallonProManager. Controle agendamentos, cálculo automático de comissões e financeiro em um só lugar. Modernize sua gestão hoje!"
+        title="SallonProManager by dodilesistemas | Sistema de Gestão para Salões e Barbearias"
+        description="Automatize seu salão com o SallonProManager by dodilesistemas. Controle agendamentos, cálculo automático de comissões e financeiro em um só lugar. Modernize sua gestão hoje!"
         keywords={['sistema para salão', 'gestão de barbearia', 'agendamento online', 'controle de comissões', 'financeiro salão']}
       />
       {/* Navigation */}
@@ -66,12 +66,12 @@ export default function LandingPage({ onAuthClick, onNavigate }: {
                   "name": "O sistema calcula comissão de cabeleireiro automaticamente?",
                   "acceptedAnswer": {
                     "@type": "Answer",
-                    "text": "Sim, o SallonProManager possui um módulo avançado para automação de comissões e divisão de pagamentos, facilitando a gestão financeira do seu negócio."
+                    "text": "Sim, o SallonProManager by dodilesistemas possui um módulo avançado para automação de comissões e divisão de pagamentos, facilitando a gestão financeira do seu negócio."
                   }
                 },
                 {
                   "@type": "Question",
-                  "name": "O SallonProManager serve para barbearias?",
+                  "name": "O SallonProManager by dodilesistemas serve para barbearias?",
                   "acceptedAnswer": {
                     "@type": "Answer",
                     "text": "Sim, o software foi projetado tanto para salões de beleza quanto para barbearias, com foco em modernização e agilidade no atendimento."
@@ -84,7 +84,7 @@ export default function LandingPage({ onAuthClick, onNavigate }: {
             <div className="w-10 h-10 bg-zinc-900 rounded-xl flex items-center justify-center shadow-lg shadow-rose-500/10 overflow-hidden border border-zinc-100">
               <img src="/logo.png" alt="SallonProManager Logo" className="w-full h-full object-cover scale-110" />
             </div>
-            <span className="text-xl font-bold text-zinc-900 tracking-tight bg-gradient-to-r from-zinc-900 to-rose-600 bg-clip-text text-transparent italic uppercase">SallonProManager</span>
+            <span className="text-xl font-bold text-zinc-900 tracking-tight bg-gradient-to-r from-zinc-900 to-rose-600 bg-clip-text text-transparent italic uppercase">SallonProManager <span className="text-xs font-semibold lowercase tracking-normal text-zinc-500 italic not-italic">by dodilesistemas</span></span>
           </div>
           
           <div className="hidden md:flex items-center gap-8">
@@ -135,7 +135,7 @@ export default function LandingPage({ onAuthClick, onNavigate }: {
                 transition={{ delay: 0.1 }}
                 className="text-5xl lg:text-7xl font-bold text-zinc-900 leading-[1.1] mb-6"
               >
-                SallonProManager: O Sistema de Gestão <span className="text-rose-500">Completo</span> para o seu Salão ou Barbearia.
+                SallonProManager by dodilesistemas: O Sistema de Gestão <span className="text-rose-500">Completo</span> para o seu Salão ou Barbearia.
               </motion.h1>
               <motion.p 
                 initial={{ opacity: 0, y: 20 }}
@@ -143,7 +143,7 @@ export default function LandingPage({ onAuthClick, onNavigate }: {
                 transition={{ delay: 0.2 }}
                 className="text-xl text-zinc-500 mb-10 max-w-2xl mx-auto lg:mx-0"
               >
-                Em 30 segundos você ganha seu próprio site de agendamento em <span className="font-bold text-zinc-900">seu-salao.sallonpromanager.com.br</span>. Automatize lembretes e recupere o controle do seu tempo.
+                Em 30 segundos você ganha seu próprio site de agendamento em <span className="font-bold text-zinc-900">seu-salao.dodile.com.br</span>. Automatize lembretes e recupere o controle do seu tempo.
               </motion.p>
               
               <motion.div 
@@ -328,7 +328,7 @@ export default function LandingPage({ onAuthClick, onNavigate }: {
         <div className="max-w-7xl mx-auto px-4">
           <div className="text-center mb-16">
             <h2 className="text-4xl font-bold text-zinc-900 mb-4">Perfeito para qualquer negócio de beleza</h2>
-            <p className="text-zinc-500 text-lg">O SallonProManager se adapta ao seu estilo de trabalho.</p>
+            <p className="text-zinc-500 text-lg">O SallonProManager by dodilesistemas se adapta ao seu estilo de trabalho.</p>
           </div>
           <div className="grid grid-cols-2 md:grid-cols-4 gap-6">
             <div className="bg-white p-6 rounded-3xl border border-zinc-100 text-center hover:shadow-xl transition-all">
@@ -388,7 +388,7 @@ export default function LandingPage({ onAuthClick, onNavigate }: {
             <FeatureCard 
               icon={<CheckCircle className="text-rose-500" />}
               title="Site Próprio"
-              description="Ganhe um endereço exclusivo seu-salao.sallonpromanager.com.br para passar mais profissionalismo."
+              description="Ganhe um endereço exclusivo seu-salao.dodile.com.br para passar mais profissionalismo."
             />
           </div>
         </div>
@@ -398,7 +398,7 @@ export default function LandingPage({ onAuthClick, onNavigate }: {
       <section className="py-24 bg-white">
         <div className="max-w-4xl mx-auto px-4">
           <div className="text-center mb-16">
-            <h2 className="text-4xl font-bold text-zinc-900 mb-4">Divisão de Pagamentos e Split (Rebranding SallonProManager)</h2>
+            <h2 className="text-4xl font-bold text-zinc-900 mb-4">Divisão de Pagamentos e Split (Rebranding SallonProManager by dodilesistemas)</h2>
             <p className="text-zinc-500 text-lg">Compare e veja a diferença na sua rotina.</p>
           </div>
           <div className="bg-white rounded-[2.5rem] border border-zinc-100 shadow-2xl overflow-hidden">
@@ -407,7 +407,7 @@ export default function LandingPage({ onAuthClick, onNavigate }: {
                 <tr className="bg-zinc-50/50">
                   <th className="px-8 py-6 text-sm font-bold text-zinc-400 uppercase tracking-wider">Recurso</th>
                   <th className="px-8 py-6 text-sm font-bold text-zinc-400 uppercase tracking-wider">Agenda Manual</th>
-                  <th className="px-8 py-6 text-sm font-bold text-rose-500 uppercase tracking-wider bg-rose-50/50">SallonProManager</th>
+                  <th className="px-8 py-6 text-sm font-bold text-rose-500 uppercase tracking-wider bg-rose-50/50">SallonProManager by dodilesistemas</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-zinc-100">
@@ -494,18 +494,18 @@ export default function LandingPage({ onAuthClick, onNavigate }: {
           <div className="space-y-4">
             <FAQItem 
               question="Preciso baixar algum aplicativo?"
-              answer="Não! O SallonProManager é uma plataforma web. Você e suas clientes acessam tudo pelo navegador do celular ou computador, sem ocupar espaço na memória."
+              answer="Não! O SallonProManager by dodilesistemas é uma plataforma web. Você e suas clientes acessam tudo pelo navegador do celular ou computador, sem ocupar espaço na memória."
             />
             <FAQItem 
               question="Como minhas clientes agendam?"
-              answer="Você recebe um link exclusivo (ex: seu-salao.sallonpromanager.com.br). Basta colocar esse link no seu Instagram ou enviar pelo WhatsApp. A cliente escolhe o serviço, o profissional e o horário disponível."
+              answer="Você recebe um link exclusivo (ex: seu-salao.dodile.com.br). Basta colocar esse link no seu Instagram ou enviar pelo WhatsApp. A cliente escolhe o serviço, o profissional e o horário disponível."
             />
             <FAQItem 
               question="O sistema calcula comissão de cabeleireiro automaticamente?"
-              answer="Sim, o SallonProManager possui um módulo avançado para automação de comissões e divisão de pagamentos, facilitando a gestão financeira do seu negócio."
+              answer="Sim, o SallonProManager by dodilesistemas possui um módulo avançado para automação de comissões e divisão de pagamentos, facilitando a gestão financeira do seu negócio."
             />
             <FAQItem 
-              question="O SallonProManager serve para barbearias?"
+              question="O SallonProManager by dodilesistemas serve para barbearias?"
               answer="Sim, o software foi projetado tanto para salões de beleza quanto para barbearias, com foco em modernização e agilidade no atendimento."
             />
             <FAQItem 
@@ -543,7 +543,7 @@ export default function LandingPage({ onAuthClick, onNavigate }: {
 
       {/* Floating WhatsApp Button */}
       <a 
-        href="https://wa.me/5511999999999" 
+        href="https://wa.me/5545999959186" 
         target="_blank" 
         rel="noopener noreferrer"
         className="fixed bottom-8 right-8 z-50 bg-emerald-500 text-white p-4 rounded-full shadow-2xl hover:bg-emerald-600 hover:scale-110 transition-all group"
@@ -561,9 +561,9 @@ export default function LandingPage({ onAuthClick, onNavigate }: {
             <div className="w-8 h-8 bg-zinc-900 rounded-lg flex items-center justify-center overflow-hidden border border-zinc-200">
               <img src="/logo.png" alt="SallonProManager Logo" className="w-full h-full object-cover scale-110" />
             </div>
-            <span className="font-bold text-zinc-900 italic">Salão Pro Manager</span>
+            <span className="font-bold text-zinc-900 italic">Salão Pro Manager <span className="text-[10px] text-zinc-500 not-italic lowercase">by dodilesistemas</span></span>
           </div>
-          <p className="text-zinc-500 text-sm">© 2026 Salão Pro Manager. Todos os direitos reservados.</p>
+          <p className="text-zinc-500 text-sm">© 2026 Salão Pro Manager by dodilesistemas. Todos os direitos reservados.</p>
           <div className="flex items-center gap-6">
             <button 
               onClick={() => onNavigate('blog')}
@@ -571,8 +571,18 @@ export default function LandingPage({ onAuthClick, onNavigate }: {
             >
               Blog
             </button>
-            <a href="#" className="text-zinc-400 hover:text-zinc-900 transition-colors">Termos</a>
-            <a href="#" className="text-zinc-400 hover:text-zinc-900 transition-colors">Privacidade</a>
+            <button 
+              onClick={() => onNavigate('terms')}
+              className="text-zinc-400 hover:text-zinc-900 transition-colors"
+            >
+              Termos
+            </button>
+            <button 
+              onClick={() => onNavigate('privacy')}
+              className="text-zinc-400 hover:text-zinc-900 transition-colors"
+            >
+              Privacidade
+            </button>
           </div>
         </div>
       </footer>
