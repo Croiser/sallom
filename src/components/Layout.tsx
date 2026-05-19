@@ -82,17 +82,17 @@ export default function Layout({ children, activeTab, setActiveTab }: LayoutProp
   ];
 
   const isSuperAdmin = 
-    userProfile?.role === 'admin' || 
     userProfile?.role === 'superadmin' ||
     userProfile?.email === 'admin@sallonpromanager.com.br' ||
     userProfile?.email === 'renatadouglas739@gmail.com' || 
-    userProfile?.email === 'sallonpromanager@gmail.com' ||
-    userProfile?.email === 'lucyr8585@gmail.com';
+    userProfile?.email === 'sallonpromanager@gmail.com';
 
-  const isProfessional = userProfile?.role === 'professional' && !isSuperAdmin;
+  const isAdmin = userProfile?.role === 'admin' || isSuperAdmin;
+
+  const isProfessional = userProfile?.role === 'professional' && !isAdmin;
 
   const filteredMenuItems = menuItems.filter(item => {
-    if (isSuperAdmin) return true;
+    if (isAdmin) return true;
     
     // Professionals only see restricted menu
     if (isProfessional) {

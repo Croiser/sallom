@@ -59,7 +59,7 @@ const tabs: { id: SettingsTab; label: string; icon: React.ReactNode }[] = [
 
 export default function Settings({ onNavigate }: SettingsProps) {
   const { user } = useAuth();
-  const isAdmin = user?.email === 'renatadouglas739@gmail.com' || user?.email === 'sallonpromanager@gmail.com' || user?.email === 'admin@sallonpromanager.com.br' || user?.email === 'lucyr8585@gmail.com';
+  const isAdmin = user?.role === 'admin' || user?.role === 'superadmin' || user?.email === 'renatadouglas739@gmail.com' || user?.email === 'sallonpromanager@gmail.com' || user?.email === 'admin@sallonpromanager.com.br';
   const isProfessional = user?.role === 'professional' && !isAdmin;
   const { plan, loading: subLoading } = useSubscription();
   const [activeTab, setActiveTab] = useState<SettingsTab>('perfil');
@@ -130,9 +130,7 @@ export default function Settings({ onNavigate }: SettingsProps) {
   }, [user]);
 
   const checkWahaStatus = async () => {
-    // isAdmin is now defined globally in the component, but if needed locally:
-    const localIsAdmin = user?.email === 'renatadouglas739@gmail.com' || user?.email === 'sallonpromanager@gmail.com' || user?.email === 'admin@sallonpromanager.com.br' || user?.email === 'lucyr8585@gmail.com';
-    if (!localIsAdmin && !plan?.features?.whatsapp) return;
+    if (!isAdmin && !plan?.features?.whatsapp) return;
     try {
       // Ensure backend has created the WhatsApp settings row for this user
       await api.getWhatsAppSettings().catch(() => {});
@@ -151,8 +149,7 @@ export default function Settings({ onNavigate }: SettingsProps) {
   };
 
   useEffect(() => {
-    const localIsAdmin = user?.email === 'renatadouglas739@gmail.com' || user?.email === 'sallonpromanager@gmail.com' || user?.email === 'admin@sallonpromanager.com.br' || user?.email === 'lucyr8585@gmail.com';
-    if (localIsAdmin || plan?.features?.whatsapp) {
+    if (isAdmin || plan?.features?.whatsapp) {
       checkWahaStatus();
       const interval = setInterval(checkWahaStatus, 15000);
       return () => clearInterval(interval);
@@ -223,9 +220,8 @@ export default function Settings({ onNavigate }: SettingsProps) {
   const handleAddStaff = async () => {
     if (!newStaffName || !user?.uid) return;
     
-    const localIsAdmin = user?.email === 'renatadouglas739@gmail.com' || user?.email === 'sallonpromanager@gmail.com' || user?.email === 'admin@sallonpromanager.com.br' || user?.email === 'lucyr8585@gmail.com';
     const staffLimit = plan?.features?.staffLimit;
-    if (!localIsAdmin && staffLimit !== undefined && staffLimit !== null && staff.length >= staffLimit) {
+    if (!isAdmin && staffLimit !== undefined && staffLimit !== null && staff.length >= staffLimit) {
       alert(`Seu plano atual permite apenas ${staffLimit} profissional(is). Faça o upgrade para adicionar mais.`);
       return;
     }

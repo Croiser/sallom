@@ -81,12 +81,10 @@ export default function SuperAdmin() {
   useEffect(() => {
     if (!user) return;
     const adminStatus = 
-      user.role === 'admin' || 
       user.role === 'superadmin' ||
       user.email === 'admin@sallonpromanager.com.br' ||
       user.email === 'renatadouglas739@gmail.com' || 
-      user.email === 'sallonpromanager@gmail.com' ||
-      user.email === 'lucyr8585@gmail.com';
+      user.email === 'sallonpromanager@gmail.com';
     
     setIsSuperAdmin(adminStatus);
     setLoading(false);

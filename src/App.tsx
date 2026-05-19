@@ -244,13 +244,13 @@ export default function App() {
     );
   }
 
-  const isAdmin = 
-    user?.role === 'admin' || 
+  const isSuperAdmin = 
     user?.role === 'superadmin' ||
     user?.email === 'admin@sallonpromanager.com.br' ||
     user?.email === 'renatadouglas739@gmail.com' || 
-    user?.email === 'sallonpromanager@gmail.com' ||
-    user?.email === 'lucyr8585@gmail.com';
+    user?.email === 'sallonpromanager@gmail.com';
+
+  const isAdmin = user?.role === 'admin' || isSuperAdmin;
 
   // Multi-Tenancy: Professional View (Admins and Owners see full dashboard)
   const isProfessional = user?.role === 'professional' && !isAdmin;
@@ -291,7 +291,7 @@ export default function App() {
           <Pricing onSelectPlan={(plan, cycle) => setCheckoutData({ plan, cycle })} />
         );
       case 'superadmin':
-        return <SuperAdmin />;
+        return isSuperAdmin ? <SuperAdmin /> : <Dashboard {...props} />;
       case 'whatsapp':
         return <WhatsApp onNavigate={handleNavigate} />;
       case 'whatsapp-chats':

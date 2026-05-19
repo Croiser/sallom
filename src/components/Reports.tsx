@@ -44,12 +44,10 @@ export default function Reports({ onNavigate }: ReportsProps) {
   const [dateRange, setDateRange] = useState('month');
 
   const isSuperAdmin = 
-    user?.role === 'admin' || 
     user?.role === 'superadmin' ||
     user?.email === 'admin@sallonpromanager.com.br' ||
     user?.email === 'renatadouglas739@gmail.com' || 
-    user?.email === 'sallonpromanager@gmail.com' ||
-    user?.email === 'lucyr8585@gmail.com';
+    user?.email === 'sallonpromanager@gmail.com';
 
   useEffect(() => {
     if (subLoading || !user) return;
