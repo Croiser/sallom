@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Scissors, Mail, Lock, User as UserIcon, ArrowRight, ArrowLeft } from 'lucide-react';
+import { Building, Mail, Lock, User as UserIcon, ArrowRight, ArrowLeft } from 'lucide-react';
 import { api } from '../services/api';
 
 export default function Auth({ onBack, onLoginSuccess, initialView = 'login' }: { onBack?: () => void, onLoginSuccess?: (user: any) => void, initialView?: 'login' | 'register' }) {
@@ -111,8 +111,8 @@ export default function Auth({ onBack, onLoginSuccess, initialView = 'login' }: 
       <div className="w-full max-w-md">
         <div className="text-center mb-10">
           <div className="inline-flex items-center justify-center mb-6">
-            <div className="w-20 h-20 bg-rose-500 rounded-2xl flex items-center justify-center shadow-lg shadow-rose-500/20">
-              <Scissors className="text-white" size={40} />
+            <div className="w-20 h-20 bg-zinc-900 rounded-2xl flex items-center justify-center shadow-lg shadow-rose-500/10 overflow-hidden border border-zinc-800">
+              <img src="/logo.png" alt="SallonProManager Logo" className="w-full h-full object-cover scale-110" />
             </div>
           </div>
           <h1 className="text-3xl font-bold text-white tracking-tight mb-2 bg-gradient-to-r from-rose-400 to-rose-600 bg-clip-text text-transparent uppercase italic">SallonProManager</h1>
@@ -179,7 +179,7 @@ export default function Auth({ onBack, onLoginSuccess, initialView = 'login' }: 
                   <div className="space-y-2">
                     <label className="text-sm font-medium text-zinc-400 ml-1">Nome do Salão</label>
                     <div className="relative">
-                      <Scissors className="absolute left-4 top-1/2 -translate-y-1/2 text-zinc-500" size={18} />
+                      <Building className="absolute left-4 top-1/2 -translate-y-1/2 text-zinc-500" size={18} />
                       <input
                         type="text"
                         required

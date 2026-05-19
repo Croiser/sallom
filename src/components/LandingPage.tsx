@@ -81,8 +81,8 @@ export default function LandingPage({ onAuthClick, onNavigate }: {
             })}
           </script>
           <div className="flex items-center gap-2">
-            <div className="w-10 h-10 bg-rose-500 rounded-xl flex items-center justify-center shadow-lg shadow-rose-500/20 overflow-hidden">
-              <ScissorsIcon className="text-white" size={24} />
+            <div className="w-10 h-10 bg-zinc-900 rounded-xl flex items-center justify-center shadow-lg shadow-rose-500/10 overflow-hidden border border-zinc-100">
+              <img src="/logo.png" alt="SallonProManager Logo" className="w-full h-full object-cover scale-110" />
             </div>
             <span className="text-xl font-bold text-zinc-900 tracking-tight bg-gradient-to-r from-zinc-900 to-rose-600 bg-clip-text text-transparent italic uppercase">SallonProManager</span>
           </div>
@@ -558,8 +558,8 @@ export default function LandingPage({ onAuthClick, onNavigate }: {
       <footer className="py-12 border-t border-zinc-100">
         <div className="max-w-7xl mx-auto px-4 flex flex-col md:flex-row justify-between items-center gap-8">
           <div className="flex items-center gap-2">
-            <div className="w-8 h-8 bg-rose-500 rounded-lg flex items-center justify-center">
-              <SparklesIcon className="text-white" size={18} />
+            <div className="w-8 h-8 bg-zinc-900 rounded-lg flex items-center justify-center overflow-hidden border border-zinc-200">
+              <img src="/logo.png" alt="SallonProManager Logo" className="w-full h-full object-cover scale-110" />
             </div>
             <span className="font-bold text-zinc-900 italic">Salão Pro Manager</span>
           </div>

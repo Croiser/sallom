@@ -137,8 +137,8 @@ export default function Layout({ children, activeTab, setActiveTab }: LayoutProp
       `}>
         <div className="p-8 flex flex-col h-full">
           <div className="flex items-center gap-3 mb-12 group cursor-pointer">
-            <div className="w-12 h-12 bg-gradient-to-br from-brand-500 to-brand-700 rounded-2xl flex items-center justify-center shadow-premium overflow-hidden transition-transform group-hover:scale-105 duration-300">
-              <Flower2 className="text-white" size={28} />
+            <div className="w-12 h-12 bg-zinc-850 rounded-2xl flex items-center justify-center shadow-premium overflow-hidden transition-transform group-hover:scale-105 duration-300 border border-white/5">
+              <img src="/logo.png" alt="SallonProManager Logo" className="w-full h-full object-cover scale-110" />
             </div>
             <div className="flex flex-col">
               <h1 className="text-xl font-display font-black tracking-tighter text-white italic leading-none group-hover:text-brand-500 transition-colors">SALLONPRO</h1>
