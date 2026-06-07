@@ -56,19 +56,19 @@ export function initReminderCron() {
               text = text.replace(regex, variables[key]);
             });
 
-            const WAHA_API_URL = process.env.WAHA_API_URL || 'http://waha:3000';
-            const waha = new WAHAService(WAHA_API_URL);
-            
-            let formattedNumber = app.phone.replace(/\D/g, '');
-            if (!formattedNumber.startsWith('55')) formattedNumber = '55' + formattedNumber;
-            const chatId = `${formattedNumber}@c.us`;
-
             try {
-              await waha.sendTextMessage(settings.wahaInstanceName || 'default', chatId, text);
-              console.log(`[Cron] Lembrete enviado para ${app.clientName} (${app.phone})`);
+              const { whatsappQueueService } = await import('./whatsappQueueService.js');
+              await whatsappQueueService.enqueueMessage({
+                ownerUid: uid,
+                recipientNumber: app.phone,
+                recipientName: app.clientName,
+                content: text,
+                type: 'reminder'
+              });
+              console.log(`[Cron] Lembrete enfileirado para ${app.clientName} (${app.phone})`);
               sentReminders.add(app.id);
             } catch (err: any) {
-              console.error(`[Cron] Falha ao enviar lembrete para ${app.clientName}:`, err.message);
+              console.error(`[Cron] Falha ao enfileirar lembrete para ${app.clientName}:`, err.message);
             }
           }
         }

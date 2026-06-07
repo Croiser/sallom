@@ -18,7 +18,7 @@ export const whatsappChatService = {
       const response = await api.post('/whatsapp/waha/send', {
         chatId: payload.chatId,
         text: payload.text,
-        session: payload.session || 'default'
+        session: payload.session
       });
       return response;
     } catch (error: any) {

@@ -12,6 +12,7 @@ export interface WhatsAppSettings {
   apiKey?: string; // This will be the Meta Access Token
   phoneNumberId?: string;
   wabaId?: string;
+  provider?: 'waha' | 'meta';
 }
 
 export const whatsappService = {

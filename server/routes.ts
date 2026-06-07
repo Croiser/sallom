@@ -564,9 +564,15 @@ router.get('/services', authenticateToken, async (req: AuthRequest, res) => {
 });
 
 router.post('/services', authenticateToken, async (req: AuthRequest, res) => {
-  const { name, duration, price } = req.body;
+  const { name, duration, price, requiresScheduling } = req.body;
   const service = await prisma.service.create({
-    data: { name, duration, price, ownerUid: req.user?.id as string }
+    data: { 
+      name, 
+      duration, 
+      price, 
+      requiresScheduling: requiresScheduling !== undefined ? requiresScheduling : true,
+      ownerUid: req.user?.id as string 
+    }
   });
   res.json(service);
 });
@@ -699,7 +705,7 @@ router.get('/whatsapp-settings', authenticateToken, async (req: AuthRequest, res
 
 router.put('/whatsapp-settings', authenticateToken, async (req: AuthRequest, res) => {
   try {
-    const { enabled, templates, apiKey, phoneNumberId, wabaId } = req.body;
+    const { enabled, templates, apiKey, phoneNumberId, wabaId, provider } = req.body;
     const uid = req.user?.id as string;
     const settings = await prisma.whatsappSettings.upsert({
       where: { uid },
@@ -709,7 +715,8 @@ router.put('/whatsapp-settings', authenticateToken, async (req: AuthRequest, res
         apiKey,
         phoneNumberId,
         wabaId,
-        wahaInstanceName: 'default',
+        wahaInstanceName: uid,
+        provider: provider || undefined,
         status: req.body.status || 'disconnected'
       },
       create: {
@@ -723,7 +730,8 @@ router.put('/whatsapp-settings', authenticateToken, async (req: AuthRequest, res
         apiKey,
         phoneNumberId,
         wabaId,
-        wahaInstanceName: 'default',
+        wahaInstanceName: uid,
+        provider: provider || 'waha',
         status: 'disconnected'
       }
     });
@@ -758,8 +766,9 @@ router.post('/whatsapp/test', authenticateToken, async (req: AuthRequest, res) =
 
 router.get('/whatsapp/waha/status', authenticateToken, async (req: AuthRequest, res) => {
   try {
+    const uid = req.user?.id as string;
     const waha = new WAHAService(WAHA_API_URL);
-    const status = await waha.getSessionStatus('default');
+    const status = await waha.getSessionStatus(uid);
     res.json(status);
   } catch (err: any) {
     res.status(500).json({ error: err.message });
@@ -768,8 +777,9 @@ router.get('/whatsapp/waha/status', authenticateToken, async (req: AuthRequest, 
 
 router.get('/whatsapp/waha/qr', authenticateToken, async (req: AuthRequest, res) => {
   try {
+    const uid = req.user?.id as string;
     const waha = new WAHAService(WAHA_API_URL);
-    const qr = await waha.getQrCode('default');
+    const qr = await waha.getQrCode(uid);
     console.log('QR Code result:', qr ? 'received' : 'null');
     res.json({ qr });
   } catch (err: any) {
@@ -780,8 +790,9 @@ router.get('/whatsapp/waha/qr', authenticateToken, async (req: AuthRequest, res)
 
 router.post('/whatsapp/waha/session/start', authenticateToken, async (req: AuthRequest, res) => {
   try {
+    const uid = req.user?.id as string;
     const waha = new WAHAService(WAHA_API_URL);
-    await waha.startSession('default');
+    await waha.startSession(uid);
     res.json({ success: true });
   } catch (err: any) {
     res.status(500).json({ error: err.message });
@@ -791,14 +802,54 @@ router.post('/whatsapp/waha/session/start', authenticateToken, async (req: AuthR
 router.post('/whatsapp/waha/send', authenticateToken, async (req: AuthRequest, res) => {
   try {
     const { chatId, text, session } = req.body;
+    const uid = req.user?.id as string;
     if (!chatId || !text) {
       return res.status(400).json({ error: 'chatId and text are required' });
     }
     const waha = new WAHAService(WAHA_API_URL);
-    const result = await waha.sendTextMessage(session || 'default', chatId, text);
+    const result = await waha.sendTextMessage(session || uid, chatId, text);
     res.json({ success: true, data: result });
   } catch (err: any) {
     console.error('Error sending message:', err.message);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// WAHA Webhook
+router.post('/whatsapp/waha/webhook', async (req, res) => {
+  try {
+    const payload = req.body;
+    console.log('[WAHA Webhook] Received:', JSON.stringify(payload));
+    
+    // Check if it's an incoming message event
+    if (payload.event === 'message' || payload.event === 'message.any') {
+      const { session, payload: msgData } = payload;
+      // session is the uid if configured as multi-tenant
+      const uid = session;
+      
+      // Basic extraction, WAHA structure might vary slightly by engine
+      const content = msgData.body || msgData.text || '';
+      const from = msgData.from || '';
+      
+      // Try to save to WhatsappMessage
+      if (uid && from && content) {
+        await prisma.whatsappMessage.create({
+          data: {
+            ownerUid: uid,
+            recipientNumber: from.replace('@c.us', ''),
+            recipientName: msgData.notifyName || '',
+            content: content,
+            type: 'text',
+            status: 'received',
+            direction: 'inbound'
+          }
+        });
+      }
+    }
+    
+    res.json({ success: true });
+  } catch (err: any) {
+    console.error('[WAHA Webhook] Error:', err.message);
     res.status(500).json({ error: err.message });
   }
 });
@@ -892,10 +943,10 @@ router.post('/webhooks/waha', async (req, res) => {
           if (appointment && appointment.owner.whatsappSettings?.enabled) {
             const user = appointment.owner;
             const settings = user.whatsappSettings!;
-            const wallet = user.wallet[0]; // Wallet is linked to user
+            const wallet = user.wallet; // Wallet is linked to user
 
             // Check Balance
-            if (!wallet || !wallet.isActive || wallet.balance < 0.10) {
+            if (!wallet || !wallet.isActive || Number(wallet.balance) < 0.10) {
               console.log(`Wallet error: Insufficient balance for user ${user.id}`);
               return res.sendStatus(200);
             }
@@ -2082,7 +2133,19 @@ router.post('/sales', authenticateToken, async (req: AuthRequest, res) => {
       const saleItemsData = [];
 
       for (const item of items) {
-        const lineTotal = item.quantity * item.unitPrice;
+        let actualUnitPrice = item.unitPrice;
+
+        if (item.serviceId) {
+          const service = await tx.service.findUnique({ where: { id: item.serviceId } });
+          if (!service) throw new Error('Serviço não encontrado.');
+          actualUnitPrice = service.price;
+        } else if (item.productId) {
+          const product = await tx.product.findUnique({ where: { id: item.productId } });
+          if (!product) throw new Error('Produto não encontrado.');
+          actualUnitPrice = product.price;
+        }
+
+        const lineTotal = item.quantity * actualUnitPrice;
 
         if (item.serviceId) {
           totalServices += lineTotal;
@@ -2094,7 +2157,7 @@ router.post('/sales', authenticateToken, async (req: AuthRequest, res) => {
           productId: item.productId || null,
           serviceId: item.serviceId || null,
           quantity: item.quantity,
-          unitPrice: item.unitPrice,
+          unitPrice: actualUnitPrice,
           totalPrice: lineTotal
         });
 

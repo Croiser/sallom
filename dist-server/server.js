@@ -4,7 +4,6 @@ import cors from 'cors';
 import path from 'path';
 import { createServer as createViteServer } from 'vite';
 import { initDb } from './server/db.js';
-import prisma from './server/db.js';
 import apiRoutes from './server/routes.js';
 import { initReminderCron } from './server/services/reminderCron.js';
 async function startServer() {
@@ -31,16 +30,6 @@ async function startServer() {
     if (process.env.NODE_ENV === 'production') {
         initReminderCron();
     }
-    app.get('/api/diag', async (req, res) => {
-        try {
-            const plans = await prisma.plan.findMany();
-            const users = await prisma.user.findMany({ take: 3 });
-            res.json({ plans, users, env: process.env.DATABASE_URL });
-        }
-        catch (err) {
-            res.status(500).json({ error: err.message });
-        }
-    });
     app.get('/api/health', (req, res) => {
         res.json({ status: 'ok', message: 'Salão Pro Manager API is running' });
     });

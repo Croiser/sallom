@@ -28,6 +28,8 @@ import { motion, AnimatePresence } from 'motion/react';
 import { useAuth } from '../contexts/AuthContext';
 import { useSubscription } from '../hooks/useSubscription';
 import { api } from '../services/api';
+import HelpDrawer from './help/HelpDrawer';
+import OnboardingTour from './help/OnboardingTour';
 
 interface LayoutProps {
   children: React.ReactNode;
@@ -40,6 +42,19 @@ export default function Layout({ children, activeTab, setActiveTab }: LayoutProp
   const { plan } = useSubscription();
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const [whatsappStatus, setWhatsappStatus] = useState<any>(null);
+  const [isHelpDrawerOpen, setIsHelpDrawerOpen] = useState(false);
+  const [runTour, setRunTour] = useState(false);
+
+  useEffect(() => {
+    const tourCompleted = localStorage.getItem('tourCompleted');
+    if (!tourCompleted) {
+      setRunTour(true);
+    }
+
+    const handleStartTour = () => setRunTour(true);
+    window.addEventListener('start-tour', handleStartTour);
+    return () => window.removeEventListener('start-tour', handleStartTour);
+  }, []);
 
   useEffect(() => {
     if (userProfile && plan?.features?.whatsapp) {
@@ -76,7 +91,6 @@ export default function Layout({ children, activeTab, setActiveTab }: LayoutProp
     { id: 'settings', label: 'Configurações', icon: SettingsIcon },
     { id: 'subscription', label: 'Minha Assinatura', icon: CreditCard },
     { id: 'automation', label: 'Automação', icon: Settings2 },
-    { id: 'whatsapp-connection', label: 'Conexão WhatsApp', icon: QrCode },
     { id: 'blog', label: 'Blog & Dicas', icon: BookOpen },
     { id: 'help', label: 'Ajuda', icon: HelpCircle },
   ];
@@ -100,7 +114,7 @@ export default function Layout({ children, activeTab, setActiveTab }: LayoutProp
       return allowedForPro.includes(item.id);
     }
 
-    if (item.id === 'whatsapp' || item.id === 'whatsapp-connection' || item.id === 'whatsapp-chats') {
+    if (item.id === 'whatsapp' || item.id === 'whatsapp-chats') {
       return plan?.features?.whatsapp === true;
     }
     return true;
@@ -117,6 +131,9 @@ export default function Layout({ children, activeTab, setActiveTab }: LayoutProp
 
   return (
     <div className="min-h-screen bg-surface-50 flex font-sans">
+      <OnboardingTour run={runTour} onFinish={() => { localStorage.setItem('tourCompleted', 'true'); setRunTour(false); }} />
+      <HelpDrawer isOpen={isHelpDrawerOpen} onClose={() => setIsHelpDrawerOpen(false)} activeTab={activeTab} />
+      
       {/* Mobile Sidebar Overlay */}
       <AnimatePresence>
         {isSidebarOpen && (
@@ -153,6 +170,7 @@ export default function Layout({ children, activeTab, setActiveTab }: LayoutProp
             {fullMenuItems.map((item) => (
               <button
                 key={item.id}
+                id={`menu-${item.id}`}
                 onClick={() => {
                   setActiveTab(item.id);
                   setIsSidebarOpen(false);
@@ -223,7 +241,8 @@ export default function Layout({ children, activeTab, setActiveTab }: LayoutProp
 
           <div className="flex items-center gap-6">
             <button 
-              onClick={() => setActiveTab('help')}
+              id="btn-support"
+              onClick={() => setIsHelpDrawerOpen(true)}
               className="p-2 text-surface-900 hover:bg-surface-100 rounded-2xl transition-all flex items-center gap-2.5 text-sm font-bold group"
             >
               <div className="p-2 bg-surface-100 rounded-xl group-hover:bg-brand-500 group-hover:text-white transition-colors">

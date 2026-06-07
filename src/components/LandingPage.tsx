@@ -135,7 +135,7 @@ export default function LandingPage({ onAuthClick, onNavigate }: {
                 transition={{ delay: 0.1 }}
                 className="text-5xl lg:text-7xl font-bold text-zinc-900 leading-[1.1] mb-6"
               >
-                SallonProManager by dodilesistemas: O Sistema de Gestão <span className="text-rose-500">Completo</span> para o seu Salão ou Barbearia.
+                SallonProManager: O Sistema de Gestão <span className="text-rose-500">Completo</span> para o seu Salão ou Barbearia.
               </motion.h1>
               <motion.p 
                 initial={{ opacity: 0, y: 20 }}
@@ -212,21 +212,7 @@ export default function LandingPage({ onAuthClick, onNavigate }: {
                   fetchPriority="high"
                 />
                 
-                <div className="absolute -bottom-10 -left-10 bg-white p-6 rounded-3xl shadow-xl border border-zinc-100 hidden md:block">
-                  <div className="flex items-center gap-4 mb-4">
-                    <div className="w-12 h-12 bg-emerald-100 rounded-2xl flex items-center justify-center text-emerald-600">
-                      <TrendingIcon size={24} />
-                    </div>
-                    <div>
-                      <p className="text-xs font-bold text-zinc-400 uppercase">Faturamento Mensal</p>
-                      <p className="text-2xl font-bold text-zinc-900">R$ 24.850,00</p>
-                    </div>
-                  </div>
-                  <div className="flex items-center gap-2 text-emerald-600 text-sm font-bold">
-                    <CheckIcon size={16} />
-                    +18% que o mês anterior
-                  </div>
-                </div>
+
               </div>
               {/* Decorative elements */}
               <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[120%] h-[120%] bg-rose-500/5 blur-[120px] rounded-full -z-10" />
@@ -398,7 +384,7 @@ export default function LandingPage({ onAuthClick, onNavigate }: {
       <section className="py-24 bg-white">
         <div className="max-w-4xl mx-auto px-4">
           <div className="text-center mb-16">
-            <h2 className="text-4xl font-bold text-zinc-900 mb-4">Divisão de Pagamentos e Split (Rebranding SallonProManager by dodilesistemas)</h2>
+            <h2 className="text-4xl font-bold text-zinc-900 mb-4">Divisão de Pagamentos e Split (Rebranding SallonProManager)</h2>
             <p className="text-zinc-500 text-lg">Compare e veja a diferença na sua rotina.</p>
           </div>
           <div className="bg-white rounded-[2.5rem] border border-zinc-100 shadow-2xl overflow-hidden">
@@ -407,7 +393,7 @@ export default function LandingPage({ onAuthClick, onNavigate }: {
                 <tr className="bg-zinc-50/50">
                   <th className="px-8 py-6 text-sm font-bold text-zinc-400 uppercase tracking-wider">Recurso</th>
                   <th className="px-8 py-6 text-sm font-bold text-zinc-400 uppercase tracking-wider">Agenda Manual</th>
-                  <th className="px-8 py-6 text-sm font-bold text-rose-500 uppercase tracking-wider bg-rose-50/50">SallonProManager by dodilesistemas</th>
+                  <th className="px-8 py-6 text-sm font-bold text-rose-500 uppercase tracking-wider bg-rose-50/50">SallonProManager</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-zinc-100">

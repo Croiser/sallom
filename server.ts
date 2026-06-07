@@ -8,6 +8,7 @@ import { initDb } from './server/db.js';
 import prisma from './server/db.js';
 import apiRoutes from './server/routes.js';
 import { initReminderCron } from './server/services/reminderCron.js';
+import { initWhatsappWorker } from './server/services/whatsappWorker.js';
 
 async function startServer() {
   const app = express();
@@ -38,17 +39,10 @@ async function startServer() {
   // Initialize background jobs
   if (process.env.NODE_ENV === 'production') {
     initReminderCron();
+    initWhatsappWorker();
   }
 
-  app.get('/api/diag', async (req, res) => {
-    try {
-      const plans = await (prisma as any).plan.findMany();
-      const users = await (prisma as any).user.findMany({ take: 3 });
-      res.json({ plans, users, env: process.env.DATABASE_URL });
-    } catch (err: any) {
-      res.status(500).json({ error: err.message });
-    }
-  });
+
 
   app.get('/api/health', (req, res) => {
     res.json({ status: 'ok', message: 'Salão Pro Manager API is running' });

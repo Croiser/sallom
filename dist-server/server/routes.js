@@ -807,9 +807,9 @@ router.post('/webhooks/waha', async (req, res) => {
                     if (appointment && appointment.owner.whatsappSettings?.enabled) {
                         const user = appointment.owner;
                         const settings = user.whatsappSettings;
-                        const wallet = user.wallet[0]; // Wallet is linked to user
+                        const wallet = user.wallet; // Wallet is linked to user
                         // Check Balance
-                        if (!wallet || !wallet.isActive || wallet.balance < 0.10) {
+                        if (!wallet || !wallet.isActive || Number(wallet.balance) < 0.10) {
                             console.log(`Wallet error: Insufficient balance for user ${user.id}`);
                             return res.sendStatus(200);
                         }
@@ -1890,7 +1890,20 @@ router.post('/sales', authenticateToken, async (req, res) => {
             let totalProducts = 0;
             const saleItemsData = [];
             for (const item of items) {
-                const lineTotal = item.quantity * item.unitPrice;
+                let actualUnitPrice = item.unitPrice;
+                if (item.serviceId) {
+                    const service = await tx.service.findUnique({ where: { id: item.serviceId } });
+                    if (!service)
+                        throw new Error('Serviço não encontrado.');
+                    actualUnitPrice = service.price;
+                }
+                else if (item.productId) {
+                    const product = await tx.product.findUnique({ where: { id: item.productId } });
+                    if (!product)
+                        throw new Error('Produto não encontrado.');
+                    actualUnitPrice = product.price;
+                }
+                const lineTotal = item.quantity * actualUnitPrice;
                 if (item.serviceId) {
                     totalServices += lineTotal;
                 }
@@ -1901,7 +1914,7 @@ router.post('/sales', authenticateToken, async (req, res) => {
                     productId: item.productId || null,
                     serviceId: item.serviceId || null,
                     quantity: item.quantity,
-                    unitPrice: item.unitPrice,
+                    unitPrice: actualUnitPrice,
                     totalPrice: lineTotal
                 });
                 // 2. Decrement stock if it's a product

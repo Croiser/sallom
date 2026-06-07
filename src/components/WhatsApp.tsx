@@ -24,6 +24,7 @@ import { useSubscription } from '../hooks/useSubscription';
 import { motion } from 'motion/react';
 import { useAuth } from '../contexts/AuthContext';
 import { api } from '../services/api';
+import WhatsAppConnection from './WhatsAppConnection';
 
 interface WhatsAppProps {
   onNavigate?: (tab: string, data?: { planId?: string, cycle?: 'monthly' | 'yearly' }) => void;
@@ -154,91 +155,117 @@ export default function WhatsApp({ onNavigate }: WhatsAppProps) {
       {activeTab === 'config' ? (
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
           <div className="lg:col-span-2 space-y-6">
-            {/* Connection Section */}
-            <div className="bg-white p-8 rounded-[2.5rem] border border-zinc-200 shadow-sm">
-              <div className="flex items-center gap-3 mb-8">
-                <div className="w-12 h-12 bg-zinc-100 rounded-2xl flex items-center justify-center">
-                  <Lock className="text-zinc-600" size={24} />
-                </div>
-                <div>
-                  <h3 className="text-lg font-bold text-zinc-900">Configuração Meta API</h3>
-                  <p className="text-sm text-zinc-500">Insira suas credenciais do WhatsApp Business Platform</p>
-                </div>
-              </div>
-
-              <div className="space-y-6">
-                <div className="space-y-2">
-                  <label className="text-sm font-bold text-zinc-700">Token de Acesso Temporário ou Permanente</label>
-                  <input 
-                    type="password"
-                    value={settings?.apiKey || ''}
-                    onChange={(e) => setSettings(s => s ? ({ ...s, apiKey: e.target.value }) : null)}
-                    className="w-full bg-zinc-50 border border-zinc-200 rounded-2xl p-4 text-sm outline-none focus:ring-2 focus:ring-zinc-900/5 focus:border-zinc-900 transition-all font-mono"
-                    placeholder="EAAG..."
-                  />
-                </div>
-
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <div className="space-y-2">
-                    <label className="text-sm font-bold text-zinc-700">Phone Number ID</label>
-                    <input 
-                      type="text"
-                      value={settings?.phoneNumberId || ''}
-                      onChange={(e) => setSettings(s => s ? ({ ...s, phoneNumberId: e.target.value }) : null)}
-                      className="w-full bg-zinc-50 border border-zinc-200 rounded-2xl p-4 text-sm outline-none focus:ring-2 focus:ring-zinc-900/5 focus:border-zinc-900 transition-all"
-                      placeholder="1234567890..."
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <label className="text-sm font-bold text-zinc-700">WhatsApp Business Account ID</label>
-                    <input 
-                      type="text"
-                      value={settings?.wabaId || ''}
-                      onChange={(e) => setSettings(s => s ? ({ ...s, wabaId: e.target.value }) : null)}
-                      className="w-full bg-zinc-50 border border-zinc-200 rounded-2xl p-4 text-sm outline-none focus:ring-2 focus:ring-zinc-900/5 focus:border-zinc-900 transition-all"
-                      placeholder="9876543210..."
-                    />
-                  </div>
-                </div>
-
-                <div className="flex gap-4">
-                  <button
-                    onClick={handleSave}
-                    disabled={saving}
-                    className="flex-1 bg-zinc-900 text-white px-6 py-4 rounded-2xl font-bold hover:bg-zinc-800 transition-all disabled:opacity-50 flex items-center justify-center gap-2"
-                  >
-                    {saving ? <RefreshCw className="animate-spin" size={20} /> : <Save size={20} />}
-                    Salvar Credenciais
-                  </button>
-                  <button
-                    onClick={handleTest}
-                    disabled={connecting || !settings?.phoneNumberId}
-                    className="px-6 py-4 rounded-2xl font-bold border border-zinc-900 text-zinc-900 hover:bg-zinc-50 transition-all disabled:opacity-50 flex items-center justify-center gap-2"
-                  >
-                    <Zap size={20} />
-                    Testar Envio
-                  </button>
-                </div>
-
-                <div className="p-6 bg-rose-50 rounded-3xl border border-rose-100 space-y-3">
-                  <h4 className="text-sm font-bold text-rose-900 flex items-center gap-2">
-                    <LifeBuoy size={16} /> Como conectar sem QR Code?
-                  </h4>
-                  <p className="text-xs text-rose-800 leading-relaxed">
-                    A API Oficial da Meta é mais segura e estável. Para conectar o WhatsApp do salão:
-                  </p>
-                  <ul className="text-[11px] text-rose-700 space-y-2">
-                    <li className="flex gap-2"><span>1.</span> <span>Crie um App (Business) no <a href="https://developers.facebook.com" target="_blank" className="underline font-bold">Meta Developers</a>.</span></li>
-                    <li className="flex gap-2"><span>2.</span> <span>Adicione o produto <strong>WhatsApp</strong> ao seu App.</span></li>
-                    <li className="flex gap-2"><span>3.</span> <span>Copie o <strong>Token Permanente</strong>, <strong>Phone ID</strong> e <strong>WABA ID</strong>.</span></li>
-                    <li className="flex gap-2"><span>4.</span> <span>Cole os códigos acima e clique em <strong>Salvar Credenciais</strong>.</span></li>
-                  </ul>
-                  <p className="text-[10px] text-rose-400 italic">
-                    *Não é mais necessário escanear QR Code. A conexão é direta via API.
-                  </p>
-                </div>
-              </div>
+            <div className="flex bg-zinc-100 p-1 rounded-2xl w-fit">
+              <button
+                onClick={() => {
+                  if (settings) {
+                    setSettings({ ...settings, provider: 'meta' });
+                  }
+                }}
+                className={`pb-3 pt-3 px-6 text-sm font-bold transition-all rounded-xl ${settings?.provider === 'meta' ? 'bg-white shadow-sm text-rose-500' : 'text-zinc-500 hover:text-zinc-700'}`}
+              >
+                API Oficial (Meta)
+              </button>
+              <button
+                onClick={() => {
+                  if (settings) {
+                    setSettings({ ...settings, provider: 'waha' });
+                  }
+                }}
+                className={`pb-3 pt-3 px-6 text-sm font-bold transition-all rounded-xl ${settings?.provider === 'waha' || !settings?.provider ? 'bg-white shadow-sm text-rose-500' : 'text-zinc-500 hover:text-zinc-700'}`}
+              >
+                QR Code Inteligente (WAHA)
+              </button>
             </div>
+
+            {settings?.provider === 'meta' ? (
+              <div className="bg-white p-8 rounded-[2.5rem] border border-zinc-200 shadow-sm">
+                <div className="flex items-center gap-3 mb-8">
+                  <div className="w-12 h-12 bg-zinc-100 rounded-2xl flex items-center justify-center">
+                    <Lock className="text-zinc-600" size={24} />
+                  </div>
+                  <div>
+                    <h3 className="text-lg font-bold text-zinc-900">Configuração Meta API</h3>
+                    <p className="text-sm text-zinc-500">Insira suas credenciais do WhatsApp Business Platform</p>
+                  </div>
+                </div>
+
+                <div className="space-y-6">
+                  <div className="space-y-2">
+                    <label className="text-sm font-bold text-zinc-700">Token de Acesso Temporário ou Permanente</label>
+                    <input 
+                      type="password"
+                      value={settings?.apiKey || ''}
+                      onChange={(e) => setSettings(s => s ? ({ ...s, apiKey: e.target.value }) : null)}
+                      className="w-full bg-zinc-50 border border-zinc-200 rounded-2xl p-4 text-sm outline-none focus:ring-2 focus:ring-zinc-900/5 focus:border-zinc-900 transition-all font-mono"
+                      placeholder="EAAG..."
+                    />
+                  </div>
+
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div className="space-y-2">
+                      <label className="text-sm font-bold text-zinc-700">Phone Number ID</label>
+                      <input 
+                        type="text"
+                        value={settings?.phoneNumberId || ''}
+                        onChange={(e) => setSettings(s => s ? ({ ...s, phoneNumberId: e.target.value }) : null)}
+                        className="w-full bg-zinc-50 border border-zinc-200 rounded-2xl p-4 text-sm outline-none focus:ring-2 focus:ring-zinc-900/5 focus:border-zinc-900 transition-all"
+                        placeholder="1234567890..."
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <label className="text-sm font-bold text-zinc-700">WhatsApp Business Account ID</label>
+                      <input 
+                        type="text"
+                        value={settings?.wabaId || ''}
+                        onChange={(e) => setSettings(s => s ? ({ ...s, wabaId: e.target.value }) : null)}
+                        className="w-full bg-zinc-50 border border-zinc-200 rounded-2xl p-4 text-sm outline-none focus:ring-2 focus:ring-zinc-900/5 focus:border-zinc-900 transition-all"
+                        placeholder="9876543210..."
+                      />
+                    </div>
+                  </div>
+
+                  <div className="flex gap-4">
+                    <button
+                      onClick={handleSave}
+                      disabled={saving}
+                      className="flex-1 bg-zinc-900 text-white px-6 py-4 rounded-2xl font-bold hover:bg-zinc-800 transition-all disabled:opacity-50 flex items-center justify-center gap-2"
+                    >
+                      {saving ? <RefreshCw className="animate-spin" size={20} /> : <Save size={20} />}
+                      Salvar Credenciais
+                    </button>
+                    <button
+                      onClick={handleTest}
+                      disabled={connecting || !settings?.phoneNumberId}
+                      className="px-6 py-4 rounded-2xl font-bold border border-zinc-900 text-zinc-900 hover:bg-zinc-50 transition-all disabled:opacity-50 flex items-center justify-center gap-2"
+                    >
+                      <Zap size={20} />
+                      Testar Envio
+                    </button>
+                  </div>
+
+                  <div className="p-6 bg-rose-50 rounded-3xl border border-rose-100 space-y-3">
+                    <h4 className="text-sm font-bold text-rose-900 flex items-center gap-2">
+                      <LifeBuoy size={16} /> Como conectar sem QR Code?
+                    </h4>
+                    <p className="text-xs text-rose-800 leading-relaxed">
+                      A API Oficial da Meta é mais segura e estável. Para conectar o WhatsApp do salão:
+                    </p>
+                    <ul className="text-[11px] text-rose-700 space-y-2">
+                      <li className="flex gap-2"><span>1.</span> <span>Crie um App (Business) no <a href="https://developers.facebook.com" target="_blank" className="underline font-bold">Meta Developers</a>.</span></li>
+                      <li className="flex gap-2"><span>2.</span> <span>Adicione o produto <strong>WhatsApp</strong> ao seu App.</span></li>
+                      <li className="flex gap-2"><span>3.</span> <span>Copie o <strong>Token Permanente</strong>, <strong>Phone ID</strong> e <strong>WABA ID</strong>.</span></li>
+                      <li className="flex gap-2"><span>4.</span> <span>Cole os códigos acima e clique em <strong>Salvar Credenciais</strong>.</span></li>
+                    </ul>
+                    <p className="text-[10px] text-rose-400 italic">
+                      *Não é mais necessário escanear QR Code. A conexão é direta via API.
+                    </p>
+                  </div>
+                </div>
+              </div>
+            ) : (
+              <WhatsAppConnection />
+            )}
 
             <div className="bg-white p-8 rounded-[2.5rem] border border-zinc-200 shadow-sm">
               <div className="flex items-center justify-between mb-8">

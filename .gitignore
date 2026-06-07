@@ -8,3 +8,5 @@ coverage/
 !.env.example
 vps.env
 *.tar.gz
+tmp/
+tmp_backup/

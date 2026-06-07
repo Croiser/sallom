@@ -1,0 +1,68 @@
+===============================================================================
+LISTA DE CONTATOS DESCONSIDERADOS (PARA CONFERENCIA MANUAL)
+===============================================================================
+
+Este arquivo contem a lista de contatos do caderno manuscrito que foram 
+desconsiderados na planilha Excel (contatos.xlsx) e no arquivo CSV, seja por 
+estarem sem numero de telefone, com o numero riscado, ou com os digitos 
+cortados na lateral da foto.
+
+Use esta lista junto com o caderno fisico para recuperar e preencher os 
+numeros em falta.
+
+-------------------------------------------------------------------------------
+FOLHA 4 (PAGINA 4)
+-------------------------------------------------------------------------------
+
+* Dete
+  - Motivo: Sem numero de telefone.
+  - Observacao: Nome anotado entre Antonia e Jessica, agrupado no canto esquerdo.
+
+* Luzia (Glaucia)
+  - Motivo: Numero cortado na lateral da foto.
+  - O que aparece na foto: "45 9991-03-9..." (incompleto)
+
+* Leila (Saff)
+  - Motivo: Numero cortado na lateral da foto.
+  - O que aparece na foto: "45 9920-45-9..." (incompleto)
+
+* Melissa
+  - Motivo: Sem numero de telefone.
+  - Observacao: Apenas o nome anotado no caderno.
+
+* Fatima Rocha
+  - Motivo: Numero cortado na lateral da foto.
+  - O que aparece na foto: "45 9901-32-3..." (incompleto)
+
+* Evellyn
+  - Motivo: Numero cortado na lateral da foto.
+  - O que aparece na foto: "45 9836-22..." (incompleto)
+
+* Bruna
+  - Motivo: Sem numero de telefone.
+  - Observacao: Apenas o nome anotado no caderno.
+
+* D. Silva
+  - Motivo: Sem numero de telefone.
+  - Observacao: Apenas o nome anotado no caderno.
+
+-------------------------------------------------------------------------------
+FOLHA 5 (PAGINA 5)
+-------------------------------------------------------------------------------
+
+* Laura
+  - Motivo: Sem numero de telefone.
+  - Observacao: Nome anotado com um traço ao lado ("Laura -").
+
+* Andressa
+  - Motivo: Contato riscado com caneta no caderno.
+  - O que aparece na foto: Nome e numero "45 9951-49-46" riscados por completo.
+  - Observacao: Foi substituida por "Eva" (que esta na planilha com o numero corrigido).
+
+* Mari
+  - Motivo: Sem numero de telefone.
+  - Observacao: Apenas o nome anotado abaixo de Luana.
+
+===============================================================================
+Fim da lista de contatos desconsiderados.
+===============================================================================

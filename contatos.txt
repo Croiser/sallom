@@ -1,0 +1,154 @@
+===============================================================================
+LISTA DE CONTATOS VALIDOS E TRANSRITOS (123 CONTATOS)
+===============================================================================
+
+Esta e a lista completa de todos os contatos validos transcritos do caderno 
+manuscrito, ordenada por folha. Apenas os contatos com telefones validos e 
+completos foram incluidos aqui (todos os contatos sem numero, riscados ou 
+cortados foram enviados para o arquivo 'contatos_desconsiderados.txt').
+
+-------------------------------------------------------------------------------
+FOLHA 1 (PAGINA 1)
+-------------------------------------------------------------------------------
+1. Bruno Lopes - 4598166973
+
+-------------------------------------------------------------------------------
+FOLHA 2 (PAGINA 2)
+-------------------------------------------------------------------------------
+2. Rosa Kozievith - 4584219317
+3. Rozi Kozievith - 4599373090
+4. Janete Profa - 4598159153
+5. Maria Macarrão - 4591358404
+6. Paty BB - 4598180865
+7. Natália Rucco - 4588292939
+8. Rafaela - 4588151735
+9. Tatão - 4598201468
+10. Ana Paula - 4599367466
+11. Luciana - 4599716816
+12. Kelma - 4599579400
+13. Luana - 4598572980
+14. Ana.S - 4591521694
+15. Mara - 4598180030
+16. Clarisse - 4598173306
+17. Carine - 4599574371
+18. Angélika - 4598158152
+19. Angélica B. - 4588067625
+20. Angélica Selo - 4599697555
+21. Beth Selo - 4599427963
+22. Zelinda - 4599819205
+23. Jéssica Reus - 4598048749
+24. Keila - 4591533554
+25. Eliane Lava - 4591389414
+26. Simone Gris - 4599670282
+27. Simoninha - 4599904710
+28. Erika - 4591590320
+29. Idete / Odete - 4599256468
+30. Leila - 4599424119
+31. Lizi - 4598027771
+32. Cida - 4599281622
+
+-------------------------------------------------------------------------------
+FOLHA 3 (PAGINA 3)
+-------------------------------------------------------------------------------
+33. Elioni Pastorini - 4591383823
+34. Mary - 4599000559
+35. Mary Lopes - 4591054501
+36. Renata - 4599278248
+37. Jamila - 4599431955
+38. Ere - 4598551962
+39. Thais Barros - 4599052490
+40. Meri - 4598235988
+41. Mara / Ewerton - 4599969666
+42. D. Lídia - 4598109977
+43. Gabriela Custódio - 4599839330
+44. Gabriela Wisch - 4591228210
+45. Giliane - 4598076959
+46. Ellen - 4591129052
+47. Cleusa - 4591265939
+48. Ana Cristina - 4599566918
+49. Ana Luiza - 4599793750
+50. Leonira - 4599887012
+51. Sara / Lara Mariano - 4599484083
+52. Andressa Tavares - 4598291473
+53. Iva Alban - 4599071046
+54. Leidi - 4598018610
+55. Josi Amaral - 4599045884
+56. Josinha - 4599505129
+57. Ivonete - 4588036353
+58. Hosana - 4599760842
+59. Lilian Sthall - 4591143553
+60. Sthefany - 4599518858
+61. Maurícia - 4599310153
+62. Silvana Farmácia - 4581775470
+63. Claúdia - 4599514412
+64. Izabel Mezzomo - 4591341997
+65. Lia Kirsten - 4599873998
+
+-------------------------------------------------------------------------------
+FOLHA 4 (PAGINA 4)
+-------------------------------------------------------------------------------
+66. Juliana Paz - 4598021008
+67. Rose Costa - 4599937809
+68. Veraci - 4599941129
+69. Silvani Baseggio (sil) - 4598450035
+70. Antônia - 4598521380
+71. Jéssica - 4598188047
+72. Faby - 4591351202
+73. Laurita - 4599797731
+74. Rose Vizinha - 4599433244
+75. Rose Vieira - 4599196434
+76. Maria Eduarda - Vanina - 4591083470
+77. Fernanda Bueno - 4598046260
+78. Tai - 4598327679
+79. Sinara - 4598041705
+80. Vanessa Bonatto - 4588116378
+81. Neuza - 4591538876
+82. Nilda Miguel - 4599835001
+83. Poliana - 4599235690
+84. Dani (menino) - 4599120698
+85. Isaura (Sheila grego) - 6993899080
+86. Andreia Nandi - 4599294644
+87. Inês - 4598251741
+88. Sol - 4584050818
+89. Zelinda - 4599819205
+90. Paula - 4598449683
+91. Eve - 4599191317
+
+-------------------------------------------------------------------------------
+FOLHA 5 (PAGINA 5)
+-------------------------------------------------------------------------------
+92. Rose Gomes - 4599835764
+93. Jéssica Gomes - 4599525880
+94. Evanir - 4588048887
+95. Nadir Reis - 4187385534
+96. Maria Roma - 4599050636
+97. Jaque Rucco - 4599778637
+98. Mayara - 45988083974
+99. Marileine - 4599407210
+100. Marilene Onório - 4598418705
+101. Grazi - 4598105299
+102. Luiza Lorena - 4599930581
+103. Silvia Renata Rigue - 4591247800
+104. Tiffany - 4599978564
+105. Dielsa - 4591189407
+106. Cris Sente - 4598594817
+107. Susete - 4599269660
+108. Letícia Locatelli - 4598200710
+109. Jaysa - 4591213089
+110. Vivi Xeque - 4591330796
+111. Olga - 4598103875
+112. Suzana - 4591225595
+113. Eva - 4599514946
+114. Regiane - 4591400343
+115. Gabizinha - 4591463891
+116. Nami - 4599078399
+117. Luana - 4598572980
+118. Michele Oliveira - 4591542158
+119. Crislaine - 4599157205
+120. Lúcia - 4599544651
+121. Silvana Ramão - 4599375903
+122. Amanda Chácara - 4599225256
+
+===============================================================================
+Fim da lista de contatos.
+===============================================================================

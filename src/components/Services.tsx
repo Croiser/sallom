@@ -25,6 +25,7 @@ export default function Services() {
   const [name, setName] = useState('');
   const [price, setPrice] = useState('');
   const [duration, setDuration] = useState('');
+  const [requiresScheduling, setRequiresScheduling] = useState(true);
 
   // Package Form State
   const [packageName, setPackageName] = useState('');
@@ -57,10 +58,11 @@ export default function Services() {
       await api.post('/services', {
         name,
         price: parseFloat(price),
-        duration: parseInt(duration)
+        duration: parseInt(duration),
+        requiresScheduling
       });
       setIsServiceModalOpen(false);
-      setName(''); setPrice(''); setDuration('');
+      setName(''); setPrice(''); setDuration(''); setRequiresScheduling(true);
       fetchData();
     } catch (err) { console.error(err); }
   };
@@ -250,6 +252,27 @@ export default function Services() {
                     />
                   </div>
                 </div>
+
+                <div className="flex items-start gap-3 p-4 bg-zinc-50 rounded-2xl border border-zinc-100">
+                  <div className="flex h-6 items-center">
+                    <input
+                      id="requiresScheduling"
+                      type="checkbox"
+                      checked={requiresScheduling}
+                      onChange={(e) => setRequiresScheduling(e.target.checked)}
+                      className="h-5 w-5 rounded-md border-zinc-300 text-amber-500 focus:ring-amber-500 outline-none cursor-pointer"
+                    />
+                  </div>
+                  <div className="text-sm">
+                    <label htmlFor="requiresScheduling" className="font-bold text-zinc-900 cursor-pointer">
+                      Ocupa horário na agenda
+                    </label>
+                    <p className="text-xs text-zinc-500 mt-1">
+                      Desmarque para criar serviços extras (upsell) que podem ser adicionados sem gastar tempo adicional na agenda.
+                    </p>
+                  </div>
+                </div>
+
                 <button type="submit" className="w-full bg-amber-500 text-zinc-900 font-black py-5 rounded-2xl shadow-xl shadow-amber-500/20 hover:bg-amber-400 transition-all flex items-center justify-center gap-2">
                   Criar Serviço <ChevronRight size={18} />
                 </button>
