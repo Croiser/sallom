@@ -502,9 +502,15 @@ router.get('/services', authenticateToken, async (req, res) => {
     res.json(services);
 });
 router.post('/services', authenticateToken, async (req, res) => {
-    const { name, duration, price } = req.body;
+    const { name, duration, price, requiresScheduling } = req.body;
     const service = await prisma.service.create({
-        data: { name, duration, price, ownerUid: req.user?.id }
+        data: {
+            name,
+            duration,
+            price,
+            requiresScheduling: requiresScheduling !== undefined ? requiresScheduling : true,
+            ownerUid: req.user?.id
+        }
     });
     res.json(service);
 });
@@ -627,7 +633,7 @@ router.get('/whatsapp-settings', authenticateToken, async (req, res) => {
 });
 router.put('/whatsapp-settings', authenticateToken, async (req, res) => {
     try {
-        const { enabled, templates, apiKey, phoneNumberId, wabaId } = req.body;
+        const { enabled, templates, apiKey, phoneNumberId, wabaId, provider } = req.body;
         const uid = req.user?.id;
         const settings = await prisma.whatsappSettings.upsert({
             where: { uid },
@@ -637,7 +643,8 @@ router.put('/whatsapp-settings', authenticateToken, async (req, res) => {
                 apiKey,
                 phoneNumberId,
                 wabaId,
-                wahaInstanceName: 'default',
+                wahaInstanceName: uid,
+                provider: provider || undefined,
                 status: req.body.status || 'disconnected'
             },
             create: {
@@ -651,7 +658,8 @@ router.put('/whatsapp-settings', authenticateToken, async (req, res) => {
                 apiKey,
                 phoneNumberId,
                 wabaId,
-                wahaInstanceName: 'default',
+                wahaInstanceName: uid,
+                provider: provider || 'waha',
                 status: 'disconnected'
             }
         });
@@ -681,8 +689,9 @@ router.post('/whatsapp/test', authenticateToken, async (req, res) => {
 // --- WAHA WhatsApp API Routes ---
 router.get('/whatsapp/waha/status', authenticateToken, async (req, res) => {
     try {
+        const uid = req.user?.id;
         const waha = new WAHAService(WAHA_API_URL);
-        const status = await waha.getSessionStatus('default');
+        const status = await waha.getSessionStatus(uid);
         res.json(status);
     }
     catch (err) {
@@ -691,8 +700,9 @@ router.get('/whatsapp/waha/status', authenticateToken, async (req, res) => {
 });
 router.get('/whatsapp/waha/qr', authenticateToken, async (req, res) => {
     try {
+        const uid = req.user?.id;
         const waha = new WAHAService(WAHA_API_URL);
-        const qr = await waha.getQrCode('default');
+        const qr = await waha.getQrCode(uid);
         console.log('QR Code result:', qr ? 'received' : 'null');
         res.json({ qr });
     }
@@ -703,8 +713,9 @@ router.get('/whatsapp/waha/qr', authenticateToken, async (req, res) => {
 });
 router.post('/whatsapp/waha/session/start', authenticateToken, async (req, res) => {
     try {
+        const uid = req.user?.id;
         const waha = new WAHAService(WAHA_API_URL);
-        await waha.startSession('default');
+        await waha.startSession(uid);
         res.json({ success: true });
     }
     catch (err) {
@@ -714,15 +725,51 @@ router.post('/whatsapp/waha/session/start', authenticateToken, async (req, res) 
 router.post('/whatsapp/waha/send', authenticateToken, async (req, res) => {
     try {
         const { chatId, text, session } = req.body;
+        const uid = req.user?.id;
         if (!chatId || !text) {
             return res.status(400).json({ error: 'chatId and text are required' });
         }
         const waha = new WAHAService(WAHA_API_URL);
-        const result = await waha.sendTextMessage(session || 'default', chatId, text);
+        const result = await waha.sendTextMessage(session || uid, chatId, text);
         res.json({ success: true, data: result });
     }
     catch (err) {
         console.error('Error sending message:', err.message);
+        res.status(500).json({ error: err.message });
+    }
+});
+// WAHA Webhook
+router.post('/whatsapp/waha/webhook', async (req, res) => {
+    try {
+        const payload = req.body;
+        console.log('[WAHA Webhook] Received:', JSON.stringify(payload));
+        // Check if it's an incoming message event
+        if (payload.event === 'message' || payload.event === 'message.any') {
+            const { session, payload: msgData } = payload;
+            // session is the uid if configured as multi-tenant
+            const uid = session;
+            // Basic extraction, WAHA structure might vary slightly by engine
+            const content = msgData.body || msgData.text || '';
+            const from = msgData.from || '';
+            // Try to save to WhatsappMessage
+            if (uid && from && content) {
+                await prisma.whatsappMessage.create({
+                    data: {
+                        ownerUid: uid,
+                        recipientNumber: from.replace('@c.us', ''),
+                        recipientName: msgData.notifyName || '',
+                        content: content,
+                        type: 'text',
+                        status: 'received',
+                        direction: 'inbound'
+                    }
+                });
+            }
+        }
+        res.json({ success: true });
+    }
+    catch (err) {
+        console.error('[WAHA Webhook] Error:', err.message);
         res.status(500).json({ error: err.message });
     }
 });

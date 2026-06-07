@@ -6,6 +6,7 @@ import { createServer as createViteServer } from 'vite';
 import { initDb } from './server/db.js';
 import apiRoutes from './server/routes.js';
 import { initReminderCron } from './server/services/reminderCron.js';
+import { initWhatsappWorker } from './server/services/whatsappWorker.js';
 async function startServer() {
     const app = express();
     const PORT = Number(process.env.PORT) || 3000;
@@ -29,6 +30,7 @@ async function startServer() {
     // Initialize background jobs
     if (process.env.NODE_ENV === 'production') {
         initReminderCron();
+        initWhatsappWorker();
     }
     app.get('/api/health', (req, res) => {
         res.json({ status: 'ok', message: 'Salão Pro Manager API is running' });
