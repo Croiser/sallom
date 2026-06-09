@@ -964,6 +964,8 @@ export default function SuperAdmin() {
                 <th className="px-8 py-5 font-bold">Plano</th>
                 <th className="px-8 py-5 font-bold">Status</th>
                 <th className="px-8 py-5 font-bold">Cadastro</th>
+                <th className="px-8 py-5 font-bold">Vigência</th>
+                <th className="px-8 py-5 font-bold">Pagamento</th>
                 <th className="px-8 py-5 font-bold text-right">Ações</th>
               </tr>
             </thead>
@@ -1003,6 +1005,28 @@ export default function SuperAdmin() {
                   </td>
                   <td className="px-8 py-6 text-sm text-zinc-500">
                     {new Date(tenant.createdAt).toLocaleDateString('pt-BR')}
+                  </td>
+                  <td className="px-8 py-6">
+                    {tenant.subscription && tenant.subscription.currentPeriodEnd ? (
+                      <span className="text-sm font-bold text-zinc-300">
+                        {new Date(tenant.subscription.currentPeriodEnd).toLocaleDateString('pt-BR')}
+                      </span>
+                    ) : (
+                      <span className="text-sm text-zinc-500">-</span>
+                    )}
+                  </td>
+                  <td className="px-8 py-6">
+                    {tenant.subscription ? (
+                      <span className={`px-2.5 py-1 rounded-full text-xs font-bold uppercase tracking-wider ${
+                        tenant.subscription.status === 'active' ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20' : 
+                        tenant.subscription.status === 'past_due' ? 'bg-rose-500/10 text-rose-400 border border-rose-500/20' : 
+                        'bg-zinc-800 text-zinc-400 border border-zinc-700'
+                      }`}>
+                        {tenant.subscription.status === 'active' ? 'Em dia' : tenant.subscription.status === 'past_due' ? 'Atrasado' : 'Cancelado'}
+                      </span>
+                    ) : (
+                      <span className="text-sm text-zinc-500">Sem Assinatura</span>
+                    )}
                   </td>
                   <td className="px-8 py-6 text-right">
                     <div className="flex items-center justify-end gap-2">

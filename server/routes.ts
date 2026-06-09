@@ -2930,7 +2930,8 @@ router.get('/superadmin/stats', authenticateToken, isSuperAdmin, async (req: Aut
 router.get('/superadmin/tenants', authenticateToken, isSuperAdmin, async (req: AuthRequest, res) => {
   try {
     const tenants = await prisma.user.findMany({
-      orderBy: { createdAt: 'desc' }
+      orderBy: { createdAt: 'desc' },
+      include: { subscription: true }
     });
     res.json(tenants);
   } catch (error) {

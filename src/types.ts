@@ -11,6 +11,7 @@ export interface UserProfile {
   phone?: string;
   billingCycle?: 'monthly' | 'yearly';
   slug?: string;
+  subscription?: Subscription;
 }
 
 export interface Client {
