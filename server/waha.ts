@@ -106,7 +106,11 @@ export class WAHAService {
   async sendTextMessage(sessionName: string = 'default', chatid: string, text: string) {
     try {
       // Clean chatid to only numbers
-      const formattedChatId = chatid.replace(/\D/g, '');
+      let formattedChatId = chatid.replace(/\D/g, '');
+      if (formattedChatId.length === 10 || formattedChatId.length === 11) {
+        formattedChatId = `55${formattedChatId}`;
+      }
+      
       const processedText = WAHAService.applySpintax(text);
 
       const response = await axios.post(`${this.apiUrl}/message/sendText/${sessionName}`, {

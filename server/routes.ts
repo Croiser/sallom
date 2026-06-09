@@ -1491,6 +1491,56 @@ router.put('/appointments/:id/status', authenticateToken, async (req: AuthReques
   }
 });
 
+router.put('/appointments/:id', authenticateToken, async (req: AuthRequest, res) => {
+  const { clientId, clientName, phone, serviceId, serviceName, barberId, barberName, staffId, staffName, date, price, isFitIn } = req.body;
+  const ownerUid = req.user?.id as string;
+  const appointmentId = req.params.id;
+
+  try {
+    const existingAppointment = await prisma.appointment.findFirst({
+      where: { id: appointmentId, ownerUid }
+    });
+
+    if (!existingAppointment) return res.status(404).json({ error: 'Appointment not found' });
+
+    // Validate if the new date/time conflicts (if not fit-in and changed)
+    if (!isFitIn) {
+      const parsedDate = new Date(date);
+      // Basic overlap logic is usually handled in frontend, but could add backend validation here
+    }
+
+    const updatedAppointment = await prisma.appointment.update({
+      where: { id: appointmentId },
+      data: {
+        clientId, clientName, phone, serviceId, serviceName, barberId, barberName, staffId, staffName, date: new Date(date), price, isFitIn
+      }
+    });
+
+    // Option: notify via WhatsApp if date/time changed
+    if (new Date(date).getTime() !== existingAppointment.date.getTime()) {
+      const user = await prisma.user.findUnique({ where: { id: ownerUid } });
+      const wahaSettings = await prisma.whatsappSettings.findUnique({ where: { uid: ownerUid } });
+      
+      if (wahaSettings?.enabled && phone) {
+        const { WAHAService } = await import('./waha.js');
+        const waha = new WAHAService(process.env.WAHA_API_URL || 'http://waha:8080');
+        const shopName = user?.shopName || 'nosso salão';
+        
+        const formattedDate = new Date(date).toLocaleDateString('pt-BR');
+        const formattedTime = new Date(date).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
+        
+        const msg = `Olá ${clientName}, seu agendamento no ${shopName} foi atualizado para o dia ${formattedDate} às ${formattedTime}. Se precisar de algo, nos avise!`;
+        
+        waha.sendTextMessage(wahaSettings.wahaInstanceName || ownerUid, phone, msg).catch(e => console.error('Erro ao notificar alteração:', e));
+      }
+    }
+
+    res.json(updatedAppointment);
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
 router.delete('/appointments/:id', authenticateToken, async (req: AuthRequest, res) => {
   await prisma.appointment.deleteMany({
     where: { id: req.params.id, ownerUid: req.user?.id }

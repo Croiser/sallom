@@ -16,7 +16,8 @@ import {
   AlertCircle,
   Repeat,
   MessageCircle,
-  TrendingUp
+  TrendingUp,
+  Edit2
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { Appointment, Client, Service, Staff, ShopSettings, ServiceCombo } from '../types';
@@ -34,6 +35,8 @@ export default function Appointments() {
   const [combos, setCombos] = useState<ServiceCombo[]>([]);
   const [settings, setSettings] = useState<ShopSettings | null>(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [isEditModalOpen, setIsEditModalOpen] = useState(false);
+  const [editingAppId, setEditingAppId] = useState<string | null>(null);
   const [isRecurringOpen, setIsRecurringOpen] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState<string>('all');
@@ -95,12 +98,7 @@ export default function Appointments() {
       });
 
       setIsModalOpen(false);
-      setSelectedClient('');
-      setSelectedService('');
-      setSelectedStaff('');
-      setDate('');
-      setTime('');
-      setIsFitIn(false);
+      resetForm();
       fetchData();
       setToast({ message: 'Agendamento criado!', type: 'success' });
       setTimeout(() => setToast(null), 3000);
@@ -109,6 +107,54 @@ export default function Appointments() {
       setToast({ message: err.response?.data?.error || 'Erro ao criar agendamento', type: 'error' });
       setTimeout(() => setToast(null), 3000);
     }
+  };
+
+  const handleEditClick = (app: Appointment) => {
+    setEditingAppId(app.id);
+    setSelectedClient(app.clientId || '');
+    setSelectedService(app.serviceId || '');
+    setSelectedStaff(app.staffId || '');
+    const d = new Date(app.date);
+    setDate(d.toISOString().split('T')[0]);
+    setTime(d.toTimeString().split(' ')[0].substring(0, 5));
+    setIsFitIn(app.isFitIn || false);
+    setIsEditModalOpen(true);
+  };
+
+  const handleUpdate = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!editingAppId || !selectedClient || !selectedService || !selectedStaff || !date || !time) return;
+
+    try {
+      const dateTimeStr = `${date}T${time}:00`;
+      await api.put(`/appointments/${editingAppId}`, {
+        clientId: selectedClient,
+        serviceId: selectedService,
+        staffId: selectedStaff,
+        date: dateTimeStr,
+        isFitIn
+      });
+
+      setIsEditModalOpen(false);
+      resetForm();
+      fetchData();
+      setToast({ message: 'Agendamento atualizado!', type: 'success' });
+      setTimeout(() => setToast(null), 3000);
+    } catch (err: any) {
+      console.error(err);
+      setToast({ message: err.response?.data?.error || 'Erro ao atualizar agendamento', type: 'error' });
+      setTimeout(() => setToast(null), 3000);
+    }
+  };
+
+  const resetForm = () => {
+    setSelectedClient('');
+    setSelectedService('');
+    setSelectedStaff('');
+    setDate('');
+    setTime('');
+    setIsFitIn(false);
+    setEditingAppId(null);
   };
 
   const updateStatus = async (id: string, status: string) => {
@@ -418,6 +464,7 @@ export default function Appointments() {
                       </td>
                       <td className="px-8 py-6 text-right">
                         <div className="flex items-center justify-end gap-2">
+                          <button onClick={() => handleEditClick(app)} className="p-2 text-zinc-300 hover:text-brand-500 transition-colors"><Edit2 size={18} /></button>
                           <button onClick={() => updateStatus(app.id, 'completed')} className="p-2 text-emerald-600 hover:bg-emerald-50 rounded-xl transition-colors"><Check size={18} /></button>
                           <button onClick={() => handleDelete(app.id)} className="p-2 text-zinc-300 hover:text-rose-500 transition-colors"><Trash2 size={18} /></button>
                         </div>
@@ -437,7 +484,7 @@ export default function Appointments() {
           <div className="bg-white w-full max-w-md rounded-3xl shadow-2xl overflow-hidden">
             <div className="p-6 border-b border-zinc-100 flex items-center justify-between">
               <h3 className="text-xl font-bold text-zinc-900">Novo Agendamento</h3>
-              <button onClick={() => setIsModalOpen(false)} className="text-zinc-400 hover:text-zinc-600">
+              <button onClick={() => { setIsModalOpen(false); resetForm(); }} className="text-zinc-400 hover:text-zinc-600">
                 <X size={24} />
               </button>
             </div>
@@ -484,6 +531,64 @@ export default function Appointments() {
 
               <button type="submit" className="w-full bg-zinc-900 hover:bg-zinc-800 text-white font-bold py-4 rounded-xl transition-all mt-6 shadow-xl shadow-zinc-900/20">
                 Confirmar Agendamento
+              </button>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {isEditModalOpen && (
+        <div className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm">
+          <div className="bg-white w-full max-w-md rounded-3xl shadow-2xl overflow-hidden">
+            <div className="p-6 border-b border-zinc-100 flex items-center justify-between">
+              <h3 className="text-xl font-bold text-zinc-900">Editar Agendamento</h3>
+              <button onClick={() => { setIsEditModalOpen(false); resetForm(); }} className="text-zinc-400 hover:text-zinc-600">
+                <X size={24} />
+              </button>
+            </div>
+            <form onSubmit={handleUpdate} className="p-6 space-y-4">
+              <div className="space-y-2">
+                <label className="text-sm font-medium text-zinc-700">Cliente</label>
+                <select required value={selectedClient} onChange={(e) => setSelectedClient(e.target.value)} className="w-full bg-zinc-50 border border-zinc-200 px-4 py-3 rounded-xl focus:outline-none focus:ring-2 focus:ring-brand-500/20 focus:border-brand-500 text-zinc-900 font-medium">
+                  <option value="">Selecione o cliente</option>
+                  {clients.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
+                </select>
+              </div>
+
+              <div className="space-y-2">
+                <label className="text-sm font-medium text-zinc-700">Serviço</label>
+                <select required value={selectedService} onChange={(e) => setSelectedService(e.target.value)} className="w-full bg-zinc-50 border border-zinc-200 px-4 py-3 rounded-xl focus:outline-none focus:ring-2 focus:ring-brand-500/20 focus:border-brand-500 text-zinc-900 font-medium">
+                  <option value="">Selecione o serviço</option>
+                  {services.map(s => <option key={s.id} value={s.id}>{s.name} - R$ {s.price}</option>)}
+                </select>
+              </div>
+
+              <div className="space-y-2">
+                <label className="text-sm font-medium text-zinc-700">Profissional</label>
+                <select required value={selectedStaff} onChange={(e) => setSelectedStaff(e.target.value)} className="w-full bg-zinc-50 border border-zinc-200 px-4 py-3 rounded-xl focus:outline-none focus:ring-2 focus:ring-brand-500/20 focus:border-brand-500 text-zinc-900 font-medium">
+                  <option value="">Selecione o profissional</option>
+                  {staff.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
+                </select>
+              </div>
+
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <label className="text-sm font-medium text-zinc-700">Data</label>
+                  <input type="date" required value={date} onChange={(e) => setDate(e.target.value)} className="w-full bg-zinc-50 border border-zinc-200 px-4 py-3 rounded-xl focus:outline-none focus:ring-2 focus:ring-brand-500/20 focus:border-brand-500 text-zinc-900 font-medium" />
+                </div>
+                <div className="space-y-2">
+                  <label className="text-sm font-medium text-zinc-700">Hora</label>
+                  <input type="time" required value={time} onChange={(e) => setTime(e.target.value)} className="w-full bg-zinc-50 border border-zinc-200 px-4 py-3 rounded-xl focus:outline-none focus:ring-2 focus:ring-brand-500/20 focus:border-brand-500 text-zinc-900 font-medium" />
+                </div>
+              </div>
+
+              <div className="flex items-center gap-2 pt-2">
+                <input type="checkbox" id="fitinEdit" checked={isFitIn} onChange={(e) => setIsFitIn(e.target.checked)} className="w-4 h-4 text-brand-600 rounded border-zinc-300 focus:ring-brand-500" />
+                <label htmlFor="fitinEdit" className="text-sm font-medium text-zinc-700">É um encaixe?</label>
+              </div>
+
+              <button type="submit" className="w-full bg-brand-500 hover:bg-brand-600 text-white font-bold py-4 rounded-xl transition-all mt-6 shadow-xl shadow-brand-500/20">
+                Salvar Alterações
               </button>
             </form>
           </div>
