@@ -2005,7 +2005,6 @@ router.put('/superadmin/tenants/:id', authenticateToken, isSuperAdmin, async (re
       });
       console.log(`[ADMIN] Updated subscription for ${userId} to ${targetPlanId}`);
     }
-    }
 
     // Manual Subscription update from the frontend form
     if (subscription) {
