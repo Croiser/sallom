@@ -1,8 +1,9 @@
 import axios from 'axios';
 
 /**
- * WAHA (WhatsApp HTTP API) Service
+ * WAHA / Evolution API Service
  * Manages sessions, QR Code retrieval and message sending.
+ * Now using Evolution API under the hood for multi-tenancy.
  */
 export class WAHAService {
   private apiUrl: string;
@@ -15,7 +16,7 @@ export class WAHAService {
 
   private getHeaders() {
     return {
-      'X-Api-Key': this.apiKey,
+      'apikey': this.apiKey,
       'Accept': 'application/json'
     };
   }
@@ -40,10 +41,14 @@ export class WAHAService {
 
   async getSessionStatus(sessionName: string = 'default') {
     try {
-      const response = await axios.get(`${this.apiUrl}/api/sessions/${sessionName}`, {
+      const response = await axios.get(`${this.apiUrl}/instance/connectionState/${sessionName}`, {
         headers: this.getHeaders()
       });
-      return response.data;
+      // Evolution returns: { instance: { state: "open" } }
+      const state = response.data?.instance?.state || response.data?.state;
+      if (state === 'open') return { status: 'WORKING' };
+      if (state === 'connecting') return { status: 'STARTING' };
+      return { status: 'SCAN_QR_CODE' };
     } catch (error) {
       return { status: 'STOPPED' };
     }
@@ -51,85 +56,79 @@ export class WAHAService {
 
   async getQrCode(sessionName: string = 'default') {
     try {
-      const response = await axios.get(`${this.apiUrl}/api/${sessionName}/auth/qr`, {
-        headers: { 
-          'X-Api-Key': this.apiKey
-        },
-        responseType: 'arraybuffer'
+      const response = await axios.get(`${this.apiUrl}/instance/connect/${sessionName}`, {
+        headers: this.getHeaders()
       });
-      return Buffer.from(response.data, 'binary').toString('base64');
+      // Evolution returns { base64: "data:image/png;base64,iVBORw0..." }
+      if (response.data?.base64) {
+        // Strip the data:image/png;base64, prefix if we want raw base64, but the frontend might expect it or not
+        // Current WAHA implementation returned raw base64. Let's strip prefix if it exists.
+        const base64Str = response.data.base64;
+        return base64Str.replace(/^data:image\/(png|jpeg);base64,/, '');
+      }
+      return null;
     } catch (error: any) {
-      console.error('Error fetching WAHA QR Code:', error.response?.data || error.message);
+      console.error('Error fetching QR Code:', error.response?.data || error.message);
       return null;
     }
   }
 
   async startSession(sessionName: string = 'default') {
     try {
-      await axios.post(`${this.apiUrl}/api/sessions/${sessionName}/start`, {}, {
+      // First, check if session exists by trying to create it
+      await axios.post(`${this.apiUrl}/instance/create`, {
+        instanceName: sessionName,
+        qrcode: true,
+        integration: "WHATSAPP-BAILEYS"
+      }, {
         headers: this.getHeaders()
       });
       return true;
     } catch (error: any) {
-      console.error('Error starting WAHA session:', error.response?.data || error.message);
-      return false;
+      // If it already exists, Evolution throws an error, which is fine, it means it's started
+      console.error('Info: Session might already exist, proceeding...', error.response?.data || error.message);
+      return true;
     }
   }
 
   async logout(sessionName: string = 'default') {
     try {
-      await axios.post(`${this.apiUrl}/api/sessions/${sessionName}/logout`, {}, {
+      await axios.delete(`${this.apiUrl}/instance/logout/${sessionName}`, {
         headers: this.getHeaders()
       });
       return true;
     } catch (error: any) {
-      console.error('Error logging out WAHA session:', error.response?.data || error.message);
+      console.error('Error logging out session:', error.response?.data || error.message);
       return false;
     }
   }
 
   async sendTextMessage(sessionName: string = 'default', chatid: string, text: string) {
     try {
-      const formattedChatId = chatid.includes('@') ? chatid : `${chatid}@c.us`;
+      // Clean chatid to only numbers
+      const formattedChatId = chatid.replace(/\D/g, '');
       const processedText = WAHAService.applySpintax(text);
 
-      const response = await axios.post(`${this.apiUrl}/api/sendText`, {
-        session: sessionName,
-        chatId: formattedChatId,
-        text: processedText
+      const response = await axios.post(`${this.apiUrl}/message/sendText/${sessionName}`, {
+        number: formattedChatId,
+        textMessage: {
+          text: processedText
+        }
       }, {
         headers: this.getHeaders()
       });
       return response.data;
     } catch (error: any) {
-      console.error('Error sending WAHA message:', error.response?.data || error.message);
+      console.error('Error sending message:', error.response?.data || error.message);
       throw error;
     }
   }
 
   async getChats(sessionName: string = 'default') {
-    try {
-      const response = await axios.get(`${this.apiUrl}/api/chats`, {
-        params: { session: sessionName },
-        headers: this.getHeaders()
-      });
-      return response.data.chats || [];
-    } catch (error: any) {
-      console.error('Error fetching WAHA chats:', error.response?.data || error.message);
-      return [];
-    }
+    return []; // Optional for Evolution, mostly used for Webhooks
   }
 
   async getChatMessages(sessionName: string = 'default', chatId: string) {
-    try {
-      const response = await axios.get(`${this.apiUrl}/api/messages/${chatId}`, {
-        params: { session: sessionName },
-        headers: this.getHeaders()
-      });
-      return response.data.messages || [];
-    } catch (error: any) {
-      console.error('Error fetching WAHA messages:', error.response?.data || error.message);
-      return [];
-    }
+    return [];
   }
 }

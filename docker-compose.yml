@@ -30,7 +30,7 @@ services:
     environment:
       DATABASE_URL: "postgresql://salonuser:salonpassword@db:5432/salondb?schema=public"
       JWT_SECRET: "sua_chave_secreta_aqui"
-      WAHA_API_URL: "http://waha:3000"
+      WAHA_API_URL: "http://waha:8080"
       WAHA_API_KEY: "waha_secret_key_2024"
       NODE_ENV: production
       ASAAS_API_KEY: ${ASAAS_API_KEY}
@@ -58,18 +58,21 @@ services:
 
 
   waha:
-    image: devlikeapro/waha
+    image: atendai/evolution-api:v1.8.2
     container_name: salon-waha
     restart: always
     ports:
-      - "3006:3000"
+      - "3006:8080"
     volumes:
-      - waha_sessions:/app/.sessions
+      - evolution_instances:/evolution/instances
+      - evolution_store:/evolution/store
     environment:
-      WHATSAPP_DEFAULT_SESSION: default
-      WHATSAPP_RESTART_ALL_SESSIONS: "True"
-      WAHA_PRINT_QR: "true"
-      WAHA_API_KEY: waha_secret_key_2024
+      - SERVER_URL=http://localhost:8080
+      - DOCKER_ENV=true
+      - LOG_LEVEL=ERROR
+      - AUTHENTICATION_API_KEY=waha_secret_key_2024
+      - AUTHENTICATION_TYPE=apikey
+      - AUTHENTICATION_EXPOSE_IN_REQ=true
     networks:
       - web-network
     deploy:
@@ -84,7 +87,8 @@ services:
 
 volumes:
   postgres_data:
-  waha_sessions:
+  evolution_instances:
+  evolution_store:
 
 networks:
   web-network:
