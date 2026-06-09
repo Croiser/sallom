@@ -80,6 +80,37 @@ export default function Appointments() {
     }
   }, [user]);
 
+  const handleCreate = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!selectedClient || !selectedService || !selectedStaff || !date || !time) return;
+
+    try {
+      const dateTimeStr = `${date}T${time}:00`;
+      await api.post('/appointments', {
+        clientId: selectedClient,
+        serviceId: selectedService,
+        staffId: selectedStaff,
+        date: dateTimeStr,
+        isFitIn
+      });
+
+      setIsModalOpen(false);
+      setSelectedClient('');
+      setSelectedService('');
+      setSelectedStaff('');
+      setDate('');
+      setTime('');
+      setIsFitIn(false);
+      fetchData();
+      setToast({ message: 'Agendamento criado!', type: 'success' });
+      setTimeout(() => setToast(null), 3000);
+    } catch (err: any) {
+      console.error(err);
+      setToast({ message: err.response?.data?.error || 'Erro ao criar agendamento', type: 'error' });
+      setTimeout(() => setToast(null), 3000);
+    }
+  };
+
   const updateStatus = async (id: string, status: string) => {
     try {
       await api.put(`/appointments/${id}/status`, { status });
@@ -401,6 +432,64 @@ export default function Appointments() {
       </AnimatePresence>
 
       {/* Modals */}
+      {isModalOpen && (
+        <div className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm">
+          <div className="bg-white w-full max-w-md rounded-3xl shadow-2xl overflow-hidden">
+            <div className="p-6 border-b border-zinc-100 flex items-center justify-between">
+              <h3 className="text-xl font-bold text-zinc-900">Novo Agendamento</h3>
+              <button onClick={() => setIsModalOpen(false)} className="text-zinc-400 hover:text-zinc-600">
+                <X size={24} />
+              </button>
+            </div>
+            <form onSubmit={handleCreate} className="p-6 space-y-4">
+              <div className="space-y-2">
+                <label className="text-sm font-medium text-zinc-700">Cliente</label>
+                <select required value={selectedClient} onChange={(e) => setSelectedClient(e.target.value)} className="w-full bg-zinc-50 border border-zinc-200 px-4 py-3 rounded-xl focus:outline-none focus:ring-2 focus:ring-brand-500/20 focus:border-brand-500 text-zinc-900 font-medium">
+                  <option value="">Selecione o cliente</option>
+                  {clients.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
+                </select>
+              </div>
+
+              <div className="space-y-2">
+                <label className="text-sm font-medium text-zinc-700">Serviço</label>
+                <select required value={selectedService} onChange={(e) => setSelectedService(e.target.value)} className="w-full bg-zinc-50 border border-zinc-200 px-4 py-3 rounded-xl focus:outline-none focus:ring-2 focus:ring-brand-500/20 focus:border-brand-500 text-zinc-900 font-medium">
+                  <option value="">Selecione o serviço</option>
+                  {services.map(s => <option key={s.id} value={s.id}>{s.name} - R$ {s.price}</option>)}
+                </select>
+              </div>
+
+              <div className="space-y-2">
+                <label className="text-sm font-medium text-zinc-700">Profissional</label>
+                <select required value={selectedStaff} onChange={(e) => setSelectedStaff(e.target.value)} className="w-full bg-zinc-50 border border-zinc-200 px-4 py-3 rounded-xl focus:outline-none focus:ring-2 focus:ring-brand-500/20 focus:border-brand-500 text-zinc-900 font-medium">
+                  <option value="">Selecione o profissional</option>
+                  {staff.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
+                </select>
+              </div>
+
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <label className="text-sm font-medium text-zinc-700">Data</label>
+                  <input type="date" required value={date} onChange={(e) => setDate(e.target.value)} className="w-full bg-zinc-50 border border-zinc-200 px-4 py-3 rounded-xl focus:outline-none focus:ring-2 focus:ring-brand-500/20 focus:border-brand-500 text-zinc-900 font-medium" />
+                </div>
+                <div className="space-y-2">
+                  <label className="text-sm font-medium text-zinc-700">Hora</label>
+                  <input type="time" required value={time} onChange={(e) => setTime(e.target.value)} className="w-full bg-zinc-50 border border-zinc-200 px-4 py-3 rounded-xl focus:outline-none focus:ring-2 focus:ring-brand-500/20 focus:border-brand-500 text-zinc-900 font-medium" />
+                </div>
+              </div>
+
+              <div className="flex items-center gap-2 pt-2">
+                <input type="checkbox" id="fitin" checked={isFitIn} onChange={(e) => setIsFitIn(e.target.checked)} className="w-4 h-4 text-brand-600 rounded border-zinc-300 focus:ring-brand-500" />
+                <label htmlFor="fitin" className="text-sm font-medium text-zinc-700">É um encaixe?</label>
+              </div>
+
+              <button type="submit" className="w-full bg-zinc-900 hover:bg-zinc-800 text-white font-bold py-4 rounded-xl transition-all mt-6 shadow-xl shadow-zinc-900/20">
+                Confirmar Agendamento
+              </button>
+            </form>
+          </div>
+        </div>
+      )}
+
       <RecurringAppointmentModal
         isOpen={isRecurringOpen}
         onClose={() => setIsRecurringOpen(false)}

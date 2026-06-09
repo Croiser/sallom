@@ -2834,6 +2834,36 @@ router.get('/public/client-portal/:slug/:phone', async (req, res) => {
 });
 
 // SuperAdmin Routes
+
+router.get('/superadmin/waha-status', authenticateToken, async (req: AuthRequest, res) => {
+  if (req.user?.role !== 'superadmin' && req.user?.email !== 'admin@sallonpromanager.com.br' && req.user?.email !== 'renatadouglas739@gmail.com' && req.user?.email !== 'sallonpromanager@gmail.com') {
+    return res.status(403).json({ error: 'Access denied' });
+  }
+
+  try {
+    const waha = new WAHAService(process.env.WAHA_API_URL || 'http://waha:3000');
+    // For free version, it's typically the 'default' session
+    const status = await waha.getSessionStatus('default');
+    res.json({ session: 'default', status });
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+router.post('/superadmin/waha-disconnect', authenticateToken, async (req: AuthRequest, res) => {
+  if (req.user?.role !== 'superadmin' && req.user?.email !== 'admin@sallonpromanager.com.br' && req.user?.email !== 'renatadouglas739@gmail.com' && req.user?.email !== 'sallonpromanager@gmail.com') {
+    return res.status(403).json({ error: 'Access denied' });
+  }
+
+  try {
+    const waha = new WAHAService(process.env.WAHA_API_URL || 'http://waha:3000');
+    // Force disconnect by calling logout
+    await waha.logout('default');
+    res.json({ success: true, message: 'Sessão WAHA desconectada com sucesso.' });
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
+});
 router.get('/superadmin/stats', authenticateToken, isSuperAdmin, async (req: AuthRequest, res) => {
   try {
     const totalUsers = await prisma.user.count();

@@ -76,6 +76,18 @@ export class WAHAService {
     }
   }
 
+  async logout(sessionName: string = 'default') {
+    try {
+      await axios.post(`${this.apiUrl}/api/sessions/${sessionName}/logout`, {}, {
+        headers: this.getHeaders()
+      });
+      return true;
+    } catch (error: any) {
+      console.error('Error logging out WAHA session:', error.response?.data || error.message);
+      return false;
+    }
+  }
+
   async sendTextMessage(sessionName: string = 'default', chatid: string, text: string) {
     try {
       const formattedChatId = chatid.includes('@') ? chatid : `${chatid}@c.us`;

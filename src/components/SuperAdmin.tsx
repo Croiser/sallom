@@ -77,6 +77,8 @@ export default function SuperAdmin() {
     webhooks: 'online'
   });
   const [isSuperAdmin, setIsSuperAdmin] = useState(false);
+  const [wahaStatus, setWahaStatus] = useState<{ session: string, status: any } | null>(null);
+  const [wahaLoading, setWahaLoading] = useState(false);
 
   useEffect(() => {
     if (!user) return;
@@ -117,10 +119,36 @@ export default function SuperAdmin() {
       } catch (error) {
         console.error('Error fetching plans:', error);
       }
+
+      // Fetch WAHA status
+      fetchWahaStatus();
     };
 
     fetchData();
   }, [isSuperAdmin]);
+
+  const fetchWahaStatus = async () => {
+    setWahaLoading(true);
+    try {
+      const data = await api.get('/superadmin/waha-status');
+      setWahaStatus(data);
+    } catch (error) {
+      console.error('Error fetching WAHA status:', error);
+    } finally {
+      setWahaLoading(false);
+    }
+  };
+
+  const handleDisconnectWaha = async () => {
+    if (!confirm('Deseja realmente desconectar a sessão WAHA ativa para TODOS os usuários?')) return;
+    try {
+      await api.post('/superadmin/waha-disconnect');
+      alert('Sessão WAHA desconectada.');
+      fetchWahaStatus();
+    } catch (error: any) {
+      alert('Erro ao desconectar WAHA: ' + (error.response?.data?.error || error.message));
+    }
+  };
 
   const fetchTenantUsage = async (userId: string) => {
     try {
@@ -405,6 +433,42 @@ export default function SuperAdmin() {
             <StatusItem label="Asaas Payment API" status={apiStatus.asaas} icon={<CreditCard size={18} />} />
             <StatusItem label="Evolution WhatsApp API" status={apiStatus.evolution} icon={<Globe size={18} />} />
             <StatusItem label="Webhooks System" status={apiStatus.webhooks} icon={<ZapIcon size={18} />} />
+          </div>
+          
+          {/* WAHA Centralized Admin */}
+          <div className="mt-8 pt-8 border-t border-zinc-800">
+            <h4 className="text-md font-bold mb-4 flex items-center gap-2">
+              <Phone size={18} className="text-emerald-500" />
+              Gestão Central WAHA (WhatsApp)
+            </h4>
+            <div className="bg-zinc-800/50 p-4 rounded-2xl border border-zinc-700/50">
+              <div className="flex justify-between items-center mb-4">
+                <span className="text-sm text-zinc-400">Sessão: <strong className="text-zinc-200">default</strong></span>
+                <div className="flex items-center gap-2">
+                  <div className={`w-2 h-2 rounded-full ${wahaStatus?.status?.status === 'WORKING' ? 'bg-emerald-500' : 'bg-rose-500'}`}></div>
+                  <span className="text-xs font-bold uppercase">{wahaStatus?.status?.status || 'STOPPED'}</span>
+                </div>
+              </div>
+              <div className="flex gap-2">
+                <button 
+                  onClick={fetchWahaStatus}
+                  disabled={wahaLoading}
+                  className="flex-1 bg-zinc-700 hover:bg-zinc-600 text-white text-xs font-bold py-2 rounded-xl transition-colors flex items-center justify-center gap-2"
+                >
+                  <Activity size={14} /> Atualizar
+                </button>
+                <button 
+                  onClick={handleDisconnectWaha}
+                  disabled={wahaStatus?.status?.status !== 'WORKING'}
+                  className="flex-1 bg-rose-500 hover:bg-rose-600 disabled:opacity-50 text-white text-xs font-bold py-2 rounded-xl transition-colors flex items-center justify-center gap-2"
+                >
+                  <ZapIcon size={14} /> Derrubar Conexão
+                </button>
+              </div>
+              <p className="text-[10px] text-zinc-500 mt-4 leading-tight">
+                <strong>Atenção:</strong> Como o WAHA gratuito não suporta múltiplas sessões, se diferentes salões tentarem ler chats, eles podem ver mensagens de quem estiver conectado na sessão 'default'. Use este botão para forçar a desconexão se um salão conectar no WhatsApp indevidamente.
+              </p>
+            </div>
           </div>
         </div>
 

@@ -187,8 +187,17 @@ export default function PDV() {
   const subtotalProducts = cart.filter(i => i.type === 'product').reduce((sum, item) => sum + (item.price * item.quantity), 0);
   const clientDebt = clients.find(c => c.id === selectedClient)?.pendingDebt || 0;
 
-  const totalImmediate = subtotalServices + (productsOnAccount ? 0 : subtotalProducts) + (includeDebt ? clientDebt : 0);
-  const totalOnAccount = productsOnAccount ? subtotalProducts : 0;
+  let productImmediate = 0;
+  if (!productsOnAccount) {
+    if (paymentMethod === 'crediario') {
+      productImmediate = entryAmount;
+    } else {
+      productImmediate = subtotalProducts;
+    }
+  }
+
+  const totalImmediate = subtotalServices + productImmediate + (includeDebt ? clientDebt : 0);
+  const totalOnAccount = productsOnAccount ? subtotalProducts : (paymentMethod === 'crediario' ? subtotalProducts - entryAmount : 0);
   const totalGlobal = subtotalServices + subtotalProducts + (includeDebt ? clientDebt : 0);
 
   const handleFinishSale = async () => {
