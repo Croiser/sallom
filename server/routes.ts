@@ -1955,7 +1955,7 @@ router.get('/superadmin/tenants', authenticateToken, isSuperAdmin, async (req: A
 });
 
 router.put('/superadmin/tenants/:id', authenticateToken, isSuperAdmin, async (req: AuthRequest, res) => {
-  const { planId, ...otherData } = req.body;
+  const { planId, subscription, ...otherData } = req.body;
   const userId = req.params.id;
   console.log(`[ADMIN] Update request: User=${userId}, Plan=${planId || 'N/A'}`);
 
@@ -2004,6 +2004,28 @@ router.put('/superadmin/tenants/:id', authenticateToken, isSuperAdmin, async (re
         }
       });
       console.log(`[ADMIN] Updated subscription for ${userId} to ${targetPlanId}`);
+    }
+    }
+
+    // Manual Subscription update from the frontend form
+    if (subscription) {
+      const updatePayload: any = {};
+      if (subscription.billingCycle) updatePayload.billingCycle = subscription.billingCycle;
+      if (subscription.status) updatePayload.status = subscription.status;
+      if (subscription.currentPeriodEnd) {
+        updatePayload.currentPeriodEnd = new Date(subscription.currentPeriodEnd);
+        updatePayload.endDate = new Date(subscription.currentPeriodEnd);
+      }
+      
+      try {
+        await (prisma.subscription as any).update({
+          where: { uid: userId },
+          data: updatePayload
+        });
+        console.log(`[ADMIN] Updated subscription fields for ${userId}`);
+      } catch (e) {
+        console.error(`[ADMIN] Failed to update subscription fields for ${userId} (may not exist)`);
+      }
     }
 
     console.log(`[ADMIN] Success: Updated user ${userId}`);

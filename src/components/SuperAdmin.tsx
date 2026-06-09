@@ -836,8 +836,43 @@ export default function SuperAdmin() {
                             className="w-full bg-zinc-950 border border-zinc-800 rounded-xl px-4 py-2 text-sm focus:border-rose-500 outline-none"
                           />
                         </div>
+                        </div>
                       </div>
-                      <div className="flex gap-2">
+                      <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mt-6 pt-6 border-t border-zinc-800">
+                        <div className="space-y-1">
+                          <label className="text-xs font-bold text-zinc-500 uppercase">Ciclo de Pagamento</label>
+                          <select 
+                            value={(selectedTenant as any).subscription?.billingCycle || 'monthly'}
+                            onChange={e => setSelectedTenant(prev => prev ? ({...prev, subscription: { ...(prev as any).subscription, billingCycle: e.target.value }}) as any : null)}
+                            className="w-full bg-zinc-950 border border-zinc-800 rounded-xl px-4 py-2 text-sm focus:border-rose-500 outline-none"
+                          >
+                            <option value="monthly">Mensal</option>
+                            <option value="yearly">Anual</option>
+                          </select>
+                        </div>
+                        <div className="space-y-1">
+                          <label className="text-xs font-bold text-zinc-500 uppercase">Vencimento / Vigência</label>
+                          <input 
+                            type="date"
+                            value={(selectedTenant as any).subscription?.currentPeriodEnd ? new Date((selectedTenant as any).subscription.currentPeriodEnd).toISOString().split('T')[0] : ''}
+                            onChange={e => setSelectedTenant(prev => prev ? ({...prev, subscription: { ...(prev as any).subscription, currentPeriodEnd: e.target.value }}) as any : null)}
+                            className="w-full bg-zinc-950 border border-zinc-800 rounded-xl px-4 py-2 text-sm focus:border-rose-500 outline-none"
+                          />
+                        </div>
+                        <div className="space-y-1">
+                          <label className="text-xs font-bold text-zinc-500 uppercase">Status (Assinatura)</label>
+                          <select 
+                            value={(selectedTenant as any).subscription?.status || 'active'}
+                            onChange={e => setSelectedTenant(prev => prev ? ({...prev, subscription: { ...(prev as any).subscription, status: e.target.value }}) as any : null)}
+                            className="w-full bg-zinc-950 border border-zinc-800 rounded-xl px-4 py-2 text-sm focus:border-rose-500 outline-none"
+                          >
+                            <option value="active">Ativo</option>
+                            <option value="past_due">Atrasado / Suspenso</option>
+                            <option value="canceled">Cancelado</option>
+                          </select>
+                        </div>
+                      </div>
+                      <div className="flex gap-2 mt-6">
                         <button 
                           type="submit"
                           className="bg-rose-500 text-zinc-900 px-6 py-2 rounded-xl font-bold text-sm hover:bg-rose-400 transition-all"
