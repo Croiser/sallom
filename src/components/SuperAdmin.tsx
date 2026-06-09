@@ -79,6 +79,10 @@ export default function SuperAdmin() {
   const [isSuperAdmin, setIsSuperAdmin] = useState(false);
   const [wahaStatus, setWahaStatus] = useState<{ session: string, status: any } | null>(null);
   const [wahaLoading, setWahaLoading] = useState(false);
+  const [broadcastSubject, setBroadcastSubject] = useState('');
+  const [broadcastMessage, setBroadcastMessage] = useState('');
+  const [isBroadcastModalOpen, setIsBroadcastModalOpen] = useState(false);
+  const [generatedPix, setGeneratedPix] = useState<{ payload: string, url: string } | null>(null);
 
   useEffect(() => {
     if (!user) return;
@@ -163,6 +167,7 @@ export default function SuperAdmin() {
   const handleOpenSupport = (tenant: UserProfile) => {
     setSelectedTenant(tenant);
     setIsEditingTenant(false);
+    setGeneratedPix(null); // Reset pix on open
     fetchTenantUsage(tenant.id!);
   };
 
@@ -267,6 +272,41 @@ export default function SuperAdmin() {
     }
   };
 
+  const handleImpersonate = async (tenantId: string) => {
+    try {
+      const res = await api.post(`/superadmin/impersonate/${tenantId}`);
+      localStorage.setItem('token', res.token);
+      window.location.href = '/dashboard';
+    } catch (err: any) {
+      alert('Erro ao acessar painel do cliente: ' + (err.response?.data?.error || err.message));
+    }
+  };
+
+  const handleBroadcast = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!broadcastSubject || !broadcastMessage) return;
+    try {
+      const res = await api.post('/superadmin/broadcast', { subject: broadcastSubject, message: broadcastMessage });
+      alert(`Comunicado enviado com sucesso para ${res.sentCount} clientes!`);
+      setIsBroadcastModalOpen(false);
+      setBroadcastSubject('');
+      setBroadcastMessage('');
+    } catch (err: any) {
+      alert('Erro ao enviar comunicado: ' + (err.response?.data?.error || err.message));
+    }
+  };
+
+  const handleGeneratePix = async (tenantId: string) => {
+    setGeneratedPix(null);
+    try {
+      const res = await api.post(`/superadmin/tenants/${tenantId}/charge`);
+      setGeneratedPix({ payload: res.pixPayload, url: res.pixUrl });
+    } catch (err: any) {
+      alert('Erro ao gerar PIX: ' + (err.response?.data?.error || err.message));
+    }
+  };
+
+
   if (loading) return <div className="flex justify-center p-10"><div className="animate-spin rounded-full h-8 w-8 border-b-2 border-amber-500"></div></div>;
 
   if (!isSuperAdmin) {
@@ -307,6 +347,13 @@ export default function SuperAdmin() {
           <p className="text-zinc-400">Gestão centralizada do SaaS <span className="text-rose-500 font-bold italic tracking-tight uppercase">Dodile</span></p>
         </div>
         <div className="flex items-center gap-3">
+          <button 
+            onClick={() => setIsBroadcastModalOpen(true)}
+            className="px-4 py-2 bg-rose-500 hover:bg-rose-600 text-white font-bold rounded-xl flex items-center gap-2 transition-colors"
+          >
+            <Mail size={18} />
+            Enviar Comunicado
+          </button>
           <div className="px-4 py-2 bg-zinc-900 border border-zinc-800 rounded-xl flex items-center gap-2">
             <div className="w-2 h-2 bg-emerald-500 rounded-full animate-pulse" />
             <span className="text-sm font-medium">Sistemas Operacionais</span>
@@ -332,7 +379,7 @@ export default function SuperAdmin() {
         />
         <StatCard 
           title="MRR Estimado" 
-          value={`R$ 12.450,00`} 
+          value={`R$ ${stats.monthlyRevenue.toFixed(2).replace('.', ',')}`} 
           icon={<TrendingUp className="text-rose-400" />} 
           trend="+18%" 
           trendUp={true} 
@@ -845,9 +892,14 @@ export default function SuperAdmin() {
                                 </div>
                                 <div className="flex items-center justify-between text-sm">
                                     <span className="text-zinc-500 flex items-center gap-1"><Phone size={14} /> WhatsApp:</span>
-                                    <span className={`font-bold ${tenantUsage?.whatsapp?.status === 'CONNECTED' ? 'text-emerald-400' : 'text-rose-400'}`}>
-                                        {tenantUsage?.whatsapp?.status || 'Desconectado'}
-                                    </span>
+                                    <div className="flex flex-col items-end">
+                                      <span className={`font-bold ${tenantUsage?.whatsapp?.status === 'CONNECTED' ? 'text-emerald-400' : 'text-rose-400'}`}>
+                                          {tenantUsage?.whatsapp?.status || 'Desconectado'}
+                                      </span>
+                                      <span className="text-[10px] text-zinc-500 uppercase tracking-wider">
+                                        {tenantUsage?.whatsapp?.messagesSent || 0} msg enviadas
+                                      </span>
+                                    </div>
                                 </div>
                             </div>
                           </div>
@@ -895,7 +947,25 @@ export default function SuperAdmin() {
                           {selectedTenant.status === 'suspended' ? <CheckCircle2 size={16} /> : <Ban size={16} />}
                           {selectedTenant.status === 'suspended' ? 'Ativar Conta' : 'Suspender Conta'}
                         </button>
+                        <button 
+                          onClick={() => handleGeneratePix(selectedTenant.id!)}
+                          className="flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-bold transition-all bg-emerald-500 text-emerald-950 hover:bg-emerald-400"
+                        >
+                          <CreditCard size={16} /> Gerar PIX
+                        </button>
                       </div>
+
+                      {generatedPix && (
+                        <div className="p-4 mt-4 bg-emerald-500/10 border border-emerald-500/20 rounded-xl space-y-3">
+                          <p className="text-sm font-bold text-emerald-400">PIX Gerado com Sucesso!</p>
+                          <div className="p-3 bg-black/30 rounded-lg select-all font-mono text-xs text-zinc-300 break-all border border-black/50">
+                            {generatedPix.payload}
+                          </div>
+                          <a href={generatedPix.url} target="_blank" rel="noreferrer" className="text-xs text-blue-400 hover:underline inline-flex items-center gap-1">
+                            Abrir Fatura <ExternalLink size={12} />
+                          </a>
+                        </div>
+                      )}
                     </div>
                   )}
                 </div>
@@ -1031,6 +1101,13 @@ export default function SuperAdmin() {
                   <td className="px-8 py-6 text-right">
                     <div className="flex items-center justify-end gap-2">
                       <button 
+                        onClick={() => handleImpersonate(tenant.id)}
+                        className="p-2 text-emerald-400 hover:bg-emerald-400/10 rounded-lg transition-colors"
+                        title="Acessar Painel do Salão"
+                      >
+                        <ArrowUpRight size={20} />
+                      </button>
+                      <button 
                         onClick={() => handleOpenSupport(tenant)}
                         className="p-2 text-blue-400 hover:bg-blue-400/10 rounded-lg transition-colors"
                         title="Suporte e Detalhes"
@@ -1052,6 +1129,75 @@ export default function SuperAdmin() {
           </table>
         </div>
       </div>
+
+      {/* Broadcast Modal */}
+      <AnimatePresence>
+        {isBroadcastModalOpen && (
+          <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              onClick={() => setIsBroadcastModalOpen(false)}
+              className="absolute inset-0 bg-black/80 backdrop-blur-sm"
+            />
+            <motion.div
+              initial={{ opacity: 0, scale: 0.95, y: 20 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.95, y: 20 }}
+              className="relative w-full max-w-xl bg-zinc-900 border border-zinc-800 rounded-3xl shadow-2xl overflow-hidden p-8"
+            >
+              <div className="flex items-center justify-between mb-6">
+                <div>
+                  <h3 className="text-xl font-bold flex items-center gap-2">
+                    <Mail size={24} className="text-rose-500" />
+                    Comunicado Geral
+                  </h3>
+                  <p className="text-sm text-zinc-500">Enviar e-mail para todos os clientes ativos</p>
+                </div>
+                <button 
+                  onClick={() => setIsBroadcastModalOpen(false)}
+                  className="p-2 text-zinc-500 hover:text-white hover:bg-zinc-800 rounded-xl transition-all"
+                >
+                  <X size={24} />
+                </button>
+              </div>
+
+              <form onSubmit={handleBroadcast} className="space-y-4">
+                <div className="space-y-1">
+                  <label className="text-xs font-bold text-zinc-500 uppercase">Assunto</label>
+                  <input 
+                    type="text"
+                    required
+                    value={broadcastSubject}
+                    onChange={e => setBroadcastSubject(e.target.value)}
+                    className="w-full bg-zinc-950 border border-zinc-800 rounded-xl px-4 py-2 text-sm focus:border-rose-500 outline-none"
+                    placeholder="Novidade no sistema!"
+                  />
+                </div>
+                <div className="space-y-1">
+                  <label className="text-xs font-bold text-zinc-500 uppercase">Mensagem</label>
+                  <textarea 
+                    required
+                    value={broadcastMessage}
+                    onChange={e => setBroadcastMessage(e.target.value)}
+                    className="w-full bg-zinc-950 border border-zinc-800 rounded-xl px-4 py-3 text-sm focus:border-rose-500 outline-none h-32 resize-none custom-scrollbar"
+                    placeholder="Olá, estamos lançando uma nova funcionalidade..."
+                  />
+                </div>
+                <button 
+                  type="submit"
+                  className="w-full bg-rose-500 text-white py-3 rounded-xl font-bold hover:bg-rose-600 transition-all flex items-center justify-center gap-2"
+                >
+                  <Mail size={18} />
+                  Disparar E-mails
+                </button>
+              </form>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
+
     </div>
   );
 }
