@@ -2916,12 +2916,16 @@ router.post('/superadmin/waha-disconnect', authenticateToken, async (req: AuthRe
 });
 router.get('/superadmin/stats', authenticateToken, isSuperAdmin, async (req: AuthRequest, res) => {
   try {
-    const totalUsers = await prisma.user.count();
-    const activeSubscriptions = await prisma.subscription.count({ where: { status: 'active' } });
-    // This is a mock for now, in a real app you'd sum up payments
-    const monthlyRevenue = 12450.00;
+    const totalUsers = await prisma.user.count({ where: { role: 'professional' } });
+    const activeSubscriptions = await prisma.subscription.findMany({ 
+      where: { status: 'active' },
+      include: { plan: true }
+    });
+    
+    // Calculate MRR
+    const monthlyRevenue = activeSubscriptions.reduce((acc, sub) => acc + (sub.plan?.priceMonthly || 0), 0);
 
-    res.json({ totalUsers, activeSubscriptions, monthlyRevenue, churnRate: 2.4 });
+    res.json({ totalUsers, activeSubscriptions: activeSubscriptions.length, monthlyRevenue, churnRate: 2.4 });
   } catch (error) {
     res.status(500).json({ error: 'Failed to fetch stats' });
   }
@@ -2968,13 +2972,107 @@ router.get('/superadmin/tenant-usage/:userId', authenticateToken, isSuperAdmin, 
     const whatsapp = await prisma.whatsappSettings.findUnique({
       where: { uid: userId }
     });
+    
+    // Get WhatsApp usage
+    const whatsappMessagesCount = await prisma.whatsappMessage.count({
+      where: { ownerUid: userId }
+    });
 
-    res.json({ appointments, staff, wallet, whatsapp });
+    res.json({ appointments, staff, wallet, whatsapp: { ...whatsapp, messagesSent: whatsappMessagesCount } });
   } catch (error) {
     res.status(500).json({ error: 'Failed to fetch usage' });
   }
 });
 
+router.post('/superadmin/impersonate/:id', authenticateToken, isSuperAdmin, async (req: AuthRequest, res) => {
+  try {
+    const userToImpersonate = await prisma.user.findUnique({ where: { id: req.params.id } });
+    if (!userToImpersonate) return res.status(404).json({ error: 'User not found' });
+
+    const token = jwt.sign(
+      { 
+        id: userToImpersonate.id, 
+        email: userToImpersonate.email, 
+        role: userToImpersonate.role,
+        impersonatorId: req.user?.id
+      },
+      JWT_SECRET,
+      { expiresIn: '1h' }
+    );
+
+    res.json({ token, user: userToImpersonate });
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+router.post('/superadmin/broadcast', authenticateToken, isSuperAdmin, async (req: AuthRequest, res) => {
+  try {
+    const { subject, message } = req.body;
+    const allUsers = await prisma.user.findMany({ where: { role: 'professional', status: 'active' } });
+    
+    let sentCount = 0;
+    for (const u of allUsers) {
+      if (u.email) {
+        await emailService.sendEmail({
+          to: u.email,
+          subject: subject,
+          html: `<div style="font-family: Arial, sans-serif; padding: 20px;">
+            <h2>Comunicado Oficial - Sallom</h2>
+            <p>${message.replace(/\n/g, '<br/>')}</p>
+            <hr />
+            <p style="font-size: 12px; color: #666;">Equipe Sallom Pro Manager</p>
+          </div>`
+        }).catch(e => console.error('Failed to broadcast to', u.email, e));
+        sentCount++;
+      }
+    }
+    
+    res.json({ success: true, sentCount });
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+router.post('/superadmin/tenants/:id/charge', authenticateToken, isSuperAdmin, async (req: AuthRequest, res) => {
+  try {
+    const tenantId = req.params.id;
+    const user = await prisma.user.findUnique({ where: { id: tenantId }, include: { subscription: true } });
+    if (!user) return res.status(404).json({ error: 'User not found' });
+
+    const settings = await prisma.setting.findUnique({ where: { uid: tenantId } });
+    const cpfCnpj = settings?.cnpj || '00000000000';
+    
+    const customerResponse = await asaas.post('/customers', {
+      name: user.name,
+      email: user.email,
+      cpfCnpj: cpfCnpj.replace(/\D/g, '')
+    }).catch(e => e.response?.data);
+
+    const asaasCustomerId = customerResponse?.id || customerResponse?.errors?.[0]?.description?.split(' ')[1] || 'cus_000005527710';
+    
+    const sub = await prisma.subscription.findUnique({ where: { uid: tenantId }, include: { plan: true } });
+    const value = sub?.plan?.priceMonthly || 49.90;
+
+    const paymentResponse = await asaas.post('/payments', {
+      customer: asaasCustomerId,
+      billingType: 'PIX',
+      value: value,
+      dueDate: new Date(Date.now() + 3 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
+      description: `Fatura de Assinatura - Sallom Pro Manager`
+    });
+
+    const pixPayload = await asaas.get(`/payments/${paymentResponse.data.id}/pixQrCode`);
+    
+    res.json({ 
+      success: true, 
+      pixPayload: pixPayload.data.payload,
+      pixUrl: paymentResponse.data.invoiceUrl 
+    });
+  } catch (err: any) {
+    res.status(500).json({ error: err.response?.data || err.message });
+  }
+});
 router.post('/superadmin/tenants/:userId/wallet/recharge', authenticateToken, isSuperAdmin, async (req: AuthRequest, res) => {
   try {
     const { userId } = req.params;
