@@ -14,7 +14,7 @@ export interface RecurrenceValidationResult {
     validDates: number;
     conflictDates: number;
   };
-  validDatesList: string[];
+  validDatesList: { date: string; startTime: string }[];
   conflicts: RecurrenceConflict[];
 }
 
@@ -43,6 +43,54 @@ const DAY_NAMES_PT = [
 ];
 
 /**
+ * Helper to find a free time slot on a specific day
+ */
+async function findFreeTimeOnDay(
+  date: Date,
+  staffId: string,
+  durationMin: number,
+  businessHour: BusinessHour,
+  prisma: PrismaClient
+): Promise<string | null> {
+  const [openH, openM] = businessHour.open.split(':').map(Number);
+  const [closeH, closeM] = businessHour.close.split(':').map(Number);
+  
+  let currentStart = new Date(date);
+  currentStart.setHours(openH, openM, 0, 0);
+
+  const endOfDay = new Date(date);
+  endOfDay.setHours(closeH, closeM, 0, 0);
+
+  while (true) {
+    const currentEnd = new Date(currentStart.getTime() + durationMin * 60_000);
+    if (currentEnd > endOfDay) {
+      break;
+    }
+
+    const overlap = await (prisma.appointment as any).findFirst({
+      where: {
+        staffId,
+        status: { not: 'cancelled' },
+        AND: [
+          { startTime: { lt: currentEnd } },
+          { endTime: { gt: currentStart } },
+        ],
+      },
+      select: { id: true },
+    });
+
+    if (!overlap) {
+      const h = currentStart.getHours().toString().padStart(2, '0');
+      const m = currentStart.getMinutes().toString().padStart(2, '0');
+      return `${h}:${m}`;
+    }
+
+    currentStart.setMinutes(currentStart.getMinutes() + 15);
+  }
+  return null;
+}
+
+/**
  * Generates all dates for a recurring series and validates each one
  * against business hours, holidays and existing appointments.
  */
@@ -54,7 +102,7 @@ export async function validateRecurrenceSeries(
   dayOfWeek: number,      // 0 = Sunday … 6 = Saturday
   seriesStart: Date,
   seriesEnd: Date,
-  frequency: 'weekly' | 'biweekly',
+  frequency: string,
   prisma: PrismaClient
 ): Promise<RecurrenceValidationResult> {
 
@@ -72,47 +120,50 @@ export async function validateRecurrenceSeries(
   const allDates: Date[] = [];
   const cursor = new Date(seriesStart);
 
-  // Advance cursor to the first matching day of week
-  while (cursor.getDay() !== dayOfWeek) {
-    cursor.setDate(cursor.getDate() + 1);
+  const isCustom = frequency.startsWith('custom_');
+  const customDays = isCustom ? parseInt(frequency.split('_')[1] || '20', 10) : 0;
+
+  // Advance cursor to the first matching day of week if not custom
+  if (!isCustom) {
+    while (cursor.getDay() !== dayOfWeek) {
+      cursor.setDate(cursor.getDate() + 1);
+    }
   }
 
-  const stepDays = frequency === 'biweekly' ? 14 : 7;
+  const stepDays = isCustom ? customDays : (frequency === 'biweekly' ? 14 : 7);
   while (cursor <= seriesEnd) {
     allDates.push(new Date(cursor));
     cursor.setDate(cursor.getDate() + stepDays);
   }
 
   // --- Validate each date ---
-  const validDatesList: string[] = [];
+  const validDatesList: { date: string; startTime: string }[] = [];
   const conflicts: RecurrenceConflict[] = [];
 
   const [startH, startM] = startTimeStr.split(':').map(Number);
 
   for (const date of allDates) {
-    const dateStr = date.toISOString().split('T')[0];
-    const dayName = DAY_NAMES_PT[date.getDay()];
-    const dayConfig = businessHours.find((b) => b.day === dayName);
+    let testDate = new Date(date);
+    const originalDateStr = date.toISOString().split('T')[0];
+    let dayConfig: BusinessHour | undefined;
 
-    // Check 1 — Closed day in settings
-    if (!dayConfig || dayConfig.closed) {
-      conflicts.push({ originalDate: dateStr, reason: 'closed_day' });
-      continue;
+    // 1. Find an open day
+    while (true) {
+      const dateStr = testDate.toISOString().split('T')[0];
+      const dayName = DAY_NAMES_PT[testDate.getDay()];
+      dayConfig = businessHours.find((b) => b.day === dayName);
+
+      if (!dayConfig || dayConfig.closed || holidaySet.has(dateStr)) {
+        testDate.setDate(testDate.getDate() + 1);
+      } else {
+        break;
+      }
     }
 
-    // Check 2 — Public holiday
-    if (holidaySet.has(dateStr)) {
-      const holiday = holidays.find((h) => h.date === dateStr);
-      conflicts.push({
-        originalDate: dateStr,
-        reason: 'holiday',
-        holidayName: holiday?.name,
-      });
-      continue;
-    }
+    const finalDateStr = testDate.toISOString().split('T')[0];
 
-    // Check 3 — Overlap with existing appointments
-    const apptStart = new Date(date);
+    // 2. Check original time on the open day
+    const apptStart = new Date(testDate);
     apptStart.setHours(startH, startM, 0, 0);
     const apptEnd = new Date(apptStart.getTime() + durationMin * 60_000);
 
@@ -128,16 +179,23 @@ export async function validateRecurrenceSeries(
       select: { id: true },
     });
 
-    if (overlap) {
-      conflicts.push({
-        originalDate: dateStr,
-        reason: 'overlap',
-        overlappingAppointmentId: overlap.id,
-      });
+    if (!overlap) {
+      validDatesList.push({ date: finalDateStr, startTime: startTimeStr });
       continue;
     }
 
-    validDatesList.push(dateStr);
+    // 3. Time is overlapped, try finding next available slot
+    const freeTimeStr = await findFreeTimeOnDay(testDate, staffId, durationMin, dayConfig!, prisma);
+    
+    if (freeTimeStr) {
+      validDatesList.push({ date: finalDateStr, startTime: freeTimeStr });
+    } else {
+      conflicts.push({
+        originalDate: originalDateStr,
+        reason: 'overlap',
+        overlappingAppointmentId: overlap.id,
+      });
+    }
   }
 
   return {

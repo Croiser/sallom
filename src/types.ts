@@ -125,7 +125,7 @@ export interface RecurrenceValidationResult {
     validDates: number;
     conflictDates: number;
   };
-  validDatesList: string[];
+  validDatesList: { date: string; startTime: string }[];
   conflicts: RecurrenceConflict[];
 }
 

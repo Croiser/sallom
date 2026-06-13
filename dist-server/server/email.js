@@ -10,6 +10,24 @@ const transporter = nodemailer.createTransport({
 });
 const fromEmail = process.env.SMTP_FROM_EMAIL || '"Sallon Pro" <contato@sallon.dodile.com.br>';
 export const emailService = {
+    async sendEmail(options) {
+        if (!process.env.SMTP_USER) {
+            console.log(`[Email Mock] ${options.subject} to ${options.to}`);
+            return;
+        }
+        try {
+            await transporter.sendMail({
+                from: fromEmail,
+                to: options.to,
+                subject: options.subject,
+                html: options.html,
+            });
+            console.log(`Email successfully sent to ${options.to}`);
+        }
+        catch (error) {
+            console.error('Error sending email:', error);
+        }
+    },
     async sendWelcomeEmail(to, name, shopName, tempPassword) {
         if (!process.env.SMTP_USER) {
             console.log(`[Email Mock] Welcome email mock to ${to} (${name})`);

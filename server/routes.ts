@@ -705,7 +705,7 @@ router.get('/whatsapp-settings', authenticateToken, async (req: AuthRequest, res
 
 router.put('/whatsapp-settings', authenticateToken, async (req: AuthRequest, res) => {
   try {
-    const { enabled, templates, apiKey, phoneNumberId, wabaId, provider } = req.body;
+    const { enabled, templates, apiKey, phoneNumberId, wabaId, provider, aiEnabled, aiPrompt, aiProvider } = req.body;
     const uid = req.user?.id as string;
     const settings = await prisma.whatsappSettings.upsert({
       where: { uid },
@@ -717,7 +717,10 @@ router.put('/whatsapp-settings', authenticateToken, async (req: AuthRequest, res
         wabaId,
         wahaInstanceName: uid,
         provider: provider || undefined,
-        status: req.body.status || 'disconnected'
+        status: req.body.status || 'disconnected',
+        aiEnabled: aiEnabled !== undefined ? aiEnabled : undefined,
+        aiPrompt: aiPrompt !== undefined ? aiPrompt : undefined,
+        aiProvider: aiProvider !== undefined ? aiProvider : undefined
       },
       create: {
         uid,
@@ -732,7 +735,10 @@ router.put('/whatsapp-settings', authenticateToken, async (req: AuthRequest, res
         wabaId,
         wahaInstanceName: uid,
         provider: provider || 'waha',
-        status: 'disconnected'
+        status: 'disconnected',
+        aiEnabled: aiEnabled ?? false,
+        aiPrompt: aiPrompt ?? null,
+        aiProvider: aiProvider ?? 'gemini'
       }
     });
 
@@ -931,14 +937,37 @@ router.get('/whatsapp/messages/:chatId', authenticateToken, async (req: AuthRequ
 // WAHA Webhook - Public Endpoint
 router.post('/webhooks/waha', async (req, res) => {
   try {
-    const { event, data } = req.body;
+    const { event, data, session } = req.body;
+    const uid = session; // Owner Uid from the WAHA session
+
     // WAHA event structure varies, usually 'message' or 'message.upsert'
     if (event === 'message' || event === 'message.upsert') {
       const message = data.message || data;
       const text = message.body || message.conversation || message.extendedTextMessage?.text;
       const from = message.from || message.key?.remoteJid;
+      const notifyName = message.notifyName || '';
+      const fromMe = message.fromMe || message.key?.fromMe || false;
 
       if (text && from) {
+        // 1. Salvar a mensagem no banco de dados para o dono do salão ver
+        if (uid) {
+          try {
+            await prisma.whatsappMessage.create({
+              data: {
+                ownerUid: uid,
+                recipientNumber: from.replace('@c.us', ''),
+                recipientName: notifyName,
+                content: text,
+                type: 'text',
+                status: 'received',
+                direction: fromMe ? 'outbound' : 'inbound'
+              }
+            });
+          } catch (dbErr) {
+            console.error('Failed to save incoming message:', dbErr);
+          }
+        }
+
         // Find appointment ID in text: "Olá, ... ID: 123-abc"
         const match = text.match(/ID:\s*([a-f0-9-]+)/i);
         if (match) {
@@ -986,6 +1015,41 @@ router.post('/webhooks/waha', async (req, res) => {
                 description: `WhatsApp WAHA - Voucher enviado: ${appointmentId}`
               }
             });
+          }
+        } else if (!fromMe && uid) {
+          // OPÇÃO B / A: RESPOSTA AUTOMÁTICA OU IA
+          const settings = await prisma.whatsappSettings.findUnique({ where: { uid } });
+          
+          if (settings && settings.enabled) {
+            if (settings.aiEnabled) {
+              // OPÇÃO B: Inteligência Artificial (Chatbot)
+              // Executa de forma assíncrona para não prender o Webhook
+              IntelligenceService.handleIncomingMessage(uid, from, text).catch(console.error);
+            } else {
+              // OPÇÃO A: Resposta Automática Simples
+              const waha = new WAHAService(WAHA_API_URL);
+              const autoReplyText = "Olá! Recebemos sua mensagem. No momento estamos atendendo, mas responderemos em breve!";
+              
+              // Tenta enviar a auto-resposta
+              try {
+                await waha.sendTextMessage(settings.wahaInstanceName || 'default', from, autoReplyText);
+                
+                // Salvar a resposta automática no banco de dados para constar no histórico
+                await prisma.whatsappMessage.create({
+                  data: {
+                    ownerUid: uid,
+                    recipientNumber: from.replace('@c.us', ''),
+                    recipientName: notifyName,
+                    content: autoReplyText,
+                    type: 'text',
+                    status: 'sent',
+                    direction: 'outbound'
+                  }
+                });
+              } catch (err) {
+                console.error('Failed to send auto-reply:', err);
+              }
+            }
           }
         }
       }

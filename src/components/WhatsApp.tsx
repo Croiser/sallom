@@ -17,7 +17,8 @@ import {
   Zap,
   Lock,
   Crown,
-  LifeBuoy
+  LifeBuoy,
+  Bot
 } from 'lucide-react';
 import { whatsappService, WhatsAppSettings } from '../services/whatsappService';
 import { useSubscription } from '../hooks/useSubscription';
@@ -316,6 +317,52 @@ export default function WhatsApp({ onNavigate }: WhatsAppProps) {
                   value={settings?.templates.reminder || ''}
                   onChange={(val) => setSettings(s => s ? ({ ...s, templates: { ...s.templates, reminder: val } }) : null)}
                 />
+              </div>
+
+              {/* Seção de Inteligência Artificial */}
+              <div className="mt-12 pt-8 border-t border-zinc-100">
+                <div className="flex items-center justify-between mb-8">
+                  <div className="flex items-center gap-3">
+                    <div className="w-12 h-12 bg-purple-100 rounded-2xl flex items-center justify-center">
+                      <Bot className="text-purple-600" size={24} />
+                    </div>
+                    <div>
+                      <h3 className="text-lg font-bold text-zinc-900">Assistente de Inteligência Artificial</h3>
+                      <p className="text-sm text-zinc-500">Deixe a IA conversar com os clientes e tirar dúvidas</p>
+                    </div>
+                  </div>
+                  <button
+                    onClick={() => setSettings(s => s ? ({ ...s, aiEnabled: !s.aiEnabled }) : null)}
+                    className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus:outline-none ${
+                      settings?.aiEnabled ? 'bg-purple-500' : 'bg-zinc-200'
+                    }`}
+                  >
+                    <span
+                      className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
+                        settings?.aiEnabled ? 'translate-x-6' : 'translate-x-1'
+                      }`}
+                    />
+                  </button>
+                </div>
+
+                {settings?.aiEnabled && (
+                  <div className="space-y-6 bg-purple-50/50 p-6 rounded-2xl border border-purple-100">
+                    <div>
+                      <label className="block text-sm font-bold text-zinc-900 mb-2">
+                        Instruções para a Inteligência Artificial
+                      </label>
+                      <p className="text-sm text-zinc-500 mb-4">
+                        Escreva como o robô deve se comportar, quais os preços, horário de funcionamento e regras do salão. O robô usará isso para responder aos clientes.
+                      </p>
+                      <textarea
+                        value={settings?.aiPrompt || ''}
+                        onChange={(e) => setSettings(s => s ? ({ ...s, aiPrompt: e.target.value }) : null)}
+                        placeholder="Ex: Você é um assistente da Barbearia XYZ. O corte custa R$ 50, a barba R$ 35..."
+                        className="w-full h-40 p-4 rounded-xl border border-zinc-200 focus:ring-2 focus:ring-purple-500 focus:border-transparent resize-none text-zinc-700 placeholder:text-zinc-400"
+                      />
+                    </div>
+                  </div>
+                )}
               </div>
 
               <div className="mt-10 pt-8 border-t border-zinc-100 flex justify-end">

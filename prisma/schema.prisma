@@ -388,6 +388,9 @@ model WhatsappSettings {
   wahaInstanceName String? @default("default")
   provider       String  @default("waha")
   status         String  @default("disconnected") // connected, disconnected, connecting
+  aiEnabled      Boolean @default(false)
+  aiPrompt       String? @db.Text
+  aiProvider     String? @default("gemini")
   user           User    @relation(fields: [uid], references: [id], onDelete: Cascade)
 
   @@map("whatsapp_settings")

@@ -73,8 +73,8 @@ export default function ConflictResolutionModal({
       // Build the full resolvedDates array:
       // 1. Valid dates from validation (original, no conflict)
       const validDates: ResolvedDate[] = validationResult.validDatesList.map(d => ({
-        date: d,
-        startTime: defaultStartTime
+        date: d.date,
+        startTime: d.startTime
       }));
 
       // 2. Conflict resolutions (adjusted or skipped)

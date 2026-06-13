@@ -633,7 +633,7 @@ router.get('/whatsapp-settings', authenticateToken, async (req, res) => {
 });
 router.put('/whatsapp-settings', authenticateToken, async (req, res) => {
     try {
-        const { enabled, templates, apiKey, phoneNumberId, wabaId, provider } = req.body;
+        const { enabled, templates, apiKey, phoneNumberId, wabaId, provider, aiEnabled, aiPrompt, aiProvider } = req.body;
         const uid = req.user?.id;
         const settings = await prisma.whatsappSettings.upsert({
             where: { uid },
@@ -645,7 +645,10 @@ router.put('/whatsapp-settings', authenticateToken, async (req, res) => {
                 wabaId,
                 wahaInstanceName: uid,
                 provider: provider || undefined,
-                status: req.body.status || 'disconnected'
+                status: req.body.status || 'disconnected',
+                aiEnabled: aiEnabled !== undefined ? aiEnabled : undefined,
+                aiPrompt: aiPrompt !== undefined ? aiPrompt : undefined,
+                aiProvider: aiProvider !== undefined ? aiProvider : undefined
             },
             create: {
                 uid,
@@ -660,7 +663,10 @@ router.put('/whatsapp-settings', authenticateToken, async (req, res) => {
                 wabaId,
                 wahaInstanceName: uid,
                 provider: provider || 'waha',
-                status: 'disconnected'
+                status: 'disconnected',
+                aiEnabled: aiEnabled ?? false,
+                aiPrompt: aiPrompt ?? null,
+                aiProvider: aiProvider ?? 'gemini'
             }
         });
         res.json(settings);
@@ -690,8 +696,10 @@ router.post('/whatsapp/test', authenticateToken, async (req, res) => {
 router.get('/whatsapp/waha/status', authenticateToken, async (req, res) => {
     try {
         const uid = req.user?.id;
+        const settings = await prisma.whatsappSettings.findUnique({ where: { uid } });
+        const sessionName = settings?.wahaInstanceName || 'default';
         const waha = new WAHAService(WAHA_API_URL);
-        const status = await waha.getSessionStatus(uid);
+        const status = await waha.getSessionStatus(sessionName);
         res.json(status);
     }
     catch (err) {
@@ -701,9 +709,11 @@ router.get('/whatsapp/waha/status', authenticateToken, async (req, res) => {
 router.get('/whatsapp/waha/qr', authenticateToken, async (req, res) => {
     try {
         const uid = req.user?.id;
+        const settings = await prisma.whatsappSettings.findUnique({ where: { uid } });
+        const sessionName = settings?.wahaInstanceName || 'default';
         const waha = new WAHAService(WAHA_API_URL);
-        const qr = await waha.getQrCode(uid);
-        console.log('QR Code result:', qr ? 'received' : 'null');
+        const qr = await waha.getQrCode(sessionName);
+        console.log(`QR Code result for session ${sessionName}:`, qr ? 'received' : 'null');
         res.json({ qr });
     }
     catch (err) {
@@ -714,8 +724,10 @@ router.get('/whatsapp/waha/qr', authenticateToken, async (req, res) => {
 router.post('/whatsapp/waha/session/start', authenticateToken, async (req, res) => {
     try {
         const uid = req.user?.id;
+        const settings = await prisma.whatsappSettings.findUnique({ where: { uid } });
+        const sessionName = settings?.wahaInstanceName || 'default';
         const waha = new WAHAService(WAHA_API_URL);
-        await waha.startSession(uid);
+        await waha.startSession(sessionName);
         res.json({ success: true });
     }
     catch (err) {
@@ -729,8 +741,10 @@ router.post('/whatsapp/waha/send', authenticateToken, async (req, res) => {
         if (!chatId || !text) {
             return res.status(400).json({ error: 'chatId and text are required' });
         }
+        const settings = await prisma.whatsappSettings.findUnique({ where: { uid } });
+        const sessionName = session || settings?.wahaInstanceName || 'default';
         const waha = new WAHAService(WAHA_API_URL);
-        const result = await waha.sendTextMessage(session || uid, chatId, text);
+        const result = await waha.sendTextMessage(sessionName, chatId, text);
         res.json({ success: true, data: result });
     }
     catch (err) {
@@ -836,13 +850,35 @@ router.get('/whatsapp/messages/:chatId', authenticateToken, async (req, res) => 
 // WAHA Webhook - Public Endpoint
 router.post('/webhooks/waha', async (req, res) => {
     try {
-        const { event, data } = req.body;
+        const { event, data, session } = req.body;
+        const uid = session; // Owner Uid from the WAHA session
         // WAHA event structure varies, usually 'message' or 'message.upsert'
         if (event === 'message' || event === 'message.upsert') {
             const message = data.message || data;
             const text = message.body || message.conversation || message.extendedTextMessage?.text;
             const from = message.from || message.key?.remoteJid;
+            const notifyName = message.notifyName || '';
+            const fromMe = message.fromMe || message.key?.fromMe || false;
             if (text && from) {
+                // 1. Salvar a mensagem no banco de dados para o dono do salão ver
+                if (uid) {
+                    try {
+                        await prisma.whatsappMessage.create({
+                            data: {
+                                ownerUid: uid,
+                                recipientNumber: from.replace('@c.us', ''),
+                                recipientName: notifyName,
+                                content: text,
+                                type: 'text',
+                                status: 'received',
+                                direction: fromMe ? 'outbound' : 'inbound'
+                            }
+                        });
+                    }
+                    catch (dbErr) {
+                        console.error('Failed to save incoming message:', dbErr);
+                    }
+                }
                 // Find appointment ID in text: "Olá, ... ID: 123-abc"
                 const match = text.match(/ID:\s*([a-f0-9-]+)/i);
                 if (match) {
@@ -884,6 +920,41 @@ router.post('/webhooks/waha', async (req, res) => {
                                 description: `WhatsApp WAHA - Voucher enviado: ${appointmentId}`
                             }
                         });
+                    }
+                }
+                else if (!fromMe && uid) {
+                    // OPÇÃO B / A: RESPOSTA AUTOMÁTICA OU IA
+                    const settings = await prisma.whatsappSettings.findUnique({ where: { uid } });
+                    if (settings && settings.enabled) {
+                        if (settings.aiEnabled) {
+                            // OPÇÃO B: Inteligência Artificial (Chatbot)
+                            // Executa de forma assíncrona para não prender o Webhook
+                            IntelligenceService.handleIncomingMessage(uid, from, text).catch(console.error);
+                        }
+                        else {
+                            // OPÇÃO A: Resposta Automática Simples
+                            const waha = new WAHAService(WAHA_API_URL);
+                            const autoReplyText = "Olá! Recebemos sua mensagem. No momento estamos atendendo, mas responderemos em breve!";
+                            // Tenta enviar a auto-resposta
+                            try {
+                                await waha.sendTextMessage(settings.wahaInstanceName || 'default', from, autoReplyText);
+                                // Salvar a resposta automática no banco de dados para constar no histórico
+                                await prisma.whatsappMessage.create({
+                                    data: {
+                                        ownerUid: uid,
+                                        recipientNumber: from.replace('@c.us', ''),
+                                        recipientName: notifyName,
+                                        content: autoReplyText,
+                                        type: 'text',
+                                        status: 'sent',
+                                        direction: 'outbound'
+                                    }
+                                });
+                            }
+                            catch (err) {
+                                console.error('Failed to send auto-reply:', err);
+                            }
+                        }
                     }
                 }
             }
@@ -1346,6 +1417,47 @@ router.put('/appointments/:id/status', authenticateToken, async (req, res) => {
         res.status(500).json({ error: err.message });
     }
 });
+router.put('/appointments/:id', authenticateToken, async (req, res) => {
+    const { clientId, clientName, phone, serviceId, serviceName, barberId, barberName, staffId, staffName, date, price, isFitIn } = req.body;
+    const ownerUid = req.user?.id;
+    const appointmentId = req.params.id;
+    try {
+        const existingAppointment = await prisma.appointment.findFirst({
+            where: { id: appointmentId, ownerUid }
+        });
+        if (!existingAppointment)
+            return res.status(404).json({ error: 'Appointment not found' });
+        // Validate if the new date/time conflicts (if not fit-in and changed)
+        if (!isFitIn) {
+            const parsedDate = new Date(date);
+            // Basic overlap logic is usually handled in frontend, but could add backend validation here
+        }
+        const updatedAppointment = await prisma.appointment.update({
+            where: { id: appointmentId },
+            data: {
+                clientId, clientName, phone, serviceId, serviceName, barberId, barberName, staffId, staffName, date: new Date(date), price, isFitIn
+            }
+        });
+        // Option: notify via WhatsApp if date/time changed
+        if (new Date(date).getTime() !== existingAppointment.date.getTime()) {
+            const user = await prisma.user.findUnique({ where: { id: ownerUid } });
+            const wahaSettings = await prisma.whatsappSettings.findUnique({ where: { uid: ownerUid } });
+            if (wahaSettings?.enabled && phone) {
+                const { WAHAService } = await import('./waha.js');
+                const waha = new WAHAService(process.env.WAHA_API_URL || 'http://waha:8080');
+                const shopName = user?.shopName || 'nosso salão';
+                const formattedDate = new Date(date).toLocaleDateString('pt-BR');
+                const formattedTime = new Date(date).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
+                const msg = `Olá ${clientName}, seu agendamento no ${shopName} foi atualizado para o dia ${formattedDate} às ${formattedTime}. Se precisar de algo, nos avise!`;
+                waha.sendTextMessage(wahaSettings.wahaInstanceName || ownerUid, phone, msg).catch(e => console.error('Erro ao notificar alteração:', e));
+            }
+        }
+        res.json(updatedAppointment);
+    }
+    catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
 router.delete('/appointments/:id', authenticateToken, async (req, res) => {
     await prisma.appointment.deleteMany({
         where: { id: req.params.id, ownerUid: req.user?.id }
@@ -1721,7 +1833,7 @@ router.get('/superadmin/tenants', authenticateToken, isSuperAdmin, async (req, r
     res.json(users);
 });
 router.put('/superadmin/tenants/:id', authenticateToken, isSuperAdmin, async (req, res) => {
-    const { planId, ...otherData } = req.body;
+    const { planId, subscription, ...otherData } = req.body;
     const userId = req.params.id;
     console.log(`[ADMIN] Update request: User=${userId}, Plan=${planId || 'N/A'}`);
     try {
@@ -1764,6 +1876,28 @@ router.put('/superadmin/tenants/:id', authenticateToken, isSuperAdmin, async (re
                 }
             });
             console.log(`[ADMIN] Updated subscription for ${userId} to ${targetPlanId}`);
+        }
+        // Manual Subscription update from the frontend form
+        if (subscription) {
+            const updatePayload = {};
+            if (subscription.billingCycle)
+                updatePayload.billingCycle = subscription.billingCycle;
+            if (subscription.status)
+                updatePayload.status = subscription.status;
+            if (subscription.currentPeriodEnd) {
+                updatePayload.currentPeriodEnd = new Date(subscription.currentPeriodEnd);
+                updatePayload.endDate = new Date(subscription.currentPeriodEnd);
+            }
+            try {
+                await prisma.subscription.update({
+                    where: { uid: userId },
+                    data: updatePayload
+                });
+                console.log(`[ADMIN] Updated subscription fields for ${userId}`);
+            }
+            catch (e) {
+                console.error(`[ADMIN] Failed to update subscription fields for ${userId} (may not exist)`);
+            }
         }
         console.log(`[ADMIN] Success: Updated user ${userId}`);
         res.json(updatedUser);
@@ -2572,13 +2706,44 @@ router.get('/public/client-portal/:slug/:phone', async (req, res) => {
     }
 });
 // SuperAdmin Routes
+router.get('/superadmin/waha-status', authenticateToken, async (req, res) => {
+    if (req.user?.role !== 'superadmin' && req.user?.email !== 'admin@sallonpromanager.com.br' && req.user?.email !== 'renatadouglas739@gmail.com' && req.user?.email !== 'sallonpromanager@gmail.com') {
+        return res.status(403).json({ error: 'Access denied' });
+    }
+    try {
+        const waha = new WAHAService(process.env.WAHA_API_URL || 'http://waha:3000');
+        // For free version, it's typically the 'default' session
+        const status = await waha.getSessionStatus('default');
+        res.json({ session: 'default', status });
+    }
+    catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
+router.post('/superadmin/waha-disconnect', authenticateToken, async (req, res) => {
+    if (req.user?.role !== 'superadmin' && req.user?.email !== 'admin@sallonpromanager.com.br' && req.user?.email !== 'renatadouglas739@gmail.com' && req.user?.email !== 'sallonpromanager@gmail.com') {
+        return res.status(403).json({ error: 'Access denied' });
+    }
+    try {
+        const waha = new WAHAService(process.env.WAHA_API_URL || 'http://waha:3000');
+        // Force disconnect by calling logout
+        await waha.logout('default');
+        res.json({ success: true, message: 'Sessão WAHA desconectada com sucesso.' });
+    }
+    catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
 router.get('/superadmin/stats', authenticateToken, isSuperAdmin, async (req, res) => {
     try {
-        const totalUsers = await prisma.user.count();
-        const activeSubscriptions = await prisma.subscription.count({ where: { status: 'active' } });
-        // This is a mock for now, in a real app you'd sum up payments
-        const monthlyRevenue = 12450.00;
-        res.json({ totalUsers, activeSubscriptions, monthlyRevenue, churnRate: 2.4 });
+        const totalUsers = await prisma.user.count({ where: { role: 'professional' } });
+        const activeSubscriptions = await prisma.subscription.findMany({
+            where: { status: 'active' },
+            include: { plan: true }
+        });
+        // Calculate MRR
+        const monthlyRevenue = activeSubscriptions.reduce((acc, sub) => acc + (sub.plan?.priceMonthly || 0), 0);
+        res.json({ totalUsers, activeSubscriptions: activeSubscriptions.length, monthlyRevenue, churnRate: 2.4 });
     }
     catch (error) {
         res.status(500).json({ error: 'Failed to fetch stats' });
@@ -2587,7 +2752,8 @@ router.get('/superadmin/stats', authenticateToken, isSuperAdmin, async (req, res
 router.get('/superadmin/tenants', authenticateToken, isSuperAdmin, async (req, res) => {
     try {
         const tenants = await prisma.user.findMany({
-            orderBy: { createdAt: 'desc' }
+            orderBy: { createdAt: 'desc' },
+            include: { subscription: true }
         });
         res.json(tenants);
     }
@@ -2622,10 +2788,91 @@ router.get('/superadmin/tenant-usage/:userId', authenticateToken, isSuperAdmin, 
         const whatsapp = await prisma.whatsappSettings.findUnique({
             where: { uid: userId }
         });
-        res.json({ appointments, staff, wallet, whatsapp });
+        // Get WhatsApp usage
+        const whatsappMessagesCount = await prisma.whatsappMessage.count({
+            where: { ownerUid: userId }
+        });
+        res.json({ appointments, staff, wallet, whatsapp: { ...whatsapp, messagesSent: whatsappMessagesCount } });
     }
     catch (error) {
         res.status(500).json({ error: 'Failed to fetch usage' });
+    }
+});
+router.post('/superadmin/impersonate/:id', authenticateToken, isSuperAdmin, async (req, res) => {
+    try {
+        const userToImpersonate = await prisma.user.findUnique({ where: { id: req.params.id } });
+        if (!userToImpersonate)
+            return res.status(404).json({ error: 'User not found' });
+        const token = jwt.sign({
+            id: userToImpersonate.id,
+            email: userToImpersonate.email,
+            role: userToImpersonate.role,
+            impersonatorId: req.user?.id
+        }, JWT_SECRET, { expiresIn: '1h' });
+        res.json({ token, user: userToImpersonate });
+    }
+    catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
+router.post('/superadmin/broadcast', authenticateToken, isSuperAdmin, async (req, res) => {
+    try {
+        const { subject, message } = req.body;
+        const allUsers = await prisma.user.findMany({ where: { role: 'professional', status: 'active' } });
+        let sentCount = 0;
+        for (const u of allUsers) {
+            if (u.email) {
+                await emailService.sendEmail({
+                    to: u.email,
+                    subject: subject,
+                    html: `<div style="font-family: Arial, sans-serif; padding: 20px;">
+            <h2>Comunicado Oficial - Sallom</h2>
+            <p>${message.replace(/\n/g, '<br/>')}</p>
+            <hr />
+            <p style="font-size: 12px; color: #666;">Equipe Sallom Pro Manager</p>
+          </div>`
+                }).catch(e => console.error('Failed to broadcast to', u.email, e));
+                sentCount++;
+            }
+        }
+        res.json({ success: true, sentCount });
+    }
+    catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
+router.post('/superadmin/tenants/:id/charge', authenticateToken, isSuperAdmin, async (req, res) => {
+    try {
+        const tenantId = req.params.id;
+        const user = await prisma.user.findUnique({ where: { id: tenantId }, include: { subscription: true } });
+        if (!user)
+            return res.status(404).json({ error: 'User not found' });
+        const settings = await prisma.setting.findUnique({ where: { uid: tenantId } });
+        const cpfCnpj = settings?.cnpj || '00000000000';
+        const customerResponse = await asaas.post('/customers', {
+            name: user.name,
+            email: user.email,
+            cpfCnpj: cpfCnpj.replace(/\D/g, '')
+        }).catch(e => e.response?.data);
+        const asaasCustomerId = customerResponse?.id || customerResponse?.errors?.[0]?.description?.split(' ')[1] || 'cus_000005527710';
+        const sub = await prisma.subscription.findUnique({ where: { uid: tenantId }, include: { plan: true } });
+        const value = sub?.plan?.priceMonthly || 49.90;
+        const paymentResponse = await asaas.post('/payments', {
+            customer: asaasCustomerId,
+            billingType: 'PIX',
+            value: value,
+            dueDate: new Date(Date.now() + 3 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
+            description: `Fatura de Assinatura - Sallom Pro Manager`
+        });
+        const pixPayload = await asaas.get(`/payments/${paymentResponse.data.id}/pixQrCode`);
+        res.json({
+            success: true,
+            pixPayload: pixPayload.data.payload,
+            pixUrl: paymentResponse.data.invoiceUrl
+        });
+    }
+    catch (err) {
+        res.status(500).json({ error: err.response?.data || err.message });
     }
 });
 router.post('/superadmin/tenants/:userId/wallet/recharge', authenticateToken, isSuperAdmin, async (req, res) => {

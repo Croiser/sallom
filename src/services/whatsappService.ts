@@ -13,6 +13,9 @@ export interface WhatsAppSettings {
   phoneNumberId?: string;
   wabaId?: string;
   provider?: 'waha' | 'meta';
+  aiEnabled?: boolean;
+  aiPrompt?: string | null;
+  aiProvider?: string;
 }
 
 export const whatsappService = {

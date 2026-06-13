@@ -7,6 +7,7 @@ import { motion, AnimatePresence } from 'motion/react';
 import { Client, Service, Staff, ServiceCombo, RecurrenceValidationResult, ResolvedDate } from '../types';
 import { api } from '../services/api';
 import ConflictResolutionModal from './ConflictResolutionModal';
+import ClientSelect from './ClientSelect';
 
 interface RecurringAppointmentModalProps {
   isOpen: boolean;
@@ -49,7 +50,7 @@ export default function RecurringAppointmentModal({
   const [comboId, setComboId] = useState('');
   const [startTime, setStartTime] = useState('09:00');
   const [dayOfWeek, setDayOfWeek] = useState(2); // Tuesday default
-  const [frequency, setFrequency] = useState<'weekly' | 'biweekly'>('weekly');
+  const [frequency, setFrequency] = useState<string>('weekly');
   const [seriesStartDate, setSeriesStartDate] = useState(() =>
     new Date().toISOString().split('T')[0]
   );
@@ -108,7 +109,7 @@ export default function RecurringAppointmentModal({
       } else {
         // No conflicts — directly save
         await saveWithDates(
-          result.validDatesList.map((d: string) => ({ date: d, startTime }))
+          result.validDatesList.map((d: any) => ({ date: d.date, startTime: d.startTime }))
         );
       }
     } catch (err: any) {
@@ -195,23 +196,17 @@ export default function RecurringAppointmentModal({
 
               {/* Body */}
               <div className="flex-1 overflow-y-auto p-6 space-y-6">
-                {/* Client */}
                 <div className="space-y-2">
                   <label className="text-sm font-semibold text-zinc-700 flex items-center gap-2">
                     <User size={14} className="text-zinc-400" />
                     Cliente *
                   </label>
-                  <select
-                    id="recurring-client"
-                    value={clientId}
-                    onChange={e => setClientId(e.target.value)}
-                    className="w-full bg-zinc-50 border border-zinc-200 px-4 py-3 rounded-xl focus:outline-none focus:ring-2 focus:ring-rose-500/20 focus:border-rose-500 text-sm"
-                  >
-                    <option value="">Selecione um cliente</option>
-                    {clients.map(c => (
-                      <option key={c.id} value={c.id}>{c.name}</option>
-                    ))}
-                  </select>
+                  <ClientSelect 
+                    clients={clients} 
+                    value={clientId} 
+                    onChange={setClientId} 
+                    error={!clientId}
+                  />
                 </div>
 
                 {/* Staff */}
@@ -334,31 +329,50 @@ export default function RecurringAppointmentModal({
                   </label>
 
                   <div className="grid grid-cols-2 gap-3">
-                    <div className="space-y-1">
-                      <label className="text-xs text-zinc-400 font-medium">Dia da semana</label>
-                      <select
-                        id="recurring-day"
-                        value={dayOfWeek}
-                        onChange={e => setDayOfWeek(Number(e.target.value))}
-                        className="w-full bg-zinc-50 border border-zinc-200 px-3 py-2.5 rounded-xl focus:outline-none focus:ring-2 focus:ring-rose-500/20 focus:border-rose-500 text-sm"
-                      >
-                        {DAYS_PT.map(d => (
-                          <option key={d.value} value={d.value}>{d.label}</option>
-                        ))}
-                      </select>
-                    </div>
-                    <div className="space-y-1">
+                    {!frequency.startsWith('custom_') && (
+                      <div className="space-y-1">
+                        <label className="text-xs text-zinc-400 font-medium">Dia da semana</label>
+                        <select
+                          id="recurring-day"
+                          value={dayOfWeek}
+                          onChange={e => setDayOfWeek(Number(e.target.value))}
+                          className="w-full bg-zinc-50 border border-zinc-200 px-3 py-2.5 rounded-xl focus:outline-none focus:ring-2 focus:ring-rose-500/20 focus:border-rose-500 text-sm"
+                        >
+                          {DAYS_PT.map(d => (
+                            <option key={d.value} value={d.value}>{d.label}</option>
+                          ))}
+                        </select>
+                      </div>
+                    )}
+                    <div className={`space-y-1 ${frequency.startsWith('custom_') ? 'col-span-2' : ''}`}>
                       <label className="text-xs text-zinc-400 font-medium">Frequência</label>
                       <select
-                        value={frequency}
-                        onChange={e => setFrequency(e.target.value as 'weekly' | 'biweekly')}
+                        value={frequency.startsWith('custom_') ? 'custom' : frequency}
+                        onChange={e => {
+                          if (e.target.value === 'custom') setFrequency('custom_20');
+                          else setFrequency(e.target.value);
+                        }}
                         className="w-full bg-zinc-50 border border-zinc-200 px-3 py-2.5 rounded-xl focus:outline-none focus:ring-2 focus:ring-rose-500/20 focus:border-rose-500 text-sm"
                       >
                         <option value="weekly">Semanal</option>
                         <option value="biweekly">Quinzenal</option>
+                        <option value="custom">Personalizado (Dias)</option>
                       </select>
                     </div>
                   </div>
+
+                  {frequency.startsWith('custom_') && (
+                    <div className="space-y-1">
+                      <label className="text-xs text-zinc-400 font-medium">Intervalo (em dias)</label>
+                      <input
+                        type="number"
+                        min="1"
+                        value={frequency.split('_')[1] || 20}
+                        onChange={e => setFrequency(`custom_${e.target.value}`)}
+                        className="w-full bg-zinc-50 border border-zinc-200 px-4 py-2.5 rounded-xl focus:outline-none focus:ring-2 focus:ring-rose-500/20 focus:border-rose-500 text-sm"
+                      />
+                    </div>
+                  )}
 
                   <div className="space-y-1">
                     <label className="text-xs text-zinc-400 font-medium">Horário do agendamento</label>

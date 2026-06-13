@@ -25,6 +25,7 @@ import { whatsappService } from '../services/whatsappService';
 import { useAuth } from '../contexts/AuthContext';
 import { api } from '../services/api';
 import RecurringAppointmentModal from './RecurringAppointmentModal';
+import ClientSelect from './ClientSelect';
 
 export default function Appointments() {
   const { user } = useAuth();
@@ -491,10 +492,12 @@ export default function Appointments() {
             <form onSubmit={handleCreate} className="p-6 space-y-4">
               <div className="space-y-2">
                 <label className="text-sm font-medium text-zinc-700">Cliente</label>
-                <select required value={selectedClient} onChange={(e) => setSelectedClient(e.target.value)} className="w-full bg-zinc-50 border border-zinc-200 px-4 py-3 rounded-xl focus:outline-none focus:ring-2 focus:ring-brand-500/20 focus:border-brand-500 text-zinc-900 font-medium">
-                  <option value="">Selecione o cliente</option>
-                  {clients.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
-                </select>
+                <ClientSelect 
+                  clients={clients} 
+                  value={selectedClient} 
+                  onChange={setSelectedClient} 
+                  error={!selectedClient}
+                />
               </div>
 
               <div className="space-y-2">
@@ -549,10 +552,12 @@ export default function Appointments() {
             <form onSubmit={handleUpdate} className="p-6 space-y-4">
               <div className="space-y-2">
                 <label className="text-sm font-medium text-zinc-700">Cliente</label>
-                <select required value={selectedClient} onChange={(e) => setSelectedClient(e.target.value)} className="w-full bg-zinc-50 border border-zinc-200 px-4 py-3 rounded-xl focus:outline-none focus:ring-2 focus:ring-brand-500/20 focus:border-brand-500 text-zinc-900 font-medium">
-                  <option value="">Selecione o cliente</option>
-                  {clients.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
-                </select>
+                <ClientSelect 
+                  clients={clients} 
+                  value={selectedClient} 
+                  onChange={setSelectedClient}
+                  error={!selectedClient}
+                />
               </div>
 
               <div className="space-y-2">

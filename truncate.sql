@@ -1,0 +1,2 @@
+TRUNCATE TABLE "appointments" CASCADE;
+TRUNCATE TABLE "RecurrenceGroup" CASCADE;

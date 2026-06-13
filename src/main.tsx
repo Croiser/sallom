@@ -4,6 +4,9 @@ import {createRoot} from 'react-dom/client';
 import App from './App';
 import './index.css';
 import { AuthProvider } from './contexts/AuthContext';
+import { registerSW } from 'virtual:pwa-register';
+
+registerSW({ immediate: true });
 
 Sentry.init({
   dsn: (import.meta as any).env.VITE_SENTRY_DSN || "",

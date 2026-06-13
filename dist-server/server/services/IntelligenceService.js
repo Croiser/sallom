@@ -89,4 +89,76 @@ export class IntelligenceService {
             reason: 'Produto mais vendido no salão'
         }));
     }
+    /**
+     * Processa mensagens recebidas pelo WhatsApp usando Inteligência Artificial
+     */
+    static async handleIncomingMessage(uid, from, text) {
+        try {
+            // 1. Obter configurações de IA do salão e os dados do usuário (dono) para pegar o slug (link)
+            const settings = await prisma.whatsappSettings.findUnique({
+                where: { uid },
+                include: { user: true } // Pegar o slug do salão
+            });
+            if (!settings || !settings.aiEnabled || !settings.enabled)
+                return;
+            // 2. Obter histórico recente da conversa (últimas 5 mensagens)
+            const recentMessages = await prisma.whatsappMessage.findMany({
+                where: { ownerUid: uid, recipientNumber: from },
+                orderBy: { createdAt: 'desc' },
+                take: 5
+            });
+            recentMessages.reverse(); // Ordem cronológica
+            let chatHistory = recentMessages.map(m => `${m.direction === 'inbound' ? 'Cliente' : 'Você'}: ${m.content}`).join('\n');
+            // 3. Montar o prompt
+            const systemPrompt = settings.aiPrompt || 'Você é um assistente virtual amigável para um salão de beleza. Seja cordial e tente ajudar o cliente a agendar um horário ou tirar dúvidas.';
+            // Montar o link real de agendamento do salão
+            const baseUrl = process.env.VITE_APP_URL || 'http://localhost:5173';
+            const shopSlug = settings.user.slug || '';
+            const bookingLink = `${baseUrl}/${shopSlug}`;
+            const fullPrompt = `Instruções do Salão:\n${systemPrompt}\n\nREGRA ABSOLUTA OBRIGATÓRIA: Se o cliente quiser agendar ou pedir o link, entregue EXATAMENTE este link real de agendamento: ${bookingLink}\nNUNCA invente links falsos ou use [link]. Use APENAS a URL informada acima.\n\nHistórico Recente:\n${chatHistory}\n\nCliente (nova mensagem): ${text}\nVocê (assistente):`;
+            let aiResponseText = '';
+            // 4. Chamar a API da IA escolhida (ex: Google Gemini)
+            // Estamos usando o provider 'gemini' por padrão. Se houver integração com openAI configurada, podemos usar.
+            if (settings.aiProvider === 'gemini') {
+                const { GoogleGenAI } = await import("@google/genai");
+                // Requer GEMINI_API_KEY no .env
+                if (!process.env.GEMINI_API_KEY) {
+                    console.error('[IntelligenceService] GEMINI_API_KEY não configurada.');
+                    return;
+                }
+                const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
+                const response = await ai.models.generateContent({
+                    model: 'gemini-2.5-flash',
+                    contents: fullPrompt,
+                });
+                aiResponseText = response.text || '';
+            }
+            else {
+                // Fallback or OpenAI implementation
+                aiResponseText = "Desculpe, a integração com esta IA ainda não está disponível.";
+            }
+            aiResponseText = aiResponseText.trim();
+            if (!aiResponseText)
+                return;
+            // 5. Enviar a resposta gerada de volta ao cliente via WAHA
+            const { WAHAService } = await import('../waha.js');
+            const waha = new WAHAService(process.env.WAHA_API_URL || 'http://localhost:3000');
+            const fullFrom = from.includes('@c.us') ? from : `${from}@c.us`;
+            await waha.sendTextMessage(settings.wahaInstanceName || 'default', fullFrom, aiResponseText);
+            // 6. Salvar a resposta no histórico de conversas
+            await prisma.whatsappMessage.create({
+                data: {
+                    ownerUid: uid,
+                    recipientNumber: from,
+                    content: aiResponseText,
+                    type: 'text',
+                    status: 'sent',
+                    direction: 'outbound'
+                }
+            });
+        }
+        catch (err) {
+            console.error('[IntelligenceService] Erro ao processar mensagem com IA:', err);
+        }
+    }
 }

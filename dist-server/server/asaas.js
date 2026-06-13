@@ -20,6 +20,15 @@ async function asaasFetch(endpoint, options = {}) {
     return data;
 }
 export const asaas = {
+    async get(endpoint) {
+        return asaasFetch(endpoint, { method: 'GET' });
+    },
+    async post(endpoint, data) {
+        return asaasFetch(endpoint, {
+            method: 'POST',
+            body: JSON.stringify(data),
+        });
+    },
     async getOrCreateCustomer(name, cpfCnpj, email, phone) {
         // Search for existing customer in Asaas by CPF/CNPJ
         const search = await asaasFetch(`/customers?cpfCnpj=${cpfCnpj.replace(/\D/g, '')}`);
