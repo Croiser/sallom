@@ -28,7 +28,7 @@ services:
     ports:
       - "3005:3000"
     environment:
-      DATABASE_URL: "postgresql://sallonpromanager_user:sallonpromanager_password@db:5432/sallonpromanager_db?schema=public"
+      DATABASE_URL: "postgresql://salonuser:salonpassword@db:5432/salondb?schema=public"
       JWT_SECRET: "sua_chave_secreta_aqui"
       WAHA_API_URL: "http://waha:8080"
       WAHA_API_KEY: "waha_secret_key_2024"
